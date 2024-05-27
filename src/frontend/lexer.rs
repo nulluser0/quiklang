@@ -126,6 +126,9 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
             ';' => tokens.push(Token::Symbol(Symbol::Semicolon)),
             ':' => tokens.push(Token::Symbol(Symbol::Colon)),
             '!' => {
+                if src.is_empty() {
+                    break
+                }
                 if let Some(&'=') = src.get(1) {
                     tokens.push(Token::Operator(Operator::NotEqual));
                     drain_char = false;
@@ -137,6 +140,9 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
             '.' => tokens.push(Token::Symbol(Symbol::Dot)),
             // Operators:
             '=' => {
+                if src.is_empty() {
+                    break
+                }
                 if let Some(&'=') = src.get(1) {
                     tokens.push(Token::Operator(Operator::Equal));
                     drain_char = false;
@@ -147,6 +153,9 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
             }
             '+' => tokens.push(Token::Operator(Operator::Add)),
             '-' => {
+                if src.is_empty() {
+                    break
+                }
                 if let Some(&'>') = src.get(1) {
                     tokens.push(Token::Symbol(Symbol::Arrow));
                     drain_char = false;
@@ -156,25 +165,10 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
                 }
             }
             '*' => tokens.push(Token::Operator(Operator::Multiply)),
-            '/' => {
-                if let Some(&'/') = src.get(1) {
-                    // It is a comment. Ignore all characters until new line.
-                    src.drain(0..2);
-                    while !src.is_empty() {
-                        if let Some(&commented_character) = src.first() {
-                            if commented_character == '\n' {
-                            break;
-                            }
-                            src.drain(0..1); // Remove the processed character
-                        }
-                        
-                    }
-                    drain_char = false;
-                } else {
-                    tokens.push(Token::Operator(Operator::Divide));
-                }
-            }
             '>' => {
+                if src.is_empty() {
+                    break
+                }
                 if let Some(&'>') = src.get(1) {
                     tokens.push(Token::Operator(Operator::GreaterThan));
                     drain_char = false;
@@ -188,6 +182,9 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
                 }
             }
             '<' => {
+                if src.is_empty() {
+                    break
+                }
                 if let Some(&'<') = src.get(1) {
                     tokens.push(Token::Operator(Operator::LessThan));
                     drain_char = false;
@@ -201,6 +198,9 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
                 }
             }
             '&' => {
+                if src.is_empty() {
+                    break
+                }
                 if let Some(&'&') = src.get(1) {
                     tokens.push(Token::Operator(Operator::And));
                     drain_char = false;
@@ -210,6 +210,9 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
                 }
             }
             '|' => {
+                if src.is_empty() {
+                    break
+                }
                 if let Some(&'|') = src.get(1) {
                     tokens.push(Token::Operator(Operator::Or));
                     drain_char = false;
@@ -276,10 +279,27 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
                             }
                         }
                     }
-                    if !src.is_empty() {
+                    if src.is_empty() {
                         drain_char = false;
                     }
                     tokens.push(Token::StringLiteral(string_literal));
+                } else if character == '/' {
+                    if let Some(&'/') = src.get(1) {
+                        // It is a comment. Ignore all characters until new line.
+                        src.drain(0..2);
+                        while !src.is_empty() {
+                            if let Some(&commented_character) = src.first() {
+                                if commented_character == '\n' {
+                                    break;
+                                } else {
+                                    src.drain(0..1); // Remove the processed character
+                                }
+                            }
+                        }
+                        drain_char = false;
+                    } else {
+                        tokens.push(Token::Operator(Operator::Divide));
+                    }
                 } else if !is_skippable(character) {
                     error_unknown_char(character);
                 }
