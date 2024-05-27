@@ -158,11 +158,14 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
                 if let Some(&'/') = src.get(1) {
                     // It is a comment. Ignore all characters until new line.
                     src.drain(0..2);
-                    while let Some(&commented_character) = src.first() {
-                        if commented_character == '\n' {
+                    while !src.is_empty() {
+                        if let Some(&commented_character) = src.first() {
+                            if commented_character == '\n' {
                             break;
+                            }
+                            src.drain(0..1); // Remove the processed character
                         }
-                        src.drain(0..1); // Remove the processed character
+                        
                     }
                     drain_char = false;
                 } else {
@@ -219,30 +222,34 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
                 // Numeric literal
                 if character.is_ascii_digit() {
                     let mut num: i64 = 0;
-                    while let Some(&number) = src.first() {
-                        if number.is_ascii_digit() {
-                            // Convert the char digit to its numeric value
-                            let digit_value = number.to_digit(10).unwrap() as i64;
-                            num = num * 10 + digit_value;
-                            src.drain(0..1); // Remove the processed character
-                        } else {
-                            drain_char = false;
-                            break; // Break the loop if the character is not a numeric digit
+                    while !src.is_empty() {
+                        if let Some(&number) = src.first() {
+                            if number.is_ascii_digit() {
+                                // Convert the char digit to its numeric value
+                                let digit_value = number.to_digit(10).unwrap() as i64;
+                                num = num * 10 + digit_value;
+                                src.drain(0..1); // Remove the processed character
+                            } else {
+                                break; // Break the loop if the character is not a numeric digit
+                            }
                         }
                     }
+                    drain_char = false;
                     tokens.push(Token::IntegerLiteral(num))
                 // Identifier, or keyword
                 } else if character.is_ascii_alphabetic() || character == '_' {
                     let mut word = String::new();
-                    while let Some(&alpha) = src.first() {
-                        if alpha.is_ascii_alphanumeric() || alpha == '_' {
-                            word.push(alpha);
-                            src.drain(0..1);
-                        } else {
-                            drain_char = false;
-                            break;
+                    while !src.is_empty() {
+                        if let Some(&alpha) = src.first() {
+                            if alpha.is_ascii_alphanumeric() || alpha == '_' {
+                                word.push(alpha);
+                                src.drain(0..1);
+                            } else {
+                                break;
+                            }
                         }
                     }
+                    drain_char = false;
                     // Before pushing word, ensure check for reserved keywords.
                     match Keyword::from_str(&word) {
                         Ok(keyword) => tokens.push(Token::Keyword(keyword)),
@@ -253,18 +260,22 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
                     // Handle string literals
                     let mut string_literal = String::new();
                     src.drain(0..1); // Remove the opening quote
-                    while let Some(&c) = src.first() {
-                        if c == '"' {
-                            // Drain the '"' char
-                            break;
-                        } else if c == '\\' && Some(&'"') == src.get(1) {
-                            src.drain(0..1);
-                            string_literal.push(c);
-                            src.drain(0..1);
-                        } else {
-                            string_literal.push(c);
-                            src.drain(0..1);
+                    while !src.is_empty() {
+                        if let Some(&c) = src.first() {
+                            if c == '"' {
+                                break;
+                            } else if c == '\\' && Some(&'"') == src.get(1) {
+                                src.drain(0..1);
+                                string_literal.push(c);
+                                src.drain(0..1);
+                            } else {
+                                string_literal.push(c);
+                                src.drain(0..1);
+                            }
                         }
+                    }
+                    if !src.is_empty() {
+                        drain_char = false;
                     }
                     tokens.push(Token::StringLiteral(string_literal));
                 } else if !is_skippable(character) {
