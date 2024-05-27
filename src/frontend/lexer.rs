@@ -111,7 +111,6 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
 
     while !src.is_empty() {
         let character = src[0];
-        println!("Pointer: {:#?}", character);
         let mut drain_char = true;
         match character {
             // Symbols:
