@@ -79,6 +79,7 @@ pub enum Operator {
     And,         // &&
     Or,          // ||
     Pipe,        // >
+    Modulus,     // %
 }
 
 // Symbols/Delimiters
@@ -221,6 +222,7 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
                     tokens.push(Token::Symbol(Symbol::DataBracket));
                 }
             }
+            '%' => tokens.push(Token::Operator(Operator::Modulus)),
 
             // Multicharacter tokens:
             _ => {

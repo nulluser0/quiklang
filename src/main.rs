@@ -1,31 +1,40 @@
-use std::{fs, io::Read, process};
+use std::{io::{self, Write}, process};
 
-use crate::frontend::lexer::tokenize;
+use crate::frontend::parser;
 
-mod frontend;
+pub mod frontend;
 
 fn main() {
-    println!("Hello, world!");
+    // Simple implementation for command system. Later, I can port the command system from my other projects...
+    let args: Vec<String> = std::env::args().collect();
 
-    let mut source = match fs::File::open("./code.quik") {
-        Ok(result) => result,
-        Err(err) => {
-            println!("No ./code.quik file found. Err: {}. Exiting...", err);
-            process::exit(2);
+    if args.len() == 2 && args[1] == "repl" {
+        repl();
+    } else {
+        println!("Usage: quiklang <command>");
+        println!("Commands:");
+        println!("  repl - Start the QuikLang REPL");
+    }
+}
+
+fn repl() {
+    println!("QuikLang REPL v{}", env!("CARGO_PKG_VERSION"));
+
+    loop {
+        let mut parser = parser::Parser::new();
+        print!("quiklang> ");
+        io::stdout().flush().expect("Failed to flush stdout");
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).expect("Failed to read line");
+
+        // Exit if user enters "exit" or "quit"
+        if input.trim() == "exit" || input.trim() == "quit" {
+            println!("Exiting QuikLang REPL.");
+            process::exit(1);
         }
-    };
-    let mut contents = String::new();
-    match source.read_to_string(&mut contents) {
-        Ok(result) => result,
-        Err(err) => {
-            println!("Cannot read ./code.quik as String. Err: {}. Exiting...", err);
-            process::exit(3);
-        }
-    };
 
-    let result = tokenize(contents);
-
-    println!("{:#?}", result);
-
-
+        let program = parser.produce_ast(input);
+        println!("{:#?}", program);
+    }
 }

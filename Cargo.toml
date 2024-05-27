@@ -4,3 +4,16 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+criterion = "0.5.1"
+
+[lib]
+name = "quiklang"
+path = "src/main.rs"
+
+[[bench]]
+name = "tokenize"
+harness = false
+
+[[bench]]
+name = "tokenize_large"
+harness = false
