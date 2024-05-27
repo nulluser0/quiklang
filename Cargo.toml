@@ -8,7 +8,11 @@ criterion = "0.5.1"
 
 [lib]
 name = "quiklang"
-path = "src/main.rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "quiklang_bin"
+path = "src/bin/main.rs"
 
 [[bench]]
 name = "tokenize"

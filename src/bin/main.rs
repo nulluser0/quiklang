@@ -1,8 +1,6 @@
 use std::{io::{self, Write}, process};
 
-use crate::frontend::parser;
-
-pub mod frontend;
+use quiklang::frontend::parser;
 
 fn main() {
     // Simple implementation for command system. Later, I can port the command system from my other projects...
