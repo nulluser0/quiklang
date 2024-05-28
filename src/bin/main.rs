@@ -1,6 +1,6 @@
 use std::{io::{self, Write}, process};
 
-use quiklang::frontend::parser;
+use quiklang::{backend::{environment::Environment, interpreter::evaluate, values::{NumberVal, NullVal, BoolVal, Val}}, frontend::parser, mk_bool, mk_null, mk_number};
 
 fn main() {
     // Simple implementation for command system. Later, I can port the command system from my other projects...
@@ -32,7 +32,25 @@ fn repl() {
             process::exit(1);
         }
 
-        let program = parser.produce_ast(input);
-        println!("{:#?}", program);
+        match parser.produce_ast(input) {
+            Ok(program) => {
+                // println!("{:#?}", program);
+
+                let mut env = Environment::new();
+                env.declare_var("x", mk_number!(100.0));
+
+                env.declare_var("null", mk_null!());
+                env.declare_var("true", mk_bool!(true));
+                env.declare_var("false", mk_bool!(false));
+
+                for stmt in program.statements {
+                    let result = evaluate(stmt, &mut env);
+                    println!("{:?}", result);
+                }
+            }
+            Err(e) => {
+                println!("Error: {:?}", e);
+            }
+        }
     }
 }

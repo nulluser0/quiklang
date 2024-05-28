@@ -5,11 +5,11 @@ use super::lexer::Operator;
 // Program struct
 #[derive(Debug)]
 pub struct Program {
-    pub statements: Vec<Expr>, // SHOULD BE STMT!!!
+    pub statements: Vec<Stmt>, // SHOULD BE STMT!!!
 }
 
 impl Program {
-    pub fn new(statements: Vec<Expr>) -> Self {
+    pub fn new(statements: Vec<Stmt>) -> Self {
         Program { statements }
     }
 }

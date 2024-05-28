@@ -38,9 +38,7 @@ impl Parser {
 
     fn parse_stmt(&mut self) -> Stmt {
         // For now, skip to parse_expr
-        self.parse_expr();
-
-        todo!()
+        Stmt::ExprStmt(self.parse_expr())
     }
 
     fn parse_expr(&mut self) -> Expr {
@@ -127,15 +125,15 @@ impl Parser {
 
     } 
 
-    pub fn produce_ast(&mut self, source_code: String) -> Program {
+    pub fn produce_ast(&mut self, source_code: String) -> Result<Program, String> {
         self.tokens = tokenize(source_code);
         let mut program = Program::new(Vec::new());
 
         while self.not_eof() {
-            program.statements.push(self.parse_expr()) // SHOULD BE PARSE_STMT!!!
+            program.statements.push(self.parse_stmt()) // SHOULD BE PARSE_STMT!!!
         }
     
-        program
+        Ok(program)
     }
     
 }
