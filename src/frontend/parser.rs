@@ -37,8 +37,9 @@ impl Parser {
     }
 
     fn parse_stmt(&mut self) -> Stmt {
-        // For now, skip to parse_expr
-        Stmt::ExprStmt(self.parse_expr())
+        match self.at() {
+            _ => Stmt::ExprStmt(self.parse_expr()),
+        }
     }
 
     fn parse_expr(&mut self) -> Expr {
