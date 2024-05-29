@@ -13,6 +13,12 @@ pub struct Parser {
     tokens: Vec<Token>,
 }
 
+impl Default for Parser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Parser {
     pub fn new() -> Self {
         Parser { tokens: Vec::new() }
@@ -27,7 +33,7 @@ impl Parser {
     }
 
     fn eat(&mut self) -> Token {
-        return self.tokens.remove(0) as Token;
+        self.tokens.remove(0) as Token
     }
 
     fn expect(&mut self, token: Token, err: &str) -> Token {
@@ -116,9 +122,9 @@ impl Parser {
         let tk = self.eat();
         match tk {
             // Token::Keyword(_) => todo!(),
-            Token::Identifier(name) => return Expr::Identifier(name.to_string()) as Expr,
+            Token::Identifier(name) => Expr::Identifier(name.to_string()) as Expr,
             Token::IntegerLiteral(integer) => {
-                return Expr::Literal(Literal::Integer(integer)) as Expr
+                Expr::Literal(Literal::Integer(integer)) as Expr
             }
             // Token::StringLiteral(_) => todo!(),
             // Token::Operator(_) => todo!(),

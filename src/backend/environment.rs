@@ -13,6 +13,12 @@ pub struct Environment {
     parent: Option<Rc<RefCell<Environment>>>,
 }
 
+impl Default for Environment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Environment {
     pub fn new() -> Self {
         Environment {
@@ -35,7 +41,7 @@ impl Environment {
                 if let Some(ref parent) = self.parent {
                     parent.borrow().resolve(name)
                 } else {
-                    return Err(());
+                    Err(())
                 }
             }
         }
@@ -51,7 +57,7 @@ impl Environment {
     }
 
     pub fn assign_var(&mut self, name: &str, value: Val) -> Val {
-        let mut env = match self.resolve(&name) {
+        let mut env = match self.resolve(name) {
             Ok(result) => result,
             Err(_) => {
                 println!("Cannot resolve {} as it does not exist.", name);
@@ -63,7 +69,7 @@ impl Environment {
     }
 
     pub fn lookup_var(&mut self, name: &str) -> Val {
-        let env = match self.resolve(&name) {
+        let env = match self.resolve(name) {
             Ok(result) => result,
             Err(_) => {
                 println!("Cannot resolve {} as it does not exist.", name);

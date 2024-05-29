@@ -27,8 +27,8 @@ fn evaluate_expr(expr: Expr, env: &mut Environment) -> Val {
 }
 
 fn evaluate_identifier(identifier: String, env: &mut Environment) -> Val {
-    let val = env.lookup_var(&identifier);
-    val
+    
+    env.lookup_var(&identifier)
 }
 
 fn evaluate_literal(literal: Literal) -> Val {
