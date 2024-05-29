@@ -4,10 +4,13 @@ use std::process;
 
 use crate::frontend::ast::{BinaryOp, Program};
 
-use super::{ast::{Expr, Literal, Stmt}, lexer::{tokenize, Operator, Symbol, Token}};
+use super::{
+    ast::{Expr, Literal, Stmt},
+    lexer::{tokenize, Operator, Symbol, Token},
+};
 
 pub struct Parser {
-    tokens: Vec<Token>
+    tokens: Vec<Token>,
 }
 
 impl Parser {
@@ -24,7 +27,7 @@ impl Parser {
     }
 
     fn eat(&mut self) -> Token {
-        return self.tokens.remove(0) as Token
+        return self.tokens.remove(0) as Token;
     }
 
     fn expect(&mut self, token: Token, err: &str) -> Token {
@@ -49,14 +52,17 @@ impl Parser {
     fn parse_additive_expr(&mut self) -> Expr {
         let mut left = self.parse_multiplicative_expr();
 
-        while matches!(self.at(), Token::Operator(Operator::Add) | Token::Operator(Operator::Subtract)) {
+        while matches!(
+            self.at(),
+            Token::Operator(Operator::Add) | Token::Operator(Operator::Subtract)
+        ) {
             let operator_astoken = self.eat();
             let operator: BinaryOp = match operator_astoken {
                 Token::Operator(op) => op.into(),
                 _ => {
                     println!("Token is not an operator! {:#?}", operator_astoken);
                     process::exit(1);
-                },
+                }
             };
             let right = self.parse_multiplicative_expr();
             left = Expr::BinaryOp {
@@ -71,14 +77,19 @@ impl Parser {
     fn parse_multiplicative_expr(&mut self) -> Expr {
         let mut left = self.parse_primary_expr();
 
-        while matches!(self.at(), Token::Operator(Operator::Multiply) | Token::Operator(Operator::Divide) | Token::Operator(Operator::Modulus)) {
+        while matches!(
+            self.at(),
+            Token::Operator(Operator::Multiply)
+                | Token::Operator(Operator::Divide)
+                | Token::Operator(Operator::Modulus)
+        ) {
             let operator_astoken = self.eat();
             let operator: BinaryOp = match operator_astoken {
                 Token::Operator(op) => op.into(),
                 _ => {
                     println!("Token is not an operator! {:#?}", operator_astoken);
                     process::exit(1);
-                },
+                }
             };
             let right = self.parse_primary_expr();
             left = Expr::BinaryOp {
@@ -106,7 +117,9 @@ impl Parser {
         match tk {
             // Token::Keyword(_) => todo!(),
             Token::Identifier(name) => return Expr::Identifier(name.to_string()) as Expr,
-            Token::IntegerLiteral(integer) => return Expr::Literal(Literal::Integer(integer)) as Expr,
+            Token::IntegerLiteral(integer) => {
+                return Expr::Literal(Literal::Integer(integer)) as Expr
+            }
             // Token::StringLiteral(_) => todo!(),
             // Token::Operator(_) => todo!(),
             Token::Symbol(Symbol::LeftParen) => {
@@ -116,15 +129,14 @@ impl Parser {
                     "Unexpected token found inside parenthesised expression. Expected closing parenthesis."
                 ); // rightParen
                 value
-            },
+            }
             // Token::EOF => todo!(),
             _ => {
                 println!("Unexpected token found during parsing! {:#?}", tk);
                 process::exit(1);
-            },
+            }
         }
-
-    } 
+    }
 
     pub fn produce_ast(&mut self, source_code: String) -> Result<Program, String> {
         self.tokens = tokenize(source_code);
@@ -133,8 +145,7 @@ impl Parser {
         while self.not_eof() {
             program.statements.push(self.parse_stmt()) // SHOULD BE PARSE_STMT!!!
         }
-    
+
         Ok(program)
     }
-    
 }

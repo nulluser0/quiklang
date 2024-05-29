@@ -31,7 +31,7 @@ impl RuntimeVal for NumberVal {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BoolVal {
-    pub value: bool, 
+    pub value: bool,
 }
 
 impl RuntimeVal for BoolVal {

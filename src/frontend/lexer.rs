@@ -27,17 +27,17 @@ pub enum Token {
 // Keywords
 #[derive(Debug, PartialEq)]
 pub enum Keyword {
-    Import,     // import
-    Fn,         // fn
-    Let,        // let
-    Mut,        // mut
-    Return,     // return
-    If,         // if
-    Else,       // else
-    Err,        // Err
-    Ok,         // Ok
-    Exit,       // exit
-    Break,      // break
+    Import, // import
+    Fn,     // fn
+    Let,    // let
+    Mut,    // mut
+    Return, // return
+    If,     // if
+    Else,   // else
+    Err,    // Err
+    Ok,     // Ok
+    Exit,   // exit
+    Break,  // break
 }
 
 impl FromStr for Keyword {
@@ -64,39 +64,39 @@ impl FromStr for Keyword {
 // Operators
 #[derive(Debug, PartialEq)]
 pub enum Operator {
-    Assign,      // =
-    Add,         // +
-    Subtract,    // -
-    Multiply,    // *
-    Divide,      // /
-    GreaterThan, // >>
-    LessThan,    // <<
+    Assign,         // =
+    Add,            // +
+    Subtract,       // -
+    Multiply,       // *
+    Divide,         // /
+    GreaterThan,    // >>
+    LessThan,       // <<
     GreaterOrEqual, // >=
     LessOrEqual,    // <=
-    Equal,       // ==
-    NotEqual,    // !=
-    Not,         // !
-    And,         // &&
-    Or,          // ||
-    Pipe,        // >
-    Modulus,     // %
+    Equal,          // ==
+    NotEqual,       // !=
+    Not,            // !
+    And,            // &&
+    Or,             // ||
+    Pipe,           // >
+    Modulus,        // %
 }
 
 // Symbols/Delimiters
 #[derive(Debug, PartialEq)]
 pub enum Symbol {
-    LeftParen,   // (
-    RightParen,  // )
-    LeftBrace,   // {
-    RightBrace,  // }
-    LeftBracket, // [
-    RightBracket,// ]
-    DataBracket, // |
-    Comma,       // ,
-    Semicolon,   // ;
-    Colon,       // :
-    Dot,         // .
-    Arrow,       // ->
+    LeftParen,    // (
+    RightParen,   // )
+    LeftBrace,    // {
+    RightBrace,   // }
+    LeftBracket,  // [
+    RightBracket, // ]
+    DataBracket,  // |
+    Comma,        // ,
+    Semicolon,    // ;
+    Colon,        // :
+    Dot,          // .
+    Arrow,        // ->
 }
 
 fn error_unknown_char(err: char) -> ! {
@@ -128,7 +128,7 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
             ':' => tokens.push(Token::Symbol(Symbol::Colon)),
             '!' => {
                 if src.is_empty() {
-                    break
+                    break;
                 }
                 if let Some(&'=') = src.get(1) {
                     tokens.push(Token::Operator(Operator::NotEqual));
@@ -142,7 +142,7 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
             // Operators:
             '=' => {
                 if src.is_empty() {
-                    break
+                    break;
                 }
                 if let Some(&'=') = src.get(1) {
                     tokens.push(Token::Operator(Operator::Equal));
@@ -155,7 +155,7 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
             '+' => tokens.push(Token::Operator(Operator::Add)),
             '-' => {
                 if src.is_empty() {
-                    break
+                    break;
                 }
                 if let Some(&'>') = src.get(1) {
                     tokens.push(Token::Symbol(Symbol::Arrow));
@@ -168,7 +168,7 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
             '*' => tokens.push(Token::Operator(Operator::Multiply)),
             '>' => {
                 if src.is_empty() {
-                    break
+                    break;
                 }
                 if let Some(&'>') = src.get(1) {
                     tokens.push(Token::Operator(Operator::GreaterThan));
@@ -184,7 +184,7 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
             }
             '<' => {
                 if src.is_empty() {
-                    break
+                    break;
                 }
                 if let Some(&'<') = src.get(1) {
                     tokens.push(Token::Operator(Operator::LessThan));
@@ -200,7 +200,7 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
             }
             '&' => {
                 if src.is_empty() {
-                    break
+                    break;
                 }
                 if let Some(&'&') = src.get(1) {
                     tokens.push(Token::Operator(Operator::And));
@@ -212,7 +212,7 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
             }
             '|' => {
                 if src.is_empty() {
-                    break
+                    break;
                 }
                 if let Some(&'|') = src.get(1) {
                     tokens.push(Token::Operator(Operator::Or));
@@ -306,7 +306,6 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
                     error_unknown_char(character);
                 }
             }
-
         }
         if drain_char {
             src.drain(0..1); // Remove processed character from the source

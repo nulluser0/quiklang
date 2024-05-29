@@ -1,6 +1,17 @@
-use std::{io::{self, Write}, process};
+use std::{
+    io::{self, Write},
+    process,
+};
 
-use quiklang::{backend::{environment::Environment, interpreter::evaluate, values::{NumberVal, NullVal, BoolVal, Val}}, frontend::parser, mk_bool, mk_null, mk_number};
+use quiklang::{
+    backend::{
+        environment::Environment,
+        interpreter::evaluate,
+        values::{BoolVal, NullVal, NumberVal, Val},
+    },
+    frontend::parser,
+    mk_bool, mk_null, mk_number,
+};
 
 fn main() {
     // Simple implementation for command system. Later, I can port the command system from my other projects...
@@ -24,7 +35,9 @@ fn repl() {
         io::stdout().flush().expect("Failed to flush stdout");
 
         let mut input = String::new();
-        io::stdin().read_line(&mut input).expect("Failed to read line");
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to read line");
 
         // Exit if user enters "exit" or "quit"
         if input.trim() == "exit" || input.trim() == "quit" {

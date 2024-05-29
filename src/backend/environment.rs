@@ -1,9 +1,9 @@
 // Environment
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::process;
 use std::rc::Rc;
-use std::cell::RefCell;
 
 use crate::backend::values::Val;
 
@@ -35,7 +35,7 @@ impl Environment {
                 if let Some(ref parent) = self.parent {
                     parent.borrow().resolve(name)
                 } else {
-                    return Err(())
+                    return Err(());
                 }
             }
         }

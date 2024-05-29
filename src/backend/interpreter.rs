@@ -1,8 +1,8 @@
 // Interpreter
 
-use crate::frontend::ast::{Stmt, Expr, Literal, BinaryOp};
-use crate::backend::values::{Val, NumberVal};
-use crate:: mk_number;
+use crate::backend::values::{NumberVal, Val};
+use crate::frontend::ast::{BinaryOp, Expr, Literal, Stmt};
+use crate::mk_number;
 
 use super::environment::Environment;
 
@@ -53,7 +53,7 @@ fn evaluate_binary_op(op: BinaryOp, left: Expr, right: Expr, env: &mut Environme
                 _ => panic!("Unsupported binary operation"),
             };
             mk_number!(result) as Val
-        },
+        }
         _ => panic!("Binary operations are only supported for numbers"),
     }
 }

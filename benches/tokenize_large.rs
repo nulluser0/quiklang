@@ -97,15 +97,17 @@ fn criterion_benchmark(c: &mut Criterion) {
         "a
     "#.to_string();
 
-    c.bench_function("tokenize_large", |b| b.iter(|| {
-        let tokens = tokenize(black_box(source_code.clone()));
-        // Use the tokens to prevent optimization removal
-        let total_length: usize = tokens.iter().map(|t| format!("{:?}", t).len()).sum();
-        black_box(total_length);
-    }));
+    c.bench_function("tokenize_large", |b| {
+        b.iter(|| {
+            let tokens = tokenize(black_box(source_code.clone()));
+            // Use the tokens to prevent optimization removal
+            let total_length: usize = tokens.iter().map(|t| format!("{:?}", t).len()).sum();
+            black_box(total_length);
+        })
+    });
 }
 
-criterion_group!{
+criterion_group! {
     name = benches;
     config = Criterion::default().sample_size(200).warm_up_time(std::time::Duration::from_secs(2));
     targets = criterion_benchmark
