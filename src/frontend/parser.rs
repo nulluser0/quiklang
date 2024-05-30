@@ -75,7 +75,7 @@ impl Parser {
 
         let identifier = match self.eat() {
             Token::Identifier(name) => Token::Identifier(name),
-            _ => panic!("Expected identifier name following let keyword.")
+            _ => panic!("Expected identifier name following let keyword."),
         };
 
         // TODO: Implement type support!

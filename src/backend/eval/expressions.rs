@@ -1,3 +1,9 @@
+use crate::{
+    backend::{environment::Environment, values::Val},
+    frontend::ast::{BinaryOp, Expr, Literal},
+    mk_number,
+};
+
 pub fn evaluate_expr(expr: Expr, env: &mut Environment) -> Val {
     match expr {
         Expr::Literal(literal) => evaluate_literal(literal),
