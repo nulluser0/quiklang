@@ -47,8 +47,8 @@ impl Parser {
 
     fn parse_stmt(&mut self) -> Stmt {
         match self.at() {
-            Token::Keyword(Keyword::Let) => self.parse_var_assignment(false),
-            Token::Keyword(Keyword::Const) => self.parse_var_assignment(true),
+            Token::Keyword(Keyword::Let) => self.parse_var_declaration(false),
+            Token::Keyword(Keyword::Const) => self.parse_var_declaration(true),
             // Token::Identifier(_) => todo!(),
             // Token::IntegerLiteral(_) => todo!(),
             // Token::StringLiteral(_) => todo!(),
@@ -60,7 +60,7 @@ impl Parser {
     }
 
     // `let (mut) ident(: type) = expr`
-    fn parse_var_assignment(&mut self, is_const: bool) -> Stmt {
+    fn parse_var_declaration(&mut self, is_const: bool) -> Stmt {
         let _ = self.eat(); // remove unneeded let/const token.
         let is_mutable = match self.at() {
             Token::Keyword(Keyword::Mut) => {
@@ -85,7 +85,7 @@ impl Parser {
             if is_const {
                 panic!("Must assign value to `const` expression. No value provided.");
             }
-            return Stmt::AssignStmt(identifier.to_string(), is_mutable, None);
+            return Stmt::DeclareStmt(identifier.to_string(), is_mutable, None);
         }
 
         self.expect(
@@ -93,7 +93,7 @@ impl Parser {
             "Expected assign token `=` following identifier in var declaration.",
         );
         let declaration =
-            Stmt::AssignStmt(identifier.to_string(), is_mutable, Some(self.parse_expr()));
+            Stmt::DeclareStmt(identifier.to_string(), is_mutable, Some(self.parse_expr()));
         self.expect(
             Token::Symbol(Symbol::Semicolon),
             "Variable declaration is a statement. It must end with a semicolon.",
