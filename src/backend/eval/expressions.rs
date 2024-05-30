@@ -1,5 +1,8 @@
 use crate::{
-    backend::{environment::Environment, values::Val},
+    backend::{
+        environment::Environment,
+        values::{NumberVal, Val},
+    },
     frontend::ast::{BinaryOp, Expr, Literal},
     mk_number,
 };
