@@ -19,14 +19,11 @@ pub fn evaluate_expr(expr: Expr, env: &mut Environment) -> Val {
 }
 
 pub fn evaluate_assignment(assignee: Expr, expr: Expr, env: &mut Environment) -> Val {
-    match assignee {
-        Expr::Identifier(_) => {}
+    let varname = match assignee {
+        Expr::Identifier(name) => name,
         _ => panic!("Invalid LHS in assignment expression. {:?}", assignee),
-    }
-
-    let varname = assignee.to_string();
+    };
     let value = evaluate_expr(expr, env);
-
     env.assign_var(&varname, value)
 }
 
