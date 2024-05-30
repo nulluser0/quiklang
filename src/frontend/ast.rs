@@ -18,6 +18,7 @@ impl Program {
 pub enum Expr {
     Literal(Literal),
     Identifier(String),
+    AssignmentExpr(Box<Expr>, Box<Expr>), // Assignee, Expr
     BinaryOp {
         op: BinaryOp,
         left: Box<Expr>,
@@ -25,6 +26,16 @@ pub enum Expr {
     },
     UnaryOp(UnaryOp, Box<Expr>),
     FunctionCall(String, Vec<Expr>),
+}
+
+impl std::fmt::Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expr::Literal(keyword) => write!(f, "{:?}", keyword),
+            Expr::Identifier(keyword) => write!(f, "{:?}", keyword),
+            _ => unimplemented!(),
+        }
+    }
 }
 
 #[derive(Debug)]

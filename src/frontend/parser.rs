@@ -102,7 +102,17 @@ impl Parser {
     }
 
     fn parse_expr(&mut self) -> Expr {
-        self.parse_additive_expr()
+        self.parse_assignment_expr()
+    }
+
+    fn parse_assignment_expr(&mut self) -> Expr {
+        let left = self.parse_additive_expr(); // Switch out with objectExpr
+        if *self.at() == Token::Operator(Operator::Assign) {
+            let _ = self.eat(); // Advance after.
+            let value = self.parse_assignment_expr();
+            return Expr::AssignmentExpr(Box::new(left), Box::new(value));
+        }
+        left
     }
 
     fn parse_additive_expr(&mut self) -> Expr {

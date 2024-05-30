@@ -14,7 +14,20 @@ pub fn evaluate_expr(expr: Expr, env: &mut Environment) -> Val {
         Expr::BinaryOp { op, left, right } => evaluate_binary_op(op, *left, *right, env),
         Expr::UnaryOp(_, _) => unimplemented!(),
         Expr::FunctionCall(_, _) => unimplemented!(),
+        Expr::AssignmentExpr(assignee, expr) => evaluate_assignment(*assignee, *expr, env),
     }
+}
+
+pub fn evaluate_assignment(assignee: Expr, expr: Expr, env: &mut Environment) -> Val {
+    match assignee {
+        Expr::Identifier(_) => {}
+        _ => panic!("Invalid LHS in assignment expression. {:?}", assignee),
+    }
+
+    let varname = assignee.to_string();
+    let value = evaluate_expr(expr, env);
+
+    env.assign_var(&varname, value)
 }
 
 pub fn evaluate_identifier(identifier: String, env: &mut Environment) -> Val {
