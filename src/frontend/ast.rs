@@ -30,7 +30,7 @@ pub enum Expr {
 #[derive(Debug)]
 pub enum Stmt {
     ExprStmt(Expr),
-    AssignStmt(String, bool, bool, Option<Expr>), // Name, is_const, is_mutable, expr
+    AssignStmt(String, bool, Option<Expr>), // Name, is_mutable, expr
     ReturnStmt(Option<Expr>),
     IfStmt(Expr, Vec<Stmt>, Vec<Stmt>),
 }

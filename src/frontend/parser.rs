@@ -85,19 +85,15 @@ impl Parser {
             if is_const {
                 panic!("Must assign value to `const` expression. No value provided.");
             }
-            return Stmt::AssignStmt(identifier.to_string(), false, false, None);
+            return Stmt::AssignStmt(identifier.to_string(), is_mutable, None);
         }
 
         self.expect(
             Token::Operator(Operator::Assign),
             "Expected assign token `=` following identifier in var declaration.",
         );
-        let declaration = Stmt::AssignStmt(
-            identifier.to_string(),
-            is_const,
-            is_mutable,
-            Some(self.parse_expr()),
-        );
+        let declaration =
+            Stmt::AssignStmt(identifier.to_string(), is_mutable, Some(self.parse_expr()));
         self.expect(
             Token::Symbol(Symbol::Semicolon),
             "Variable declaration is a statement. It must end with a semicolon.",

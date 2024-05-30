@@ -30,10 +30,10 @@ fn repl() {
     println!("QuikLang REPL v{}", env!("CARGO_PKG_VERSION"));
 
     let mut env = Environment::new();
-    env.declare_var("x", mk_number!(100.0));
-    env.declare_var("null", mk_null!());
-    env.declare_var("true", mk_bool!(true));
-    env.declare_var("false", mk_bool!(false));
+    env.declare_var("x", mk_number!(100.0), false);
+    env.declare_var("null", mk_null!(), false);
+    env.declare_var("true", mk_bool!(true), false);
+    env.declare_var("false", mk_bool!(false), false);
 
     loop {
         let mut parser = parser::Parser::new();
