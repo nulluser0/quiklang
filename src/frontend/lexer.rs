@@ -26,7 +26,15 @@ pub enum Token {
 
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            Token::Keyword(keyword) => write!(f, "{:?}", keyword),
+            Token::Identifier(name) => write!(f, "{}", name),
+            Token::IntegerLiteral(value) => write!(f, "{}", value),
+            Token::StringLiteral(value) => write!(f, "{}", value),
+            Token::Operator(operator) => write!(f, "{:?}", operator),
+            Token::Symbol(symbol) => write!(f, "{:?}", symbol),
+            Token::EOF => write!(f, "EOF"),
+        }
     }
 }
 
