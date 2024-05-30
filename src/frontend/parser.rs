@@ -6,7 +6,7 @@ use crate::frontend::ast::{BinaryOp, Program};
 
 use super::{
     ast::{Expr, Literal, Stmt},
-    lexer::{tokenize, Operator, Symbol, Token},
+    lexer::{tokenize, Keyword, Operator, Symbol, Token},
 };
 
 pub struct Parser {
@@ -47,8 +47,62 @@ impl Parser {
 
     fn parse_stmt(&mut self) -> Stmt {
         match self.at() {
+            Token::Keyword(Keyword::Let) => self.parse_var_assignment(false),
+            Token::Keyword(Keyword::Const) => self.parse_var_assignment(true),
+            // Token::Identifier(_) => todo!(),
+            // Token::IntegerLiteral(_) => todo!(),
+            // Token::StringLiteral(_) => todo!(),
+            // Token::Operator(_) => todo!(),
+            // Token::Symbol(_) => todo!(),
+            // Token::EOF => todo!(),
             _ => Stmt::ExprStmt(self.parse_expr()),
         }
+    }
+
+    // `let (mut) ident(: type) = expr`
+    fn parse_var_assignment(&mut self, is_const: bool) -> Stmt {
+        let _ = self.eat(); // remove unneeded let/const token.
+        let is_mutable = match self.at() {
+            Token::Keyword(Keyword::Mut) => {
+                let _ = self.eat(); // We now know mut keyword us used. Advance.
+                if is_const {
+                    panic!("Cannot apply mutability `mut` to a constant `const`!");
+                }
+                true
+            }
+            _ => false, // No mut keyword, variable is immutable.
+        };
+
+        let identifier = match self.eat() {
+            Token::Identifier(name) => Token::Identifier(name),
+            _ => panic!("Expected identifier name following let keyword.")
+        };
+
+        // TODO: Implement type support!
+
+        if *self.at() == Token::Symbol(Symbol::Semicolon) {
+            self.eat();
+            if is_const {
+                panic!("Must assign value to `const` expression. No value provided.");
+            }
+            return Stmt::AssignStmt(identifier.to_string(), false, false, None);
+        }
+
+        self.expect(
+            Token::Operator(Operator::Assign),
+            "Expected assign token `=` following identifier in var declaration.",
+        );
+        let declaration = Stmt::AssignStmt(
+            identifier.to_string(),
+            is_const,
+            is_mutable,
+            Some(self.parse_expr()),
+        );
+        self.expect(
+            Token::Symbol(Symbol::Semicolon),
+            "Variable declaration is a statement. It must end with a semicolon.",
+        );
+        declaration
     }
 
     fn parse_expr(&mut self) -> Expr {
@@ -123,9 +177,7 @@ impl Parser {
         match tk {
             // Token::Keyword(_) => todo!(),
             Token::Identifier(name) => Expr::Identifier(name.to_string()) as Expr,
-            Token::IntegerLiteral(integer) => {
-                Expr::Literal(Literal::Integer(integer)) as Expr
-            }
+            Token::IntegerLiteral(integer) => Expr::Literal(Literal::Integer(integer)) as Expr,
             // Token::StringLiteral(_) => todo!(),
             // Token::Operator(_) => todo!(),
             Token::Symbol(Symbol::LeftParen) => {

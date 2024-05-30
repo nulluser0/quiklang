@@ -24,6 +24,12 @@ pub enum Token {
     EOF,
 }
 
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 // Keywords
 #[derive(Debug, PartialEq)]
 pub enum Keyword {
@@ -31,6 +37,7 @@ pub enum Keyword {
     Fn,     // fn
     Let,    // let
     Mut,    // mut
+    Const,  // const
     Return, // return
     If,     // if
     Else,   // else
@@ -49,6 +56,7 @@ impl FromStr for Keyword {
             "fn" => Ok(Keyword::Fn),
             "let" => Ok(Keyword::Let),
             "mut" => Ok(Keyword::Mut),
+            "const" => Ok(Keyword::Const),
             "return" => Ok(Keyword::Return),
             "if" => Ok(Keyword::If),
             "else" => Ok(Keyword::Else),
