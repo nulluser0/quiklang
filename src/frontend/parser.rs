@@ -9,6 +9,7 @@ use super::{
     lexer::{tokenize, Keyword, Operator, Symbol, Token},
 };
 
+#[derive(Debug)]
 pub struct Parser {
     tokens: Vec<Token>,
 }
@@ -179,7 +180,7 @@ impl Parser {
     }
 
     fn parse_multiplicative_expr(&mut self) -> Expr {
-        let mut left = self.parse_primary_expr();
+        let mut left = self.parse_call_member_expr();
 
         while matches!(
             self.at(),
@@ -195,7 +196,7 @@ impl Parser {
                     process::exit(1);
                 }
             };
-            let right = self.parse_primary_expr();
+            let right = self.parse_call_member_expr();
             left = Expr::BinaryOp {
                 op: operator,
                 left: Box::new(left),
@@ -205,16 +206,66 @@ impl Parser {
         left
     }
 
-    // Orders of prescidence:
-    // AssignmentExpr
-    // MemberExpr
-    // FunctionCall
-    // LogicalExpr
-    // ComparisonExpr
-    // AdditiveExpr (+ or -)
-    // MultiplicativeExpr (* or /)
-    // UnaryExpr
-    // PrimaryExpr
+    fn parse_call_member_expr(&mut self) -> Expr {
+        let member = self.parse_member_expr();
+        if *self.at() == Token::Symbol(Symbol::LeftParen) {
+            return self.parse_call_expr(member);
+        }
+        member
+    }
+
+    fn parse_call_expr(&mut self, caller: Expr) -> Expr {
+        let mut call_expr: Expr = Expr::FunctionCall(self.parse_args(), Box::new(caller));
+        if *self.at() == Token::Symbol(Symbol::LeftParen) {
+            call_expr = self.parse_call_expr(call_expr);
+        }
+        call_expr
+    }
+
+    fn parse_args(&mut self) -> Vec<Expr> {
+        self.expect(Token::Symbol(Symbol::LeftParen), "Expected left paren.");
+        let args = match *self.at() == Token::Symbol(Symbol::RightParen) {
+            true => vec![],
+            false => self.parse_arguments_list(),
+        };
+        self.expect(Token::Symbol(Symbol::RightParen), "Missing right paren inside arguments list.");
+        args
+    }
+
+    fn parse_arguments_list(&mut self) -> Vec<Expr> {
+        let mut args = vec![self.parse_expr()];
+        while *self.at() == Token::Symbol(Symbol::Comma) && self.not_eof() {
+            self.eat();
+            args.push(self.parse_assignment_expr());
+        };
+        args
+    }
+
+    fn parse_member_expr(&mut self) -> Expr {
+        let mut object = self.parse_primary_expr();
+        while *self.at() == Token::Symbol(Symbol::Dot) || *self.at() == Token::Symbol(Symbol::LeftBracket) {
+            let operator = self.eat();
+            let property: Expr;
+            let computed: bool;
+
+            // Non-computed properties (like obj.expr):
+            if operator == Token::Symbol(Symbol::Dot) {
+                computed = false;
+                // Get identifier
+                property = self.parse_primary_expr();
+                match property {
+                    Expr::Identifier(_) => {},
+                    _ => panic!("Cannot use dot operator without right hand side being an identifier."),
+                }
+            } else { // This allows obj[computed value]
+                computed = true;
+                property = self.parse_expr();
+                self.expect(Token::Symbol(Symbol::RightBracket), "Missing right bracket in computed value.");
+            }
+            object = Expr::Member(Box::new(object), Box::new(property), computed);
+        }
+        object
+    }
 
     fn parse_primary_expr(&mut self) -> Expr {
         let tk = self.eat();

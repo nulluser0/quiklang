@@ -14,10 +14,10 @@ pub fn evaluate_expr(expr: Expr, env: &mut Environment) -> Val {
         Expr::Literal(literal) => evaluate_literal(literal, env),
         Expr::Identifier(identifier) => evaluate_identifier(identifier, env),
         Expr::BinaryOp { op, left, right } => evaluate_binary_op(op, *left, *right, env),
-        Expr::UnaryOp(_, _) => unimplemented!(),
-        Expr::FunctionCall(_, _) => unimplemented!(),
+        Expr::UnaryOp(_, _) => unimplemented!("{:?}", expr),
+        Expr::FunctionCall(_, _) => unimplemented!("{:?}", expr),
         Expr::AssignmentExpr(assignee, expr) => evaluate_assignment(*assignee, *expr, env),
-        Expr::Member(_, _, _) => todo!(),
+        Expr::Member(_, _, _) => todo!("{:?}", expr),
     }
 }
 
