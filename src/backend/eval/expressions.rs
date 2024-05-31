@@ -17,6 +17,7 @@ pub fn evaluate_expr(expr: Expr, env: &mut Environment) -> Val {
         Expr::UnaryOp(_, _) => unimplemented!(),
         Expr::FunctionCall(_, _) => unimplemented!(),
         Expr::AssignmentExpr(assignee, expr) => evaluate_assignment(*assignee, *expr, env),
+        Expr::Member(_, _, _) => todo!(),
     }
 }
 
