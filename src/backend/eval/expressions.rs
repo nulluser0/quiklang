@@ -47,10 +47,7 @@ pub fn evaluate_object_expr(obj: Vec<Property>, env: &mut Environment) -> Val {
         properties: HashMap::new(),
     };
     for property in obj {
-        let runtime_val: Option<Val> = match property.value {
-            Some(expr) => Some(evaluate_expr(expr, env)),
-            None => None,
-        };
+        let runtime_val: Option<Val> = property.value.map(|expr| evaluate_expr(expr, env));
         object.properties.insert(property.key, runtime_val);
     }
 

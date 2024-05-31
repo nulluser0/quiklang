@@ -131,18 +131,18 @@ impl Parser {
             // Allows shorthand key: pair -> { key, }
             if *self.at() == Token::Symbol(Symbol::Comma) {
                 self.eat(); // Advance
-                properties.push(Property {key: key, value: None});
+                properties.push(Property {key, value: None});
                 break;
             // Allows shorthand key: pair -> { key } 
             } else if *self.at() == Token::Symbol(Symbol::RightBrace) {
-                properties.push(Property {key: key, value: None});
+                properties.push(Property {key, value: None});
                 break;
             }
 
             // { key: val }
             self.expect(Token::Symbol(Symbol::Colon), "Missing colon following identifier in Object Expression");
             let value = self.parse_expr();
-            properties.push(Property {key: key, value: Some(value)});
+            properties.push(Property {key, value: Some(value)});
             if *self.at() != Token::Symbol(Symbol::RightBrace) {
                 self.expect(Token::Symbol(Symbol::Comma), "Expected comma or Right Brace following property.");
             }
