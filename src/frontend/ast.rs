@@ -25,7 +25,8 @@ pub enum Expr {
         right: Box<Expr>,
     },
     UnaryOp(UnaryOp, Box<Expr>),
-    FunctionCall(String, Vec<Expr>),
+    FunctionCall(Vec<Expr>, Expr), // Args, Caller
+    Member(Expr, Expr, bool), // Object, Property, Computed?
 }
 
 impl std::fmt::Display for Expr {
@@ -49,7 +50,14 @@ pub enum Stmt {
 pub enum Literal {
     Integer(i64),
     String(String),
+    Object(Vec<Property>),
     // Other literal types...
+}
+
+#[derive(Debug)]
+pub struct Property {
+    pub key: String,
+    pub value: Option<Expr>,
 }
 
 #[derive(Debug)]

@@ -1,8 +1,11 @@
+use std::collections::HashMap;
+
 #[derive(Debug, PartialEq)]
 pub enum ValueType {
     Null,
     Number,
     Bool,
+    Object,
 }
 
 pub trait RuntimeVal: std::fmt::Debug {
@@ -40,12 +43,24 @@ impl RuntimeVal for BoolVal {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct ObjectVal {
+    pub properties: HashMap<String, Option<Val>>,
+}
+
+impl RuntimeVal for ObjectVal {
+    fn get_type(&self) -> ValueType {
+        ValueType::Object
+    }
+}
+
 // This enum encapsulates any RuntimeVal type to handle them generically.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Val {
     Null(NullVal),
     Number(NumberVal),
     Bool(BoolVal),
+    Object(ObjectVal),
 }
 
 impl RuntimeVal for Val {
@@ -54,6 +69,7 @@ impl RuntimeVal for Val {
             Val::Null(_) => ValueType::Null,
             Val::Number(_) => ValueType::Number,
             Val::Bool(_) => ValueType::Bool,
+            Val::Object(_) => ValueType::Object,
         }
     }
 }

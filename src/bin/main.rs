@@ -7,10 +7,8 @@ use quiklang::{
     backend::{
         environment::Environment,
         interpreter::evaluate,
-        values::{BoolVal, NullVal, Val},
     },
     frontend::parser,
-    mk_bool, mk_null,
 };
 
 fn main() {

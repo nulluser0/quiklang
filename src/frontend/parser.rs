@@ -2,7 +2,7 @@
 
 use std::process;
 
-use crate::frontend::ast::{BinaryOp, Program};
+use crate::frontend::ast::{BinaryOp, Program, Property};
 
 use super::{
     ast::{Expr, Literal, Stmt},
@@ -106,13 +106,51 @@ impl Parser {
     }
 
     fn parse_assignment_expr(&mut self) -> Expr {
-        let left = self.parse_additive_expr(); // Switch out with objectExpr
+        let left = self.parse_object_expr();
         if *self.at() == Token::Operator(Operator::Assign) {
             let _ = self.eat(); // Advance after.
             let value = self.parse_assignment_expr();
             return Expr::AssignmentExpr(Box::new(left), Box::new(value));
         }
         left
+    }
+
+    fn parse_object_expr(&mut self) -> Expr {
+        if *self.at() != Token::Symbol(Symbol::LeftBrace) {
+            return self.parse_additive_expr()
+        }
+        self.eat(); // advance past leftbrace
+        let mut properties: Vec<Property> = Vec::new();
+        while self.not_eof() && *self.at() != Token::Symbol(Symbol::RightBrace) {
+            let key = match self.eat() {
+                Token::Identifier(name) => name,
+                _ => panic!("Object literal key expected."),
+            };
+
+            // Allows shorthand key: pair -> { key, }
+            if *self.at() == Token::Symbol(Symbol::Comma) {
+                self.eat(); // Advance
+                properties.push(Property {key: key, value: None});
+                break;
+            // Allows shorthand key: pair -> { key } 
+            } else if *self.at() == Token::Symbol(Symbol::RightBrace) {
+                properties.push(Property {key: key, value: None});
+                break;
+            }
+
+            // { key: val }
+            self.expect(Token::Symbol(Symbol::Colon), "Missing colon following identifier in Object Expression");
+            let value = self.parse_expr();
+            properties.push(Property {key: key, value: Some(value)});
+            if *self.at() != Token::Symbol(Symbol::RightBrace) {
+                self.expect(Token::Symbol(Symbol::Comma), "Expected comma or Right Brace following property.");
+            }
+        }
+        self.expect(
+            Token::Symbol(Symbol::RightBrace),
+            "Object literal missing right brace `}`."
+        );
+        Expr::Literal(Literal::Object(properties))
     }
 
     fn parse_additive_expr(&mut self) -> Expr {
