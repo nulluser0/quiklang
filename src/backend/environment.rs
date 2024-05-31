@@ -3,7 +3,8 @@
 use std::collections::{HashMap, HashSet};
 use std::process;
 
-use crate::backend::values::Val;
+use crate::backend::values::{BoolVal, NullVal, Val};
+use crate::{mk_bool, mk_null};
 
 #[derive(Debug, Clone)]
 pub struct Environment<'a> {
@@ -18,13 +19,21 @@ impl<'a> Default for Environment<'a> {
     }
 }
 
+fn setup_env(env: &mut Environment) {
+    env.declare_var("null", mk_null!(), false);
+    env.declare_var("true", mk_bool!(true), false);
+    env.declare_var("false", mk_bool!(false), false);
+}
+
 impl<'a> Environment<'a> {
     pub fn new() -> Self {
-        Environment {
+        let mut env = Environment {
             values: HashMap::new(),
             is_mutable: HashSet::new(),
             parent: None,
-        }
+        };
+        setup_env(&mut env);
+        env
     }
 
     pub fn new_with_parent(parent: &'a Environment<'a>) -> Self {
@@ -44,7 +53,10 @@ impl<'a> Environment<'a> {
             return parent.resolve(varname);
         }
 
-        Err(format!("Cannot resolve '{}', as it does not exist.", varname))
+        Err(format!(
+            "Cannot resolve '{}', as it does not exist.",
+            varname
+        ))
     }
 
     pub fn declare_var(&mut self, name: &str, value: Val, is_mutable: bool) -> Val {
