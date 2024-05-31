@@ -4,10 +4,7 @@ use std::{
 };
 
 use quiklang::{
-    backend::{
-        environment::Environment,
-        interpreter::evaluate,
-    },
+    backend::{environment::Environment, interpreter::evaluate},
     frontend::parser,
 };
 

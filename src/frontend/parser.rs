@@ -118,7 +118,7 @@ impl Parser {
 
     fn parse_object_expr(&mut self) -> Expr {
         if *self.at() != Token::Symbol(Symbol::LeftBrace) {
-            return self.parse_additive_expr()
+            return self.parse_additive_expr();
         }
         self.eat(); // advance past leftbrace
         let mut properties: Vec<Property> = Vec::new();
@@ -131,25 +131,34 @@ impl Parser {
             // Allows shorthand key: pair -> { key, }
             if *self.at() == Token::Symbol(Symbol::Comma) {
                 self.eat(); // Advance
-                properties.push(Property {key, value: None});
+                properties.push(Property { key, value: None });
                 break;
-            // Allows shorthand key: pair -> { key } 
+            // Allows shorthand key: pair -> { key }
             } else if *self.at() == Token::Symbol(Symbol::RightBrace) {
-                properties.push(Property {key, value: None});
+                properties.push(Property { key, value: None });
                 break;
             }
 
             // { key: val }
-            self.expect(Token::Symbol(Symbol::Colon), "Missing colon following identifier in Object Expression");
+            self.expect(
+                Token::Symbol(Symbol::Colon),
+                "Missing colon following identifier in Object Expression",
+            );
             let value = self.parse_expr();
-            properties.push(Property {key, value: Some(value)});
+            properties.push(Property {
+                key,
+                value: Some(value),
+            });
             if *self.at() != Token::Symbol(Symbol::RightBrace) {
-                self.expect(Token::Symbol(Symbol::Comma), "Expected comma or Right Brace following property.");
+                self.expect(
+                    Token::Symbol(Symbol::Comma),
+                    "Expected comma or Right Brace following property.",
+                );
             }
         }
         self.expect(
             Token::Symbol(Symbol::RightBrace),
-            "Object literal missing right brace `}`."
+            "Object literal missing right brace `}`.",
         );
         Expr::Literal(Literal::Object(properties))
     }
@@ -228,7 +237,10 @@ impl Parser {
             true => vec![],
             false => self.parse_arguments_list(),
         };
-        self.expect(Token::Symbol(Symbol::RightParen), "Missing right paren inside arguments list.");
+        self.expect(
+            Token::Symbol(Symbol::RightParen),
+            "Missing right paren inside arguments list.",
+        );
         args
     }
 
@@ -237,13 +249,15 @@ impl Parser {
         while *self.at() == Token::Symbol(Symbol::Comma) && self.not_eof() {
             self.eat();
             args.push(self.parse_assignment_expr());
-        };
+        }
         args
     }
 
     fn parse_member_expr(&mut self) -> Expr {
         let mut object = self.parse_primary_expr();
-        while *self.at() == Token::Symbol(Symbol::Dot) || *self.at() == Token::Symbol(Symbol::LeftBracket) {
+        while *self.at() == Token::Symbol(Symbol::Dot)
+            || *self.at() == Token::Symbol(Symbol::LeftBracket)
+        {
             let operator = self.eat();
             let property: Expr;
             let computed: bool;
@@ -254,13 +268,19 @@ impl Parser {
                 // Get identifier
                 property = self.parse_primary_expr();
                 match property {
-                    Expr::Identifier(_) => {},
-                    _ => panic!("Cannot use dot operator without right hand side being an identifier."),
+                    Expr::Identifier(_) => {}
+                    _ => panic!(
+                        "Cannot use dot operator without right hand side being an identifier."
+                    ),
                 }
-            } else { // This allows obj[computed value]
+            } else {
+                // This allows obj[computed value]
                 computed = true;
                 property = self.parse_expr();
-                self.expect(Token::Symbol(Symbol::RightBracket), "Missing right bracket in computed value.");
+                self.expect(
+                    Token::Symbol(Symbol::RightBracket),
+                    "Missing right bracket in computed value.",
+                );
             }
             object = Expr::Member(Box::new(object), Box::new(property), computed);
         }
