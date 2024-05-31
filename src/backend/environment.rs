@@ -1,26 +1,24 @@
 // Environment
 
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::process;
-use std::rc::Rc;
 
 use crate::backend::values::Val;
 
 #[derive(Debug, Clone)]
-pub struct Environment {
+pub struct Environment<'a> {
     values: HashMap<String, Val>,
     is_mutable: HashSet<String>,
-    parent: Option<Rc<RefCell<Environment>>>,
+    parent: Option<&'a Environment<'a>>,
 }
 
-impl Default for Environment {
+impl<'a> Default for Environment<'a> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Environment {
+impl<'a> Environment<'a> {
     pub fn new() -> Self {
         Environment {
             values: HashMap::new(),
@@ -29,7 +27,7 @@ impl Environment {
         }
     }
 
-    pub fn new_with_parent(parent: Rc<RefCell<Environment>>) -> Self {
+    pub fn new_with_parent(parent: &'a Environment<'a>) -> Self {
         Environment {
             values: HashMap::new(),
             is_mutable: HashSet::new(),
@@ -37,17 +35,16 @@ impl Environment {
         }
     }
 
-    pub fn resolve(&self, name: &str) -> Result<Environment, ()> {
-        match self.values.get(name) {
-            Some(_) => Ok(self.clone()),
-            None => {
-                if let Some(ref parent) = self.parent {
-                    parent.borrow().resolve(name)
-                } else {
-                    Err(())
-                }
-            }
+    pub fn resolve(&'a self, varname: &str) -> Result<&'a Environment<'a>, String> {
+        if self.values.contains_key(varname) {
+            return Ok(self);
         }
+
+        if let Some(parent) = self.parent {
+            return parent.resolve(varname);
+        }
+
+        Err(format!("Cannot resolve '{}', as it does not exist.", varname))
     }
 
     pub fn declare_var(&mut self, name: &str, value: Val, is_mutable: bool) -> Val {
@@ -63,7 +60,7 @@ impl Environment {
     }
 
     pub fn assign_var(&mut self, name: &str, value: Val) -> Val {
-        let mut env = match self.resolve(name) {
+        match self.resolve(name) {
             Ok(result) => result,
             Err(_) => {
                 println!("Cannot resolve {} as it does not exist.", name);
@@ -72,12 +69,12 @@ impl Environment {
         };
 
         // immutables (const and let) cannot have its value changed.
-        if !env.is_mutable.contains(name) {
+        if !self.is_mutable.contains(name) {
             println!("Cannot resolve {} as it is immutable.", name);
             process::exit(1);
         }
 
-        env.values.insert(name.to_string(), value.clone());
+        self.values.insert(name.to_string(), value.clone());
         value
     }
 
