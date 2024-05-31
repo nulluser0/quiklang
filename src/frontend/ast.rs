@@ -25,8 +25,8 @@ pub enum Expr {
         right: Box<Expr>,
     },
     UnaryOp(UnaryOp, Box<Expr>),
-    FunctionCall(Vec<Expr>, Expr), // Args, Caller
-    Member(Expr, Expr, bool), // Object, Property, Computed?
+    FunctionCall(Vec<Expr>, Box<Expr>), // Args, Caller
+    Member(Box<Expr>, Box<Expr>, bool), // Object, Property, Computed?
 }
 
 impl std::fmt::Display for Expr {
