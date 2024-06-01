@@ -8,7 +8,7 @@ use crate::{mk_bool, mk_native_fn, mk_null};
 
 use super::native_fn::{native_println, native_time};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Environment<'a> {
     values: HashMap<String, Val>,
     is_mutable: HashSet<String>,

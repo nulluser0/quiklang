@@ -3,10 +3,11 @@ use std::collections::HashMap;
 use crate::{
     backend::{
         environment::Environment,
-        values::{FloatVal, IntegerVal, ObjectVal, ToFloat, Val},
+        interpreter::evaluate,
+        values::{FloatVal, IntegerVal, NullVal, ObjectVal, ToFloat, Val},
     },
     frontend::ast::{BinaryOp, Expr, Literal, Property},
-    mk_float, mk_integer,
+    mk_float, mk_integer, mk_null,
 };
 
 pub fn evaluate_expr(expr: Expr, env: &mut Environment) -> Val {
@@ -61,11 +62,31 @@ pub fn evaluate_call_expr(args: Vec<Expr>, caller: Expr, env: &mut Environment) 
         .map(|expr| evaluate_expr(expr, env))
         .collect();
     let function = evaluate_expr(caller, env);
-    let callable = match function {
-        Val::NativeFunction(callable) => callable.call,
-        _ => panic!("Cannot call value that is not a function: {:?}", function),
+    match &function {
+        Val::NativeFunction(callable) => return (callable.call)(evaluated_args, env),
+        Val::Function(fn_value) => {
+            let mut scope = Environment::new_with_parent(env);
+            println!("{:#?}", scope);
+            for (i, _) in evaluated_args
+                .iter()
+                .enumerate()
+                .take(fn_value.parameters.len())
+            {
+                // TODO: Check the bounds here.
+                // Verify arity of function.
+                let varname = &fn_value.parameters[i];
+                let arg = &evaluated_args[i];
+                scope.declare_var(varname, arg.clone(), false);
+            }
+            let mut result: Val = mk_null!();
+            for stmt in &fn_value.body {
+                result = evaluate(stmt.clone(), &mut scope)
+            }
+            return result;
+        }
+        _ => {}
     };
-    callable(evaluated_args, env)
+    panic!("Cannot call value that is not a function: {:?}", function);
 }
 
 pub fn evaluate_binary_op(op: BinaryOp, left: Expr, right: Expr, env: &mut Environment) -> Val {

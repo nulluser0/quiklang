@@ -1,6 +1,9 @@
 use crate::{
-    backend::{environment::Environment, values::NullVal, values::Val},
-    frontend::ast::Expr,
+    backend::{
+        environment::Environment,
+        values::{FunctionVal, NullVal, Val},
+    },
+    frontend::ast::{Expr, Stmt},
     mk_null,
 };
 
@@ -19,4 +22,21 @@ pub fn evaluate_declare_var(
     };
 
     env.declare_var(&name, value, is_mutable)
+}
+
+pub fn evaluate_declare_fn(
+    parameters: Vec<String>,
+    name: String,
+    body: Vec<Stmt>,
+    is_async: bool,
+    env: &mut Environment,
+) -> Val {
+    let function: Val = Val::Function(FunctionVal {
+        name: name.clone(),
+        parameters,
+        body,
+        is_async,
+    });
+
+    env.declare_var(&name, function, false)
 }

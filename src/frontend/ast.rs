@@ -14,7 +14,7 @@ impl Program {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     Literal(Literal),
     Identifier(String),
@@ -38,7 +38,7 @@ impl std::fmt::Display for Expr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Stmt {
     ExprStmt(Expr),
     DeclareStmt(String, bool, Option<Expr>), // Name, is_mutable, expr
@@ -47,7 +47,7 @@ pub enum Stmt {
     IfStmt(Expr, Vec<Stmt>, Vec<Stmt>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
     Integer(i64),
     Float(f64),
@@ -56,13 +56,13 @@ pub enum Literal {
     // Other literal types...
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Property {
     pub key: String,
     pub value: Option<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BinaryOp {
     Add,
     Subtract,
@@ -100,7 +100,7 @@ impl From<Operator> for BinaryOp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum UnaryOp {
     Negate,
     // Other unary operators...

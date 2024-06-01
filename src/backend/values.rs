@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::frontend::ast::Stmt;
+
 use super::environment::Environment;
 
 #[derive(Debug, PartialEq)]
@@ -95,9 +97,10 @@ impl RuntimeVal for NativeFunctionVal {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionVal {
-    name: String,
-    parameters: Vec<String>,
-    declaration_env: &Environment,
+    pub name: String,
+    pub parameters: Vec<String>,
+    pub body: Vec<Stmt>,
+    pub is_async: bool,
 }
 
 impl RuntimeVal for FunctionVal {
