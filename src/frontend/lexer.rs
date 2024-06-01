@@ -55,6 +55,7 @@ pub enum Keyword {
     Ok,     // Ok
     Exit,   // exit
     Break,  // break
+    Async,  // async
 }
 
 impl FromStr for Keyword {
@@ -74,6 +75,7 @@ impl FromStr for Keyword {
             "Ok" => Ok(Keyword::Ok),
             "exit" => Ok(Keyword::Exit),
             "break" => Ok(Keyword::Break),
+            "async" => Ok(Keyword::Async),
             _ => Err(format!("{} is not a keyword.", s)),
         }
     }

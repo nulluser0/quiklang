@@ -43,6 +43,7 @@ pub enum Stmt {
     ExprStmt(Expr),
     DeclareStmt(String, bool, Option<Expr>), // Name, is_mutable, expr
     ReturnStmt(Option<Expr>),
+    FunctionDeclaration(Vec<String>, String, Vec<Stmt>, bool), // Parameters, Name, Body, Is async?
     IfStmt(Expr, Vec<Stmt>, Vec<Stmt>),
 }
 

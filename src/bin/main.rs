@@ -1,5 +1,6 @@
 use std::{
-    io::{self, Write},
+    fs::File,
+    io::{self, Read, Write},
     process,
 };
 
@@ -9,16 +10,63 @@ use quiklang::{
 };
 
 fn main() {
-    // Simple implementation for command system. Later, I can port the command system from my other projects...
     let args: Vec<String> = std::env::args().collect();
 
-    if args.len() == 2 && args[1] == "repl" {
-        repl();
-    } else {
-        println!("Usage: quiklang <command>");
-        println!("Commands:");
-        println!("  repl - Start the QuikLang REPL");
+    match args.as_slice() {
+        // If no arguments are passed, print usage
+        [_] => print_usage(),
+
+        // If "repl" is passed, start the REPL
+        [_, cmd] if cmd == "repl" => repl(),
+
+        // If a file path is passed, execute the file
+        [_, file_path] => run_file(file_path),
+
+        // Print usage instructions if the input is invalid
+        _ => print_usage(),
     }
+}
+
+fn print_usage() {
+    println!("Usage: quiklang <command>");
+    println!("Commands:");
+    println!("  repl - Start the QuikLang REPL");
+    println!("  <file> - Execute the specified QuikLang script file");
+}
+
+fn run(input: String, env: &mut Environment) {
+    let mut parser = parser::Parser::new();
+    match parser.produce_ast(input) {
+        Ok(program) => {
+            // println!("{:#?}", program);
+
+            for stmt in program.statements {
+                let _ = evaluate(stmt, env);
+            }
+        }
+        Err(e) => {
+            println!("Error: {:?}", e);
+        }
+    }
+}
+
+fn run_file(file_path: &str) {
+    let mut file = match File::open(file_path) {
+        Ok(file) => file,
+        Err(e) => {
+            println!("Error opening file {}: {}", file_path, e);
+            process::exit(1);
+        }
+    };
+
+    let mut content = String::new();
+    if let Err(e) = file.read_to_string(&mut content) {
+        println!("Error reading file {}: {}", file_path, e);
+        process::exit(1);
+    }
+
+    let mut env = Environment::new();
+    run(content, &mut env);
 }
 
 fn repl() {
@@ -27,7 +75,6 @@ fn repl() {
     let mut env = Environment::new();
 
     loop {
-        let mut parser = parser::Parser::new();
         print!("quiklang> ");
         io::stdout().flush().expect("Failed to flush stdout");
 
@@ -39,20 +86,8 @@ fn repl() {
         // Exit if user enters "exit" or "quit"
         if input.trim() == "exit" || input.trim() == "quit" {
             println!("Exiting QuikLang REPL.");
-            process::exit(1);
+            process::exit(0); // Exit normally
         }
-
-        match parser.produce_ast(input) {
-            Ok(program) => {
-                // println!("{:#?}", program);
-
-                for stmt in program.statements {
-                    let _ = evaluate(stmt, &mut env);
-                }
-            }
-            Err(e) => {
-                println!("Error: {:?}", e);
-            }
-        }
+        run(input, &mut env);
     }
 }

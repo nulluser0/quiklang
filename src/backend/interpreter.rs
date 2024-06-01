@@ -15,6 +15,7 @@ pub fn evaluate(stmt: Stmt, env: &mut Environment) -> Val {
         }
         Stmt::ReturnStmt(_) => unimplemented!(),
         Stmt::IfStmt(_, _, _) => unimplemented!(),
+        Stmt::FunctionDeclaration(parameters, name, body, is_async) => todo!(),
         // Handle other statement types...
     }
 }

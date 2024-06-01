@@ -10,6 +10,7 @@ pub enum ValueType {
     Bool,
     Object,
     NativeFunction,
+    Function,
 }
 
 pub trait RuntimeVal: std::fmt::Debug {
@@ -92,6 +93,19 @@ impl RuntimeVal for NativeFunctionVal {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct FunctionVal {
+    name: String,
+    parameters: Vec<String>,
+    declaration_env: &Environment,
+}
+
+impl RuntimeVal for FunctionVal {
+    fn get_type(&self) -> ValueType {
+        ValueType::Function
+    }
+}
+
 // This enum encapsulates any RuntimeVal type to handle them generically.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Val {
@@ -101,6 +115,7 @@ pub enum Val {
     Bool(BoolVal),
     Object(ObjectVal),
     NativeFunction(NativeFunctionVal),
+    Function(FunctionVal),
 }
 
 impl RuntimeVal for Val {
@@ -112,6 +127,7 @@ impl RuntimeVal for Val {
             Val::Bool(_) => ValueType::Bool,
             Val::Object(_) => ValueType::Object,
             Val::NativeFunction(_) => ValueType::NativeFunction,
+            Val::Function(_) => ValueType::Function,
         }
     }
 }

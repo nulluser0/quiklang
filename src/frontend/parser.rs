@@ -1,5 +1,6 @@
 // Parser
 
+use core::panic;
 use std::process;
 
 use crate::frontend::ast::{BinaryOp, Program, Property};
@@ -50,6 +51,14 @@ impl Parser {
         match self.at() {
             Token::Keyword(Keyword::Let) => self.parse_var_declaration(false),
             Token::Keyword(Keyword::Const) => self.parse_var_declaration(true),
+            Token::Keyword(Keyword::Fn) => self.parse_fn_declaration(false),
+            Token::Keyword(Keyword::Async) => {
+                self.eat();
+                match self.at() {
+                    Token::Keyword(Keyword::Fn) => self.parse_fn_declaration(true),
+                    _ => panic!("Async: `fn` missing!"),
+                }
+            }
             // Token::Identifier(_) => todo!(),
             // Token::IntegerLiteral(_) => todo!(),
             // Token::StringLiteral(_) => todo!(),
@@ -58,6 +67,37 @@ impl Parser {
             // Token::EOF => todo!(),
             _ => Stmt::ExprStmt(self.parse_expr()),
         }
+    }
+
+    fn parse_fn_declaration(&mut self, is_async: bool) -> Stmt {
+        self.eat();
+        let name = match self.eat() {
+            Token::Identifier(name) => name,
+            _ => panic!("No identifier for fn!"),
+        };
+        let args: Vec<Expr> = self.parse_args();
+        let mut params: Vec<String> = Vec::new();
+        for arg in args {
+            match arg {
+                Expr::Identifier(name) => params.push(name),
+                _ => panic!(
+                    "Inside function declaration expected parameters to be one of type String."
+                ),
+            }
+        }
+        self.expect(
+            Token::Symbol(Symbol::LeftBrace),
+            "Expected function body following declaration.",
+        );
+        let mut body: Vec<Stmt> = Vec::new();
+        while self.not_eof() && *self.at() != Token::Symbol(Symbol::RightBrace) {
+            body.push(self.parse_stmt());
+        }
+        self.expect(
+            Token::Symbol(Symbol::RightBrace),
+            "Closing brace expected inside function declaration.",
+        );
+        Stmt::FunctionDeclaration(params, name, body, is_async)
     }
 
     // `let (mut) ident(: type) = expr`
