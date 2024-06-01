@@ -47,8 +47,7 @@ fn repl() {
                 // println!("{:#?}", program);
 
                 for stmt in program.statements {
-                    let result = evaluate(stmt, &mut env);
-                    println!("{:?}", result);
+                    let _ = evaluate(stmt, &mut env);
                 }
             }
             Err(e) => {

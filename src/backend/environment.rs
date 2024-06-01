@@ -3,8 +3,10 @@
 use std::collections::{HashMap, HashSet};
 use std::process;
 
-use crate::backend::values::{BoolVal, NullVal, Val};
-use crate::{mk_bool, mk_null};
+use crate::backend::values::{BoolVal, NativeFunctionVal, NullVal, Val};
+use crate::{mk_bool, mk_native_fn, mk_null};
+
+use super::native_fn::{native_println, native_time};
 
 #[derive(Debug, Clone)]
 pub struct Environment<'a> {
@@ -20,9 +22,13 @@ impl<'a> Default for Environment<'a> {
 }
 
 fn setup_env(env: &mut Environment) {
+    // Create Default Global Environment
     env.declare_var("null", mk_null!(), false);
     env.declare_var("true", mk_bool!(true), false);
     env.declare_var("false", mk_bool!(false), false);
+    // Define a native built-in method
+    env.declare_var("println", mk_native_fn!(native_println), false);
+    env.declare_var("time", mk_native_fn!(native_time), false);
 }
 
 impl<'a> Environment<'a> {

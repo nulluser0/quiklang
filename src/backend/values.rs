@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use super::environment::Environment;
+
 #[derive(Debug, PartialEq)]
 pub enum ValueType {
     Null,
@@ -7,6 +9,7 @@ pub enum ValueType {
     Integer,
     Bool,
     Object,
+    NativeFunction,
 }
 
 pub trait RuntimeVal: std::fmt::Debug {
@@ -76,6 +79,19 @@ impl RuntimeVal for ObjectVal {
     }
 }
 
+type NativeFunctionCallback = fn(Vec<Val>, &mut Environment) -> Val;
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct NativeFunctionVal {
+    pub call: NativeFunctionCallback,
+}
+
+impl RuntimeVal for NativeFunctionVal {
+    fn get_type(&self) -> ValueType {
+        ValueType::NativeFunction
+    }
+}
+
 // This enum encapsulates any RuntimeVal type to handle them generically.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Val {
@@ -84,6 +100,7 @@ pub enum Val {
     Integer(IntegerVal),
     Bool(BoolVal),
     Object(ObjectVal),
+    NativeFunction(NativeFunctionVal),
 }
 
 impl RuntimeVal for Val {
@@ -94,6 +111,7 @@ impl RuntimeVal for Val {
             Val::Integer(_) => ValueType::Integer,
             Val::Bool(_) => ValueType::Bool,
             Val::Object(_) => ValueType::Object,
+            Val::NativeFunction(_) => ValueType::NativeFunction,
         }
     }
 }
@@ -133,5 +151,12 @@ macro_rules! mk_integer {
     };
     () => {
         mk_integer!(0)
+    };
+}
+
+#[macro_export]
+macro_rules! mk_native_fn {
+    ($n:expr) => {
+        Val::NativeFunction(NativeFunctionVal { call: $n })
     };
 }

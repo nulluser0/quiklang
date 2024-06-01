@@ -15,7 +15,7 @@ pub fn evaluate_expr(expr: Expr, env: &mut Environment) -> Val {
         Expr::Identifier(identifier) => evaluate_identifier(identifier, env),
         Expr::BinaryOp { op, left, right } => evaluate_binary_op(op, *left, *right, env),
         Expr::UnaryOp(_, _) => unimplemented!("{:?}", expr),
-        Expr::FunctionCall(_, _) => unimplemented!("{:?}", expr),
+        Expr::FunctionCall(args, caller) => evaluate_call_expr(args, *caller, env),
         Expr::AssignmentExpr(assignee, expr) => evaluate_assignment(*assignee, *expr, env),
         Expr::Member(_, _, _) => todo!("{:?}", expr),
     }
@@ -53,6 +53,19 @@ pub fn evaluate_object_expr(obj: Vec<Property>, env: &mut Environment) -> Val {
     }
 
     Val::Object(object)
+}
+
+pub fn evaluate_call_expr(args: Vec<Expr>, caller: Expr, env: &mut Environment) -> Val {
+    let evaluated_args: Vec<Val> = args
+        .into_iter()
+        .map(|expr| evaluate_expr(expr, env))
+        .collect();
+    let function = evaluate_expr(caller, env);
+    let callable = match function {
+        Val::NativeFunction(callable) => callable.call,
+        _ => panic!("Cannot call value that is not a function: {:?}", function),
+    };
+    callable(evaluated_args, env)
 }
 
 pub fn evaluate_binary_op(op: BinaryOp, left: Expr, right: Expr, env: &mut Environment) -> Val {
