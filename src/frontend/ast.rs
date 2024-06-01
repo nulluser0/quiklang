@@ -49,6 +49,7 @@ pub enum Stmt {
 #[derive(Debug)]
 pub enum Literal {
     Integer(i64),
+    Float(f64),
     String(String),
     Object(Vec<Property>),
     // Other literal types...

@@ -293,6 +293,7 @@ impl Parser {
             // Token::Keyword(_) => todo!(),
             Token::Identifier(name) => Expr::Identifier(name.to_string()) as Expr,
             Token::IntegerLiteral(integer) => Expr::Literal(Literal::Integer(integer)) as Expr,
+            Token::FloatLiteral(float) => Expr::Literal(Literal::Float(float)) as Expr,
             // Token::StringLiteral(_) => todo!(),
             // Token::Operator(_) => todo!(),
             Token::Symbol(Symbol::LeftParen) => {

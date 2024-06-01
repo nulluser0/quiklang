@@ -3,7 +3,8 @@ use std::collections::HashMap;
 #[derive(Debug, PartialEq)]
 pub enum ValueType {
     Null,
-    Number,
+    Float,
+    Integer,
     Bool,
     Object,
 }
@@ -22,13 +23,34 @@ impl RuntimeVal for NullVal {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct NumberVal {
+pub struct FloatVal {
     pub value: f64,
 }
 
-impl RuntimeVal for NumberVal {
+impl RuntimeVal for FloatVal {
     fn get_type(&self) -> ValueType {
-        ValueType::Number
+        ValueType::Float
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct IntegerVal {
+    pub value: i64,
+}
+
+impl RuntimeVal for IntegerVal {
+    fn get_type(&self) -> ValueType {
+        ValueType::Integer
+    }
+}
+
+pub trait ToFloat {
+    fn to_float(&self) -> f64;
+}
+
+impl ToFloat for IntegerVal {
+    fn to_float(&self) -> f64 {
+        self.value as f64
     }
 }
 
@@ -58,7 +80,8 @@ impl RuntimeVal for ObjectVal {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Val {
     Null(NullVal),
-    Number(NumberVal),
+    Float(FloatVal),
+    Integer(IntegerVal),
     Bool(BoolVal),
     Object(ObjectVal),
 }
@@ -67,7 +90,8 @@ impl RuntimeVal for Val {
     fn get_type(&self) -> ValueType {
         match self {
             Val::Null(_) => ValueType::Null,
-            Val::Number(_) => ValueType::Number,
+            Val::Float(_) => ValueType::Float,
+            Val::Integer(_) => ValueType::Integer,
             Val::Bool(_) => ValueType::Bool,
             Val::Object(_) => ValueType::Object,
         }
@@ -93,11 +117,21 @@ macro_rules! mk_bool {
 }
 
 #[macro_export]
-macro_rules! mk_number {
+macro_rules! mk_float {
     ($n:expr) => {
-        Val::Number(NumberVal { value: $n })
+        Val::Float(FloatVal { value: $n })
     };
     () => {
-        mk_number!(0.0)
+        mk_float!(0.0)
+    };
+}
+
+#[macro_export]
+macro_rules! mk_integer {
+    ($n:expr) => {
+        Val::Integer(IntegerVal { value: $n })
+    };
+    () => {
+        mk_integer!(0)
     };
 }

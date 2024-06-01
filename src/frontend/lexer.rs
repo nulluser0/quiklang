@@ -12,6 +12,7 @@ pub enum Token {
 
     // Literals
     IntegerLiteral(i64),
+    FloatLiteral(f64),
     StringLiteral(String),
 
     // Operators
@@ -30,6 +31,7 @@ impl std::fmt::Display for Token {
             Token::Keyword(keyword) => write!(f, "{:?}", keyword),
             Token::Identifier(name) => write!(f, "{}", name),
             Token::IntegerLiteral(value) => write!(f, "{}", value),
+            Token::FloatLiteral(value) => write!(f, "{}", value),
             Token::StringLiteral(value) => write!(f, "{}", value),
             Token::Operator(operator) => write!(f, "{:?}", operator),
             Token::Symbol(symbol) => write!(f, "{:?}", symbol),
@@ -245,21 +247,40 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
                 // Numeric literal
                 if character.is_ascii_digit() {
                     let mut num: i64 = 0;
+                    let mut decimal_num: f64 = 0.0;
+                    let mut decimal_place: f64 = 1.0;
+                    let mut is_decimal = false;
+
                     while !src.is_empty() {
                         if let Some(&number) = src.first() {
                             if number.is_ascii_digit() {
                                 // Convert the char digit to its numeric value
                                 let digit_value = number.to_digit(10).unwrap() as i64;
-                                num = num * 10 + digit_value;
+                                if is_decimal {
+                                    decimal_place *= 0.1;
+                                    decimal_num += digit_value as f64 * decimal_place;
+                                } else {
+                                    num = num * 10 + digit_value;
+                                }
                                 src.drain(0..1); // Remove the processed character
+                            } else if number == '.' && !is_decimal {
+                                // Handle the decimal point
+                                is_decimal = true;
+                                src.drain(0..1); // Remove the decimal point
                             } else {
-                                break; // Break the loop if the character is not a numeric digit
+                                break; // Break the loop if the character is not a numeric digit or a single decimal point
                             }
                         }
                     }
+
                     drain_char = false;
-                    tokens.push(Token::IntegerLiteral(num))
-                // Identifier, or keyword
+
+                    if is_decimal {
+                        let final_num = num as f64 + decimal_num;
+                        tokens.push(Token::FloatLiteral(final_num));
+                    } else {
+                        tokens.push(Token::IntegerLiteral(num));
+                    }
                 } else if character.is_ascii_alphabetic() || character == '_' {
                     let mut word = String::new();
                     while !src.is_empty() {
