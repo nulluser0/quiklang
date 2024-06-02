@@ -9,13 +9,13 @@ use crate::{mk_bool, mk_native_fn, mk_null};
 use super::native_fn::{native_println, native_time};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Environment<'a> {
+pub struct Environment {
     values: HashMap<String, Val>,
     is_mutable: HashSet<String>,
-    parent: Option<&'a Environment<'a>>,
+    parent: Option<Box<Environment>>,
 }
 
-impl<'a> Default for Environment<'a> {
+impl Default for Environment {
     fn default() -> Self {
         Self::new()
     }
@@ -31,7 +31,7 @@ fn setup_env(env: &mut Environment) {
     env.declare_var("time", mk_native_fn!(native_time), false);
 }
 
-impl<'a> Environment<'a> {
+impl Environment {
     pub fn new() -> Self {
         let mut env = Environment {
             values: HashMap::new(),
@@ -42,20 +42,20 @@ impl<'a> Environment<'a> {
         env
     }
 
-    pub fn new_with_parent(parent: &'a Environment<'a>) -> Self {
+    pub fn new_with_parent(parent: Environment) -> Self {
         Environment {
             values: HashMap::new(),
             is_mutable: HashSet::new(),
-            parent: Some(parent),
+            parent: Some(Box::new(parent)),
         }
     }
 
-    pub fn resolve(&'a self, varname: &str) -> Result<&'a Environment<'a>, String> {
+    pub fn resolve(&self, varname: &str) -> Result<&Environment, String> {
         if self.values.contains_key(varname) {
             return Ok(self);
         }
 
-        if let Some(parent) = self.parent {
+        if let Some(parent) = &self.parent {
             return parent.resolve(varname);
         }
 

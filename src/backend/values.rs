@@ -101,6 +101,7 @@ pub struct FunctionVal {
     pub parameters: Vec<String>,
     pub body: Vec<Stmt>,
     pub is_async: bool,
+    pub declaration_env: Environment,
 }
 
 impl RuntimeVal for FunctionVal {

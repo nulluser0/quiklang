@@ -36,6 +36,7 @@ pub fn evaluate_declare_fn(
         parameters,
         body,
         is_async,
+        declaration_env: env.to_owned(),
     });
 
     env.declare_var(&name, function, false)
