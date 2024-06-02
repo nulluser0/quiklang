@@ -66,7 +66,6 @@ pub fn evaluate_call_expr(args: Vec<Expr>, caller: Expr, env: &mut Environment) 
         Val::NativeFunction(callable) => return (callable.call)(evaluated_args, env),
         Val::Function(fn_value) => {
             let mut scope = Environment::new_with_parent(fn_value.declaration_env.to_owned());
-            println!("{:#?}", scope);
             for (i, _) in evaluated_args
                 .iter()
                 .enumerate()
