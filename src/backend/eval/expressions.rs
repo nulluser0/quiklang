@@ -39,12 +39,20 @@ pub fn evaluate_if_expr(
         if condition_bool.value {
             // Evaluate the consequent block if the condition is true
             for stmt in then {
-                evaluate(stmt, env);
+                let result = evaluate(stmt, env);
+                match result {
+                    Val::Null(_) => {}
+                    val => return val,
+                }
             }
         } else if let Some(alt) = else_stmt {
             // Evaluate the alternative block if the condition is false and an alternative is provided
             for stmt in alt {
-                evaluate(stmt, env);
+                let result = evaluate(stmt, env);
+                match result {
+                    Val::Null(_) => {}
+                    val => return val,
+                }
             }
         }
     } else {
