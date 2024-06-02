@@ -4,7 +4,7 @@ use crate::{
     backend::{
         environment::Environment,
         interpreter::evaluate,
-        values::{FloatVal, IntegerVal, NullVal, ObjectVal, ToFloat, Val},
+        values::{BoolVal, FloatVal, IntegerVal, NullVal, ObjectVal, ToFloat, Val},
     },
     frontend::ast::{BinaryOp, Expr, Literal, Property, Stmt},
     mk_float, mk_integer, mk_null,
@@ -135,26 +135,42 @@ pub fn evaluate_binary_op(op: BinaryOp, left: Expr, right: Expr, env: &mut Envir
     let right_val = evaluate_expr(right, env);
 
     match (left_val, right_val) {
-        (Val::Integer(l), Val::Integer(r)) => {
-            match op {
-                BinaryOp::Add => Val::Integer(IntegerVal {
-                    value: l.value + r.value,
-                }),
-                BinaryOp::Subtract => Val::Integer(IntegerVal {
-                    value: l.value - r.value,
-                }),
-                BinaryOp::Multiply => Val::Integer(IntegerVal {
-                    value: l.value * r.value,
-                }),
-                BinaryOp::Divide => Val::Integer(IntegerVal {
-                    value: l.value / r.value,
-                }), // Note: integer division
-                BinaryOp::Modulus => Val::Integer(IntegerVal {
-                    value: l.value % r.value,
-                }),
-                _ => panic!("Unsupported binary operation"),
-            }
-        }
+        (Val::Integer(l), Val::Integer(r)) => match op {
+            BinaryOp::Add => Val::Integer(IntegerVal {
+                value: l.value + r.value,
+            }),
+            BinaryOp::Subtract => Val::Integer(IntegerVal {
+                value: l.value - r.value,
+            }),
+            BinaryOp::Multiply => Val::Integer(IntegerVal {
+                value: l.value * r.value,
+            }),
+            BinaryOp::Divide => Val::Integer(IntegerVal {
+                value: l.value / r.value,
+            }),
+            BinaryOp::Modulus => Val::Integer(IntegerVal {
+                value: l.value % r.value,
+            }),
+            BinaryOp::GreaterThan => Val::Bool(BoolVal {
+                value: l.value > r.value,
+            }),
+            BinaryOp::LessThan => Val::Bool(BoolVal {
+                value: l.value < r.value,
+            }),
+            BinaryOp::GreaterOrEqual => Val::Bool(BoolVal {
+                value: l.value >= r.value,
+            }),
+            BinaryOp::LessOrEqual => Val::Bool(BoolVal {
+                value: l.value <= r.value,
+            }),
+            BinaryOp::Equal => Val::Bool(BoolVal {
+                value: l.value == r.value,
+            }),
+            BinaryOp::NotEqual => Val::Bool(BoolVal {
+                value: l.value != r.value,
+            }),
+            _ => panic!("Unsupported binary operation"),
+        },
         (Val::Float(l), Val::Float(r)) => {
             match op {
                 BinaryOp::Add => Val::Float(FloatVal {
@@ -172,6 +188,24 @@ pub fn evaluate_binary_op(op: BinaryOp, left: Expr, right: Expr, env: &mut Envir
                 BinaryOp::Modulus => Val::Float(FloatVal {
                     value: l.value % r.value,
                 }), // Note: % operator for floats
+                BinaryOp::GreaterThan => Val::Bool(BoolVal {
+                    value: l.value > r.value,
+                }),
+                BinaryOp::LessThan => Val::Bool(BoolVal {
+                    value: l.value < r.value,
+                }),
+                BinaryOp::GreaterOrEqual => Val::Bool(BoolVal {
+                    value: l.value >= r.value,
+                }),
+                BinaryOp::LessOrEqual => Val::Bool(BoolVal {
+                    value: l.value <= r.value,
+                }),
+                BinaryOp::Equal => Val::Bool(BoolVal {
+                    value: l.value == r.value,
+                }),
+                BinaryOp::NotEqual => Val::Bool(BoolVal {
+                    value: l.value != r.value,
+                }),
                 _ => panic!("Unsupported binary operation"),
             }
         }
@@ -192,6 +226,24 @@ pub fn evaluate_binary_op(op: BinaryOp, left: Expr, right: Expr, env: &mut Envir
                 BinaryOp::Modulus => Val::Float(FloatVal {
                     value: l.to_float() % r.value,
                 }), // Convert to float and then mod
+                BinaryOp::GreaterThan => Val::Bool(BoolVal {
+                    value: l.to_float() > r.value,
+                }),
+                BinaryOp::LessThan => Val::Bool(BoolVal {
+                    value: l.to_float() < r.value,
+                }),
+                BinaryOp::GreaterOrEqual => Val::Bool(BoolVal {
+                    value: l.to_float() >= r.value,
+                }),
+                BinaryOp::LessOrEqual => Val::Bool(BoolVal {
+                    value: l.to_float() <= r.value,
+                }),
+                BinaryOp::Equal => Val::Bool(BoolVal {
+                    value: l.to_float() == r.value,
+                }),
+                BinaryOp::NotEqual => Val::Bool(BoolVal {
+                    value: l.to_float() != r.value,
+                }),
                 _ => panic!("Unsupported binary operation"),
             }
         }
@@ -212,6 +264,24 @@ pub fn evaluate_binary_op(op: BinaryOp, left: Expr, right: Expr, env: &mut Envir
                 BinaryOp::Modulus => Val::Float(FloatVal {
                     value: l.value % r.to_float(),
                 }), // Convert to float and then mod
+                BinaryOp::GreaterThan => Val::Bool(BoolVal {
+                    value: l.value > r.to_float(),
+                }),
+                BinaryOp::LessThan => Val::Bool(BoolVal {
+                    value: l.value < r.to_float(),
+                }),
+                BinaryOp::GreaterOrEqual => Val::Bool(BoolVal {
+                    value: l.value >= r.to_float(),
+                }),
+                BinaryOp::LessOrEqual => Val::Bool(BoolVal {
+                    value: l.value <= r.to_float(),
+                }),
+                BinaryOp::Equal => Val::Bool(BoolVal {
+                    value: l.value == r.to_float(),
+                }),
+                BinaryOp::NotEqual => Val::Bool(BoolVal {
+                    value: l.value != r.to_float(),
+                }),
                 _ => panic!("Unsupported binary operation"),
             }
         }

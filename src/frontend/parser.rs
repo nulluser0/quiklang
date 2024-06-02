@@ -158,7 +158,7 @@ impl Parser {
 
     fn parse_object_expr(&mut self) -> Expr {
         if *self.at() != Token::Symbol(Symbol::LeftBrace) {
-            return self.parse_additive_expr();
+            return self.parse_relational_expr();
         }
         self.eat(); // advance past leftbrace
         let mut properties: Vec<Property> = Vec::new();
@@ -201,6 +201,40 @@ impl Parser {
             "Object literal missing right brace `}`.",
         );
         Expr::Literal(Literal::Object(properties))
+    }
+
+    fn parse_relational_expr(&mut self) -> Expr {
+        let mut left = self.parse_additive_expr();
+        while matches!(
+            self.at(),
+            Token::Operator(Operator::GreaterThan)
+                | Token::Operator(Operator::LessThan)
+                | Token::Operator(Operator::GreaterOrEqual)
+                | Token::Operator(Operator::LessOrEqual)
+                | Token::Operator(Operator::Equal)
+                | Token::Operator(Operator::NotEqual)
+        ) {
+            let operator_astoken = self.eat();
+            let operator: BinaryOp = match operator_astoken {
+                Token::Operator(Operator::GreaterThan) => BinaryOp::GreaterThan,
+                Token::Operator(Operator::LessThan) => BinaryOp::LessThan,
+                Token::Operator(Operator::GreaterOrEqual) => BinaryOp::GreaterOrEqual,
+                Token::Operator(Operator::LessOrEqual) => BinaryOp::LessOrEqual,
+                Token::Operator(Operator::Equal) => BinaryOp::Equal,
+                Token::Operator(Operator::NotEqual) => BinaryOp::NotEqual,
+                _ => {
+                    println!("Token is not an operator! {:#?}", operator_astoken);
+                    process::exit(1);
+                }
+            };
+            let right = self.parse_additive_expr();
+            left = Expr::BinaryOp {
+                op: operator,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
+        }
+        left
     }
 
     fn parse_additive_expr(&mut self) -> Expr {
