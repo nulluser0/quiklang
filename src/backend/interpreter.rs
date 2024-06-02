@@ -14,7 +14,6 @@ pub fn evaluate(stmt: Stmt, env: &mut Environment) -> Val {
             evaluate_declare_var(name, is_mutable, expr, env)
         }
         Stmt::ReturnStmt(_) => unimplemented!(),
-        Stmt::IfStmt(_, _, _) => unimplemented!(),
         Stmt::FunctionDeclaration(parameters, name, body, is_async) => {
             evaluate_declare_fn(parameters, name, body, is_async, env)
         } // Handle other statement types...

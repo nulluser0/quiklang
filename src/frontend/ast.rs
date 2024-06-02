@@ -27,6 +27,7 @@ pub enum Expr {
     UnaryOp(UnaryOp, Box<Expr>),
     FunctionCall(Vec<Expr>, Box<Expr>), // Args, Caller
     Member(Box<Expr>, Box<Expr>, bool), // Object, Property, Computed?
+    IfExpr(Box<Expr>, Vec<Stmt>, Option<Vec<Stmt>>), // Condition, Then, Optional Else
 }
 
 impl std::fmt::Display for Expr {
@@ -44,7 +45,6 @@ pub enum Stmt {
     DeclareStmt(String, bool, Option<Expr>), // Name, is_mutable, expr
     ReturnStmt(Option<Expr>),
     FunctionDeclaration(Vec<String>, String, Vec<Stmt>, bool), // Parameters, Name, Body, Is async?
-    IfStmt(Expr, Vec<Stmt>, Option<Vec<Stmt>>),                // Condition, Then, Else
 }
 
 #[derive(Debug, PartialEq, Clone)]

@@ -330,7 +330,7 @@ impl Parser {
     fn parse_primary_expr(&mut self) -> Expr {
         let tk = self.eat();
         match tk {
-            // Token::Keyword(_) => todo!(),
+            Token::Keyword(Keyword::If) => self.parse_if_expr() as Expr,
             Token::Identifier(name) => Expr::Identifier(name.to_string()) as Expr,
             Token::IntegerLiteral(integer) => Expr::Literal(Literal::Integer(integer)) as Expr,
             Token::FloatLiteral(float) => Expr::Literal(Literal::Float(float)) as Expr,
@@ -350,6 +350,44 @@ impl Parser {
                 process::exit(1);
             }
         }
+    }
+
+    fn parse_if_expr(&mut self) -> Expr {
+        let condition = self.parse_expr();
+        self.expect(
+            Token::Symbol(Symbol::LeftBrace),
+            "Expected left brace before `if` expression.",
+        );
+        let mut consequent: Vec<Stmt> = Vec::new();
+        while self.not_eof() && *self.at() != Token::Symbol(Symbol::RightBrace) {
+            consequent.push(self.parse_stmt());
+        }
+        self.expect(
+            Token::Symbol(Symbol::RightBrace),
+            "Expected right brace after `if` expression.",
+        );
+        let mut alternative: Option<Vec<Stmt>> = None;
+        if *self.at() == Token::Keyword(Keyword::Else) {
+            self.eat(); // Advance from else
+            if *self.at() == Token::Keyword(Keyword::If) {
+                alternative = Some(vec![Stmt::ExprStmt(self.parse_if_expr())])
+            } else {
+                self.expect(
+                    Token::Symbol(Symbol::LeftBrace),
+                    "Expected left brace before `else` expression.",
+                );
+                let mut else_block: Vec<Stmt> = Vec::new();
+                while self.not_eof() && *self.at() != Token::Symbol(Symbol::RightBrace) {
+                    else_block.push(self.parse_stmt());
+                }
+                self.expect(
+                    Token::Symbol(Symbol::RightBrace),
+                    "Expected right brace after `else` expression.",
+                );
+                alternative = Some(else_block);
+            }
+        }
+        Expr::IfExpr(Box::new(condition), consequent, alternative)
     }
 
     pub fn produce_ast(&mut self, source_code: String) -> Result<Program, String> {

@@ -6,7 +6,7 @@ use crate::{
         interpreter::evaluate,
         values::{FloatVal, IntegerVal, NullVal, ObjectVal, ToFloat, Val},
     },
-    frontend::ast::{BinaryOp, Expr, Literal, Property},
+    frontend::ast::{BinaryOp, Expr, Literal, Property, Stmt},
     mk_float, mk_integer, mk_null,
 };
 
@@ -19,7 +19,41 @@ pub fn evaluate_expr(expr: Expr, env: &mut Environment) -> Val {
         Expr::FunctionCall(args, caller) => evaluate_call_expr(args, *caller, env),
         Expr::AssignmentExpr(assignee, expr) => evaluate_assignment(*assignee, *expr, env),
         Expr::Member(_, _, _) => todo!("{:?}", expr),
+        Expr::IfExpr(condition, then, else_stmt) => {
+            evaluate_if_expr(*condition, then, else_stmt, env)
+        }
     }
+}
+
+pub fn evaluate_if_expr(
+    condition: Expr,
+    then: Vec<Stmt>,
+    else_stmt: Option<Vec<Stmt>>,
+    env: &mut Environment,
+) -> Val {
+    // Evaluate the condition. If it is true, then complete then, else do the else_stmt (or ignore if statement.)
+    let condition_value = evaluate_expr(condition, env);
+
+    // Check if the condition evaluates to true
+    if let Val::Bool(condition_bool) = condition_value {
+        if condition_bool.value {
+            // Evaluate the consequent block if the condition is true
+            for stmt in then {
+                evaluate(stmt, env);
+            }
+        } else if let Some(alt) = else_stmt {
+            // Evaluate the alternative block if the condition is false and an alternative is provided
+            for stmt in alt {
+                evaluate(stmt, env);
+            }
+        }
+    } else {
+        // Error: If condition doesn't evaluate to a boolean value
+        panic!("If condition must evaluate to a boolean value.");
+    }
+    // TODO: Handle cases where expr returns a value. Also as a result:
+    // TODO: Handle cases where Exprs do not return a value using the semicolon.
+    mk_null!()
 }
 
 pub fn evaluate_assignment(assignee: Expr, expr: Expr, env: &mut Environment) -> Val {
