@@ -3,17 +3,19 @@ use quiklang::frontend::lexer::tokenize;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let source_code = r#"
-        fn factorial(n: Integer) -> Integer {
+        fn factorial(n) {
             if n <= 1 {
-                return 1
+                1
             } else {
-                return n * factorial(n - 1)
+                n * factorial(n - 1)
             }
         }
+
+        factorial(5)
     "#
     .to_string();
 
-    c.bench_function("tokenize", |b| {
+    c.bench_function("tokenize_factorial", |b| {
         b.iter(|| {
             let tokens = tokenize(black_box(source_code.clone()));
             // Use the tokens to prevent optimization removal

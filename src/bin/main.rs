@@ -6,10 +6,7 @@ use std::{
     rc::Rc,
 };
 
-use quiklang::{
-    backend::{environment::Environment, interpreter::evaluate},
-    frontend::parser,
-};
+use quiklang::{backend::environment::Environment, utils::run::run};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -34,22 +31,6 @@ fn print_usage() {
     println!("Commands:");
     println!("  repl - Start the QuikLang REPL");
     println!("  <file> - Execute the specified QuikLang script file");
-}
-
-fn run(input: String, env: &Rc<RefCell<Environment>>) {
-    let mut parser = parser::Parser::new();
-    match parser.produce_ast(input) {
-        Ok(program) => {
-            // println!("{:#?}", program);
-
-            for stmt in program.statements {
-                let _ = evaluate(stmt, env);
-            }
-        }
-        Err(e) => {
-            println!("Error: {:?}", e);
-        }
-    }
 }
 
 fn run_file(file_path: &str) {

@@ -338,6 +338,23 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
                             }
                         }
                         drain_char = false;
+                    } else if let Some(&'*') = src.get(1) {
+                        // It is a multiline comment. Ignore all characters until '*/'.
+                        src.drain(0..2);
+                        while !src.is_empty() {
+                            if let Some(&commented_character) = src.first() {
+                                if commented_character == '*' {
+                                    src.drain(0..1);
+                                    if !src.is_empty() && Some(&'/') == src.get(1) {
+                                        src.drain(0..1);
+                                        break;
+                                    }
+                                } else {
+                                    src.drain(0..1); // Remove the processed character
+                                }
+                            }
+                        }
+                        drain_char = false;
                     } else {
                         tokens.push(Token::Operator(Operator::Divide));
                     }

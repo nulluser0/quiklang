@@ -3,10 +3,9 @@ use quiklang::frontend::lexer::tokenize;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let source_code = r#"
-        import io test hello world
         import async
 
-        io.print("Hello, World!");
+        println("Hello, World!");
 
         // Example factorial function
         fn factorial(n: Integer) -> Integer {
@@ -29,14 +28,14 @@ fn criterion_benchmark(c: &mut Criterion) {
         }
 
         let mut values: [String, String] = async.spawn!(task1(), task2);
-        io.print("These functions are called, but we can still do stuff here!");
-        io.print("Now lets collect the results of the functions, and print them.");
+        println("These functions are called, but we can still do stuff here!");
+        println("Now lets collect the results of the functions, and print them.");
         values = values > async.collect();
-        io.print("We pipe the values with futures into the async collector using the '>' operator. The async collector will sort them correctly into the right order of execution.");
-        io.print("We can expect 'OK1' then 'OK2' as a result.");
-        io.print(values>expand()>concat(", ")) // Whitespace around '>' is not strictly required.
+        println("We pipe the values with futures into the async collector using the '>' operator. The async collector will sort them correctly into the right order of execution.");
+        println("We can expect 'OK1' then 'OK2' as a result.");
+        println(values>expand()>concat(", ")) // Whitespace around '>' is not strictly required.
 
-        io.print("Let's create our own pipable function now.");
+        println("Let's create our own pipable function now.");
 
         fn add_1(self: Integer) -> Integer {
             return self + 1
@@ -44,9 +43,9 @@ fn criterion_benchmark(c: &mut Criterion) {
 
         let two: Integer = 2;
         two = two > add_1();
-        io.print(two); // Outputs 3
+        println(two); // Outputs 3
 
-        io.print("What about error handling?");
+        println("What about error handling?");
 
         fn ok_if_three(number: Integer) -> Result|(), String| {
             if !(number == 3) {
@@ -55,28 +54,28 @@ fn criterion_benchmark(c: &mut Criterion) {
             return Ok(())
         }
 
-        io.print(ok_if_three(2)>unwrap_result); // Results in "Not three!!!"
-        io.print(ok_if_three(3)>unwrap_result)
+        println(ok_if_three(2)>unwrap_result); // Results in "Not three!!!"
+        println(ok_if_three(3)>unwrap_result)
             > catch(error)
-            > io.print(error);
+            > println(error);
 
         // Two forms of error handling here! One is a Rust-like Result<> return form, and the other is catching an error via pipes using catch()!
         // We then pipe the catch into a print statement!
 
-        io.print("Now to end this with a blast...")
+        println("Now to end this with a blast...")
 
         // We define a panic module here which will be used instead of the default panic module.
         // If on_panic fails somehow, it defaults back to the default panic module.
         process.on_panic(error) {
             import io;
-            io.print("And now we panic here!");
-            io.print("The panic error: " + error);
+            println("And now we panic here!");
+            println("The panic error: " + error);
             process.exit // Exit the code.
         };
 
         ok_if_three(1);
 
-        io.print("This area is unreachable!!! How did you get here? Anyways, bye!");
+        println("This area is unreachable!!! How did you get here? Anyways, bye!");
         panic();
 
         // In the code checker, this would say something like this:
