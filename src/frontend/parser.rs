@@ -370,7 +370,7 @@ impl Parser {
             Token::FloatLiteral(float) => Expr::Literal(Literal::Float(float)) as Expr,
             Token::Operator(Operator::Not) => {
                 let expr = self.parse_call_member_expr();
-                Expr::UnaryOp(UnaryOp::Negate, Box::new(expr))
+                Expr::UnaryOp(UnaryOp::Not, Box::new(expr))
             }
             // Token::StringLiteral(_) => todo!(),
             // Token::Operator(_) => todo!(),
