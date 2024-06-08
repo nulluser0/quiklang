@@ -22,6 +22,49 @@ pub fn evaluate_expr(expr: Expr, env: &Rc<RefCell<Environment>>) -> Val {
         Expr::IfExpr(condition, then, else_stmt) => {
             evaluate_if_expr(*condition, then, else_stmt, env)
         }
+        Expr::ForExpr(_, _) => todo!("{:?}", expr),
+        Expr::WhileExpr(condition, then) => evaluate_while_expr(*condition, then, env),
+        Expr::ForeverLoopExpr(then) => evaluate_loop_expr(then, env),
+        Expr::Array(_) => todo!("{:?}", expr),
+    }
+}
+
+pub fn evaluate_while_expr(
+    condition: Expr,
+    then: Vec<Stmt>,
+    env: &Rc<RefCell<Environment>>,
+) -> Val {
+    if let Val::Bool(_) = evaluate_expr(condition.clone(), env) {
+        while let Val::Bool(BoolVal { value: true }) = evaluate_expr(condition.clone(), env) {
+            // Evaluate the consequent block if the condition is true
+            for stmt in &then {
+                if let Stmt::BreakStmt(maybe_expr) = stmt {
+                    return match maybe_expr {
+                        Some(expr) => evaluate_expr(expr.clone(), env),
+                        None => mk_null!(),
+                    };
+                }
+                evaluate(stmt.clone(), env);
+            }
+        }
+    } else {
+        // Error: If condition doesn't evaluate to a boolean value
+        panic!("While condition must evaluate to a boolean value.");
+    }
+    mk_null!()
+}
+
+pub fn evaluate_loop_expr(then: Vec<Stmt>, env: &Rc<RefCell<Environment>>) -> Val {
+    loop {
+        for stmt in &then {
+            if let Stmt::BreakStmt(maybe_expr) = stmt {
+                return match maybe_expr {
+                    Some(expr) => evaluate_expr(expr.clone(), env),
+                    None => mk_null!(),
+                };
+            }
+            evaluate(stmt.clone(), env);
+        }
     }
 }
 

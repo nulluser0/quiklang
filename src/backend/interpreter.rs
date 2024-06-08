@@ -19,6 +19,7 @@ pub fn evaluate(stmt: Stmt, env: &Rc<RefCell<Environment>>) -> Val {
         Stmt::ReturnStmt(_) => unimplemented!(),
         Stmt::FunctionDeclaration(parameters, name, body, is_async) => {
             evaluate_declare_fn(parameters, name, body, is_async, env)
-        } // Handle other statement types...
+        }
+        Stmt::BreakStmt(_) => todo!(), // Handle other statement types...
     }
 }

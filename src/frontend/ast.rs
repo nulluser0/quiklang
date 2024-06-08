@@ -17,6 +17,7 @@ impl Program {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     Literal(Literal),
+    Array(Vec<Expr>),
     Identifier(String),
     AssignmentExpr(Box<Expr>, Box<Expr>), // Assignee, Expr
     BinaryOp {
@@ -26,8 +27,11 @@ pub enum Expr {
     },
     UnaryOp(UnaryOp, Box<Expr>),
     FunctionCall(Vec<Expr>, Box<Expr>), // Args, Caller
-    Member(Box<Expr>, Box<Expr>, bool), // Object, Property, Computed?
+    Member(Box<Expr>, Box<Expr>, bool), // Object, Property, Computed? (a[b] = true), (a.b = false)
     IfExpr(Box<Expr>, Vec<Stmt>, Option<Vec<Stmt>>), // Condition, Then, Optional Else
+    ForExpr(Box<Expr>, Vec<Stmt>),      // For item in iterable, Do Stmts
+    WhileExpr(Box<Expr>, Vec<Stmt>),    // While Condition, Do Stmts
+    ForeverLoopExpr(Vec<Stmt>),         // Forever loop! Has vec of stmts.
 }
 
 impl std::fmt::Display for Expr {
@@ -44,6 +48,7 @@ pub enum Stmt {
     ExprStmt(Expr),
     DeclareStmt(String, bool, Option<Expr>), // Name, is_mutable, expr
     ReturnStmt(Option<Expr>),
+    BreakStmt(Option<Expr>),
     FunctionDeclaration(Vec<String>, String, Vec<Stmt>, bool), // Parameters, Name, Body, Is async?
 }
 
@@ -106,6 +111,4 @@ pub enum UnaryOp {
     ArithmeticNegative, // -
     ArithmeticPositive, // +
     BitwiseNot,         // ~
-
-                        // Other unary operators...
 }

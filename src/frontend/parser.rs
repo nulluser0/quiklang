@@ -59,6 +59,7 @@ impl Parser {
                     _ => panic!("Async: `fn` missing!"),
                 }
             }
+            Token::Keyword(Keyword::Break) => self.parse_break_declaration(),
             // Token::Identifier(_) => todo!(),
             // Token::IntegerLiteral(_) => todo!(),
             // Token::StringLiteral(_) => todo!(),
@@ -67,6 +68,20 @@ impl Parser {
             // Token::EOF => todo!(),
             _ => Stmt::ExprStmt(self.parse_expr()),
         }
+    }
+
+    fn parse_break_declaration(&mut self) -> Stmt {
+        self.eat();
+        if *self.at() == Token::Symbol(Symbol::Semicolon) {
+            self.eat();
+            return Stmt::BreakStmt(None);
+        }
+        let expr = self.parse_expr();
+        self.expect(
+            Token::Symbol(Symbol::Semicolon),
+            "break declaration is a statement. It must end with a semicolon.",
+        );
+        Stmt::BreakStmt(Some(expr))
     }
 
     fn parse_fn_declaration(&mut self, is_async: bool) -> Stmt {
@@ -366,6 +381,8 @@ impl Parser {
         match tk {
             // Keyword
             Token::Keyword(Keyword::If) => self.parse_if_expr() as Expr,
+            Token::Keyword(Keyword::While) => self.parse_while_expr() as Expr,
+            Token::Keyword(Keyword::Loop) => self.parse_loop_expr() as Expr,
             // Identifier
             Token::Identifier(name) => Expr::Identifier(name.to_string()) as Expr,
             // Literals
@@ -398,12 +415,61 @@ impl Parser {
                 ); // rightParen
                 value
             }
+            Token::Symbol(Symbol::LeftBracket) => {
+                let mut elements: Vec<Expr> = Vec::new();
+                if self.not_eof() && *self.at() != Token::Symbol(Symbol::RightBracket) {
+                    // Parse elements
+                    elements.push(self.parse_expr());
+                    while *self.at() == Token::Symbol(Symbol::Comma) {
+                        self.eat(); // Consume comma
+                        elements.push(self.parse_expr());
+                    }
+                }
+                self.expect(
+                    Token::Symbol(Symbol::RightBracket),
+                    "Expected right bracket after array literal.",
+                );
+                Expr::Array(elements)
+            }
             // Token::EOF => todo!(),
             _ => {
                 println!("Unexpected token found during parsing! {:#?}", tk);
                 process::exit(1);
             }
         }
+    }
+
+    fn parse_while_expr(&mut self) -> Expr {
+        let condition = self.parse_expr();
+        self.expect(
+            Token::Symbol(Symbol::LeftBrace),
+            "Expected left brace before `while` expression.",
+        );
+        let mut statements: Vec<Stmt> = Vec::new();
+        while self.not_eof() && *self.at() != Token::Symbol(Symbol::RightBrace) {
+            statements.push(self.parse_stmt());
+        }
+        self.expect(
+            Token::Symbol(Symbol::RightBrace),
+            "Expected right brace after `while` expression.",
+        );
+        Expr::WhileExpr(Box::new(condition), statements)
+    }
+
+    fn parse_loop_expr(&mut self) -> Expr {
+        self.expect(
+            Token::Symbol(Symbol::LeftBrace),
+            "Expected left brace before `loop` expression.",
+        );
+        let mut statements: Vec<Stmt> = Vec::new();
+        while self.not_eof() && *self.at() != Token::Symbol(Symbol::RightBrace) {
+            statements.push(self.parse_stmt());
+        }
+        self.expect(
+            Token::Symbol(Symbol::RightBrace),
+            "Expected right brace after `loop` expression.",
+        );
+        Expr::ForeverLoopExpr(statements)
     }
 
     fn parse_if_expr(&mut self) -> Expr {
