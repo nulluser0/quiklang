@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::frontend::ast::Stmt;
 
@@ -82,7 +82,7 @@ impl RuntimeVal for ObjectVal {
     }
 }
 
-type NativeFunctionCallback = fn(Vec<Val>, &mut Environment) -> Val;
+type NativeFunctionCallback = fn(Vec<Val>, &Rc<RefCell<Environment>>) -> Val;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct NativeFunctionVal {
@@ -101,7 +101,7 @@ pub struct FunctionVal {
     pub parameters: Vec<String>,
     pub body: Vec<Stmt>,
     pub is_async: bool,
-    pub declaration_env: Environment,
+    pub declaration_env: Rc<RefCell<Environment>>,
 }
 
 impl RuntimeVal for FunctionVal {

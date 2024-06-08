@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     backend::{
         environment::Environment,
@@ -13,7 +15,7 @@ pub fn evaluate_declare_var(
     name: String,
     is_mutable: bool,
     expr: Option<Expr>,
-    env: &mut Environment,
+    env: &Rc<RefCell<Environment>>,
 ) -> Val {
     let value: Val = if let Some(val) = expr {
         evaluate_expr(val, env)
@@ -21,7 +23,7 @@ pub fn evaluate_declare_var(
         mk_null!()
     };
 
-    env.declare_var(&name, value, is_mutable)
+    env.borrow_mut().declare_var(&name, value, is_mutable)
 }
 
 pub fn evaluate_declare_fn(
@@ -29,15 +31,15 @@ pub fn evaluate_declare_fn(
     name: String,
     body: Vec<Stmt>,
     is_async: bool,
-    env: &mut Environment,
+    env: &Rc<RefCell<Environment>>,
 ) -> Val {
     let function: Val = Val::Function(FunctionVal {
         name: name.clone(),
         parameters,
         body,
         is_async,
-        declaration_env: env.to_owned(),
+        declaration_env: env.clone(),
     });
 
-    env.declare_var(&name, function, false)
+    env.borrow_mut().declare_var(&name, function, false)
 }

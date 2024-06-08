@@ -1,7 +1,9 @@
 // Environment
 
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::process;
+use std::rc::Rc;
 
 use crate::backend::values::{BoolVal, NativeFunctionVal, NullVal, Val};
 use crate::{mk_bool, mk_native_fn, mk_null};
@@ -12,7 +14,7 @@ use super::native_fn::{native_println, native_time};
 pub struct Environment {
     values: HashMap<String, Val>,
     is_mutable: HashSet<String>,
-    parent: Option<Box<Environment>>,
+    parent: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Default for Environment {
@@ -42,21 +44,21 @@ impl Environment {
         env
     }
 
-    pub fn new_with_parent(parent: Environment) -> Self {
+    pub fn new_with_parent(parent: Rc<RefCell<Environment>>) -> Self {
         Environment {
             values: HashMap::new(),
             is_mutable: HashSet::new(),
-            parent: Some(Box::new(parent)),
+            parent: Some(parent),
         }
     }
 
-    pub fn resolve(&self, varname: &str) -> Result<&Environment, String> {
+    pub fn resolve(&self, varname: &str) -> Result<Rc<RefCell<Environment>>, String> {
         if self.values.contains_key(varname) {
-            return Ok(self);
+            return Ok(Rc::new(RefCell::new(self.clone())));
         }
 
         if let Some(parent) = &self.parent {
-            return parent.resolve(varname);
+            return parent.borrow().resolve(varname);
         }
 
         Err(format!(
@@ -96,7 +98,7 @@ impl Environment {
         value
     }
 
-    pub fn lookup_var(&mut self, name: &str) -> Val {
+    pub fn lookup_var(&self, name: &str) -> Val {
         let env = match self.resolve(name) {
             Ok(result) => result,
             Err(_) => {
@@ -104,6 +106,7 @@ impl Environment {
                 process::exit(1);
             }
         };
-        env.values.get(name).unwrap().clone()
+        let x = env.borrow().values.get(name).unwrap().clone();
+        x
     }
 }

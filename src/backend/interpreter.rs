@@ -1,5 +1,8 @@
 // Interpreter
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::frontend::ast::Stmt;
 
 use super::environment::Environment;
@@ -7,7 +10,7 @@ use super::eval::expressions::evaluate_expr;
 use super::eval::statements::{evaluate_declare_fn, evaluate_declare_var};
 use super::values::Val;
 
-pub fn evaluate(stmt: Stmt, env: &mut Environment) -> Val {
+pub fn evaluate(stmt: Stmt, env: &Rc<RefCell<Environment>>) -> Val {
     match stmt {
         Stmt::ExprStmt(expr) => evaluate_expr(expr, env),
         Stmt::DeclareStmt(name, is_mutable, expr) => {

@@ -1,7 +1,9 @@
 use std::{
+    cell::RefCell,
     fs::File,
     io::{self, Read, Write},
     process,
+    rc::Rc,
 };
 
 use quiklang::{
@@ -34,7 +36,7 @@ fn print_usage() {
     println!("  <file> - Execute the specified QuikLang script file");
 }
 
-fn run(input: String, env: &mut Environment) {
+fn run(input: String, env: &Rc<RefCell<Environment>>) {
     let mut parser = parser::Parser::new();
     match parser.produce_ast(input) {
         Ok(program) => {
@@ -65,14 +67,14 @@ fn run_file(file_path: &str) {
         process::exit(1);
     }
 
-    let mut env = Environment::new();
-    run(content, &mut env);
+    let env = Rc::new(RefCell::new(Environment::new()));
+    run(content, &env)
 }
 
 fn repl() {
     println!("QuikLang REPL v{}", env!("CARGO_PKG_VERSION"));
 
-    let mut env = Environment::new();
+    let env = Rc::new(RefCell::new(Environment::new()));
 
     loop {
         print!("quiklang> ");
@@ -88,6 +90,6 @@ fn repl() {
             println!("Exiting QuikLang REPL.");
             process::exit(0); // Exit normally
         }
-        run(input, &mut env);
+        run(input, &env);
     }
 }

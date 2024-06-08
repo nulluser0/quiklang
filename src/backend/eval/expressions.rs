@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     backend::{
@@ -10,7 +10,7 @@ use crate::{
     mk_float, mk_integer, mk_null,
 };
 
-pub fn evaluate_expr(expr: Expr, env: &mut Environment) -> Val {
+pub fn evaluate_expr(expr: Expr, env: &Rc<RefCell<Environment>>) -> Val {
     match expr {
         Expr::Literal(literal) => evaluate_literal(literal, env),
         Expr::Identifier(identifier) => evaluate_identifier(identifier, env),
@@ -29,7 +29,7 @@ pub fn evaluate_if_expr(
     condition: Expr,
     then: Vec<Stmt>,
     else_stmt: Option<Vec<Stmt>>,
-    env: &mut Environment,
+    env: &Rc<RefCell<Environment>>,
 ) -> Val {
     // Evaluate the condition. If it is true, then complete then, else do the else_stmt (or ignore if statement.)
     let condition_value = evaluate_expr(condition, env);
@@ -64,20 +64,20 @@ pub fn evaluate_if_expr(
     mk_null!()
 }
 
-pub fn evaluate_assignment(assignee: Expr, expr: Expr, env: &mut Environment) -> Val {
+pub fn evaluate_assignment(assignee: Expr, expr: Expr, env: &Rc<RefCell<Environment>>) -> Val {
     let varname = match assignee {
         Expr::Identifier(name) => name,
         _ => panic!("Invalid LHS in assignment expression. {:?}", assignee),
     };
     let value = evaluate_expr(expr, env);
-    env.assign_var(&varname, value)
+    env.borrow_mut().assign_var(&varname, value)
 }
 
-pub fn evaluate_identifier(identifier: String, env: &mut Environment) -> Val {
-    env.lookup_var(&identifier)
+pub fn evaluate_identifier(identifier: String, env: &Rc<RefCell<Environment>>) -> Val {
+    env.borrow().lookup_var(&identifier)
 }
 
-pub fn evaluate_literal(literal: Literal, env: &mut Environment) -> Val {
+pub fn evaluate_literal(literal: Literal, env: &Rc<RefCell<Environment>>) -> Val {
     match literal {
         Literal::Integer(value) => mk_integer!(value) as Val,
         Literal::Float(value) => mk_float!(value) as Val,
@@ -86,7 +86,7 @@ pub fn evaluate_literal(literal: Literal, env: &mut Environment) -> Val {
     }
 }
 
-pub fn evaluate_object_expr(obj: Vec<Property>, env: &mut Environment) -> Val {
+pub fn evaluate_object_expr(obj: Vec<Property>, env: &Rc<RefCell<Environment>>) -> Val {
     let mut object = ObjectVal {
         properties: HashMap::new(),
     };
@@ -98,7 +98,7 @@ pub fn evaluate_object_expr(obj: Vec<Property>, env: &mut Environment) -> Val {
     Val::Object(object)
 }
 
-pub fn evaluate_call_expr(args: Vec<Expr>, caller: Expr, env: &mut Environment) -> Val {
+pub fn evaluate_call_expr(args: Vec<Expr>, caller: Expr, env: &Rc<RefCell<Environment>>) -> Val {
     let evaluated_args: Vec<Val> = args
         .into_iter()
         .map(|expr| evaluate_expr(expr, env))
@@ -107,7 +107,9 @@ pub fn evaluate_call_expr(args: Vec<Expr>, caller: Expr, env: &mut Environment) 
     match &function {
         Val::NativeFunction(callable) => return (callable.call)(evaluated_args, env),
         Val::Function(fn_value) => {
-            let mut scope = Environment::new_with_parent(fn_value.declaration_env.to_owned());
+            let scope = Rc::new(RefCell::new(Environment::new_with_parent(
+                fn_value.declaration_env.clone(),
+            )));
             for (i, _) in evaluated_args
                 .iter()
                 .enumerate()
@@ -117,11 +119,11 @@ pub fn evaluate_call_expr(args: Vec<Expr>, caller: Expr, env: &mut Environment) 
                 // Verify arity of function.
                 let varname = &fn_value.parameters[i];
                 let arg = &evaluated_args[i];
-                scope.declare_var(varname, arg.clone(), false);
+                scope.borrow_mut().declare_var(varname, arg.clone(), false);
             }
             let mut result: Val = mk_null!();
             for stmt in &fn_value.body {
-                result = evaluate(stmt.clone(), &mut scope)
+                result = evaluate(stmt.clone(), &scope)
             }
             return result;
         }
@@ -130,7 +132,12 @@ pub fn evaluate_call_expr(args: Vec<Expr>, caller: Expr, env: &mut Environment) 
     panic!("Cannot call value that is not a function: {:?}", function);
 }
 
-pub fn evaluate_binary_op(op: BinaryOp, left: Expr, right: Expr, env: &mut Environment) -> Val {
+pub fn evaluate_binary_op(
+    op: BinaryOp,
+    left: Expr,
+    right: Expr,
+    env: &Rc<RefCell<Environment>>,
+) -> Val {
     let left_val = evaluate_expr(left, env);
     let right_val = evaluate_expr(right, env);
 
