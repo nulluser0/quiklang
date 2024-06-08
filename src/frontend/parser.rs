@@ -364,16 +364,32 @@ impl Parser {
     fn parse_primary_expr(&mut self) -> Expr {
         let tk = self.eat();
         match tk {
+            // Keyword
             Token::Keyword(Keyword::If) => self.parse_if_expr() as Expr,
+            // Identifier
             Token::Identifier(name) => Expr::Identifier(name.to_string()) as Expr,
+            // Literals
             Token::IntegerLiteral(integer) => Expr::Literal(Literal::Integer(integer)) as Expr,
             Token::FloatLiteral(float) => Expr::Literal(Literal::Float(float)) as Expr,
-            Token::Operator(Operator::Not) => {
-                let expr = self.parse_call_member_expr();
-                Expr::UnaryOp(UnaryOp::Not, Box::new(expr))
-            }
             // Token::StringLiteral(_) => todo!(),
-            // Token::Operator(_) => todo!(),
+            // Unary Operators
+            Token::Operator(Operator::LogicalNot) => {
+                let expr = self.parse_call_member_expr();
+                Expr::UnaryOp(UnaryOp::LogicalNot, Box::new(expr))
+            }
+            Token::Operator(Operator::Subtract) => {
+                let expr = self.parse_call_member_expr();
+                Expr::UnaryOp(UnaryOp::ArithmeticNegative, Box::new(expr))
+            }
+            Token::Operator(Operator::Add) => {
+                let expr = self.parse_call_member_expr();
+                Expr::UnaryOp(UnaryOp::ArithmeticPositive, Box::new(expr))
+            }
+            Token::Operator(Operator::BitwiseNot) => {
+                let expr = self.parse_call_member_expr();
+                Expr::UnaryOp(UnaryOp::BitwiseNot, Box::new(expr))
+            }
+            // Symbols
             Token::Symbol(Symbol::LeftParen) => {
                 let value = self.parse_expr();
                 self.expect(

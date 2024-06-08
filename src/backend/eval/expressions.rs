@@ -6,7 +6,7 @@ use crate::{
         interpreter::evaluate,
         values::{BoolVal, FloatVal, IntegerVal, NullVal, ObjectVal, ToFloat, Val},
     },
-    frontend::ast::{BinaryOp, Expr, Literal, Property, Stmt},
+    frontend::ast::{BinaryOp, Expr, Literal, Property, Stmt, UnaryOp},
     mk_float, mk_integer, mk_null,
 };
 
@@ -15,13 +15,46 @@ pub fn evaluate_expr(expr: Expr, env: &Rc<RefCell<Environment>>) -> Val {
         Expr::Literal(literal) => evaluate_literal(literal, env),
         Expr::Identifier(identifier) => evaluate_identifier(identifier, env),
         Expr::BinaryOp { op, left, right } => evaluate_binary_op(op, *left, *right, env),
-        Expr::UnaryOp(_, _) => unimplemented!("{:?}", expr),
+        Expr::UnaryOp(op, expr) => evaluate_unary_op(op, *expr, env),
         Expr::FunctionCall(args, caller) => evaluate_call_expr(args, *caller, env),
         Expr::AssignmentExpr(assignee, expr) => evaluate_assignment(*assignee, *expr, env),
         Expr::Member(_, _, _) => todo!("{:?}", expr),
         Expr::IfExpr(condition, then, else_stmt) => {
             evaluate_if_expr(*condition, then, else_stmt, env)
         }
+    }
+}
+
+pub fn evaluate_unary_op(op: UnaryOp, expr: Expr, env: &Rc<RefCell<Environment>>) -> Val {
+    let evaluated_expr = evaluate_expr(expr, env);
+    match op {
+        UnaryOp::LogicalNot => {
+            if let Val::Bool(condition_bool) = evaluated_expr {
+                Val::Bool(BoolVal {
+                    value: !(condition_bool.value),
+                })
+            } else {
+                panic!("Unary Operation `LogicalNot` (`!`) must apply to a boolean value.")
+            }
+        }
+        UnaryOp::ArithmeticNegative => match evaluated_expr {
+            Val::Float(FloatVal { value }) => Val::Float(FloatVal { value: -value }),
+            Val::Integer(IntegerVal { value }) => Val::Integer(IntegerVal { value: -value }),
+            _ => panic!(
+                "Unary Operation `ArithmeticNegative` (`-`) must apply to a float or integer."
+            ),
+        },
+        UnaryOp::ArithmeticPositive => match evaluated_expr {
+            Val::Float(_) => evaluated_expr,
+            Val::Integer(_) => evaluated_expr,
+            _ => panic!(
+                "Unary Operation `ArithmeticPositive` (`+`) must apply to a float or integer."
+            ),
+        },
+        UnaryOp::BitwiseNot => match evaluated_expr {
+            Val::Integer(IntegerVal { value }) => Val::Integer(IntegerVal { value: !value }),
+            _ => panic!("Unary Operation `BitwiseNot` (`~`) must apply to an integer."),
+        },
     }
 }
 

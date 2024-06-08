@@ -102,6 +102,10 @@ impl From<Operator> for BinaryOp {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum UnaryOp {
-    Not,
-    // Other unary operators...
+    LogicalNot,         // !
+    ArithmeticNegative, // -
+    ArithmeticPositive, // +
+    BitwiseNot,         // ~
+
+                        // Other unary operators...
 }

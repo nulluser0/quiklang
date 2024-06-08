@@ -95,11 +95,12 @@ pub enum Operator {
     LessOrEqual,    // <=
     Equal,          // ==
     NotEqual,       // !=
-    Not,            // !
+    LogicalNot,     // !
     And,            // &&
     Or,             // ||
     Pipe,           // >
     Modulus,        // %
+    BitwiseNot,     // ~
 }
 
 // Symbols/Delimiters
@@ -146,6 +147,7 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
             ',' => tokens.push(Token::Symbol(Symbol::Comma)),
             ';' => tokens.push(Token::Symbol(Symbol::Semicolon)),
             ':' => tokens.push(Token::Symbol(Symbol::Colon)),
+            '~' => tokens.push(Token::Operator(Operator::BitwiseNot)),
             '!' => {
                 if src.is_empty() {
                     break;
@@ -155,7 +157,7 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
                     drain_char = false;
                     src.drain(0..2); // Remove '!=' characters
                 } else {
-                    tokens.push(Token::Operator(Operator::Not));
+                    tokens.push(Token::Operator(Operator::LogicalNot));
                 }
             }
             '.' => tokens.push(Token::Symbol(Symbol::Dot)),
