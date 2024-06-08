@@ -6,7 +6,7 @@ use std::process;
 use crate::frontend::ast::{BinaryOp, Program, Property};
 
 use super::{
-    ast::{Expr, Literal, Stmt},
+    ast::{Expr, Literal, Stmt, UnaryOp},
     lexer::{tokenize, Keyword, Operator, Symbol, Token},
 };
 
@@ -368,6 +368,10 @@ impl Parser {
             Token::Identifier(name) => Expr::Identifier(name.to_string()) as Expr,
             Token::IntegerLiteral(integer) => Expr::Literal(Literal::Integer(integer)) as Expr,
             Token::FloatLiteral(float) => Expr::Literal(Literal::Float(float)) as Expr,
+            Token::Operator(Operator::Not) => {
+                let expr = self.parse_call_member_expr();
+                Expr::UnaryOp(UnaryOp::Negate, Box::new(expr))
+            }
             // Token::StringLiteral(_) => todo!(),
             // Token::Operator(_) => todo!(),
             Token::Symbol(Symbol::LeftParen) => {
