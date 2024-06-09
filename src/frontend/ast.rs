@@ -32,6 +32,7 @@ pub enum Expr {
     ForExpr(Box<Expr>, Vec<Stmt>),      // For item in iterable, Do Stmts
     WhileExpr(Box<Expr>, Vec<Stmt>),    // While Condition, Do Stmts
     ForeverLoopExpr(Vec<Stmt>),         // Forever loop! Has vec of stmts.
+    SpecialNull, // Literally just returns null. Should ONLY be returned as a result of a semicolon.
 }
 
 impl std::fmt::Display for Expr {

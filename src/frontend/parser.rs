@@ -14,6 +14,7 @@ use super::{
 pub struct Parser {
     tokens: Vec<Token>,
     inside_loop: bool,
+    inside_function: bool,
 }
 
 impl Default for Parser {
@@ -27,6 +28,7 @@ impl Parser {
         Parser {
             tokens: Vec::new(),
             inside_loop: false,
+            inside_function: false,
         }
     }
 
@@ -64,6 +66,7 @@ impl Parser {
                 }
             }
             Token::Keyword(Keyword::Break) => self.parse_break_declaration(),
+            Token::Keyword(Keyword::Return) => self.parse_return_declaration(),
             // Token::Identifier(_) => todo!(),
             // Token::IntegerLiteral(_) => todo!(),
             // Token::StringLiteral(_) => todo!(),
@@ -91,6 +94,23 @@ impl Parser {
         Stmt::BreakStmt(Some(expr))
     }
 
+    fn parse_return_declaration(&mut self) -> Stmt {
+        self.eat();
+        if !self.inside_function {
+            panic!("`return` statement found outside of a function context.")
+        }
+        if *self.at() == Token::Symbol(Symbol::Semicolon) {
+            self.eat();
+            return Stmt::ReturnStmt(None);
+        }
+        let expr = self.parse_expr();
+        self.expect(
+            Token::Symbol(Symbol::Semicolon),
+            "return declaration is a statement. It must end with a semicolon.",
+        );
+        Stmt::ReturnStmt(Some(expr))
+    }
+
     fn parse_fn_declaration(&mut self, is_async: bool) -> Stmt {
         self.eat();
         let name = match self.eat() {
@@ -111,10 +131,13 @@ impl Parser {
             Token::Symbol(Symbol::LeftBrace),
             "Expected function body following declaration.",
         );
+        let prev_inside_function = self.inside_function;
+        self.inside_function = true;
         let mut body: Vec<Stmt> = Vec::new();
         while self.not_eof() && *self.at() != Token::Symbol(Symbol::RightBrace) {
             body.push(self.parse_stmt());
         }
+        self.inside_function = prev_inside_function;
         self.expect(
             Token::Symbol(Symbol::RightBrace),
             "Closing brace expected inside function declaration.",
@@ -438,6 +461,7 @@ impl Parser {
                 );
                 Expr::Array(elements)
             }
+            Token::Symbol(Symbol::Semicolon) => Expr::SpecialNull,
             // Token::EOF => todo!(),
             _ => {
                 println!("Unexpected token found during parsing! {:#?}", tk);

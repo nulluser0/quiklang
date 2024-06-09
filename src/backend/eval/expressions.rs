@@ -29,6 +29,7 @@ pub fn evaluate_expr(expr: Expr, env: &Rc<RefCell<Environment>>) -> Val {
         Expr::WhileExpr(condition, then) => evaluate_while_expr(*condition, then, env),
         Expr::ForeverLoopExpr(then) => evaluate_loop_expr(then, env),
         Expr::Array(_) => todo!("{:?}", expr),
+        Expr::SpecialNull => mk_null!(),
     }
 }
 
@@ -46,10 +47,7 @@ pub fn evaluate_while_expr(
                     return_value,
                 }) = evaluate(stmt.clone(), env)
                 {
-                    return match return_value {
-                        Some(val) => *val,
-                        None => mk_null!(),
-                    };
+                    return return_value.map_or(mk_null!(), |val| *val);
                 }
             }
         }
@@ -68,10 +66,7 @@ pub fn evaluate_loop_expr(then: Vec<Stmt>, env: &Rc<RefCell<Environment>>) -> Va
                 return_value,
             }) = evaluate(stmt.clone(), env)
             {
-                return match return_value {
-                    Some(val) => *val,
-                    None => mk_null!(),
-                };
+                return return_value.map_or(mk_null!(), |val| *val);
             }
         }
     }
@@ -144,7 +139,6 @@ pub fn evaluate_if_expr(
         // Error: If condition doesn't evaluate to a boolean value
         panic!("If condition must evaluate to a boolean value.");
     }
-    // TODO: Handle cases where expr returns a value. Also as a result:
     // TODO: Handle cases where Exprs do not return a value using the semicolon.
     mk_null!()
 }
@@ -190,31 +184,29 @@ pub fn evaluate_call_expr(args: Vec<Expr>, caller: Expr, env: &Rc<RefCell<Enviro
         .collect();
     let function = evaluate_expr(caller, env);
     match &function {
-        Val::NativeFunction(callable) => return (callable.call)(evaluated_args, env),
+        Val::NativeFunction(callable) => (callable.call)(evaluated_args, env),
         Val::Function(fn_value) => {
             let scope = Rc::new(RefCell::new(Environment::new_with_parent(
                 fn_value.declaration_env.clone(),
             )));
-            for (i, _) in evaluated_args
-                .iter()
-                .enumerate()
-                .take(fn_value.parameters.len())
-            {
-                // TODO: Check the bounds here.
-                // Verify arity of function.
-                let varname = &fn_value.parameters[i];
-                let arg = &evaluated_args[i];
+            for (varname, arg) in fn_value.parameters.iter().zip(evaluated_args.iter()) {
                 scope.borrow_mut().declare_var(varname, arg.clone(), false);
             }
             let mut result: Val = mk_null!();
             for stmt in &fn_value.body {
-                result = evaluate(stmt.clone(), &scope)
+                result = evaluate(stmt.clone(), &scope);
+                if let Val::Special(SpecialVal {
+                    keyword: SpecialValKeyword::Return,
+                    return_value,
+                }) = result
+                {
+                    return return_value.map_or(mk_null!(), |val| *val);
+                }
             }
-            return result;
+            result
         }
-        _ => {}
-    };
-    panic!("Cannot call value that is not a function: {:?}", function);
+        _ => panic!("Cannot call value that is not a function: {:?}", function),
+    }
 }
 
 pub fn evaluate_binary_op(
