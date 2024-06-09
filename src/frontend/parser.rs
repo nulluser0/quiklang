@@ -13,6 +13,7 @@ use super::{
 #[derive(Debug)]
 pub struct Parser {
     tokens: Vec<Token>,
+    inside_loop: bool,
 }
 
 impl Default for Parser {
@@ -23,7 +24,10 @@ impl Default for Parser {
 
 impl Parser {
     pub fn new() -> Self {
-        Parser { tokens: Vec::new() }
+        Parser {
+            tokens: Vec::new(),
+            inside_loop: false,
+        }
     }
 
     fn not_eof(&self) -> bool {
@@ -72,6 +76,9 @@ impl Parser {
 
     fn parse_break_declaration(&mut self) -> Stmt {
         self.eat();
+        if !self.inside_loop {
+            panic!("`break` statement found outside of a loop (while, for, loop) context.")
+        }
         if *self.at() == Token::Symbol(Symbol::Semicolon) {
             self.eat();
             return Stmt::BreakStmt(None);
@@ -445,10 +452,14 @@ impl Parser {
             Token::Symbol(Symbol::LeftBrace),
             "Expected left brace before `while` expression.",
         );
+
+        let prev_inside_loop = self.inside_loop; // Save previous context.
+        self.inside_loop = true; // We are now in a loop context. Modify parser.
         let mut statements: Vec<Stmt> = Vec::new();
         while self.not_eof() && *self.at() != Token::Symbol(Symbol::RightBrace) {
             statements.push(self.parse_stmt());
         }
+        self.inside_loop = prev_inside_loop; // Restore previous context
         self.expect(
             Token::Symbol(Symbol::RightBrace),
             "Expected right brace after `while` expression.",
@@ -461,10 +472,13 @@ impl Parser {
             Token::Symbol(Symbol::LeftBrace),
             "Expected left brace before `loop` expression.",
         );
+        let prev_inside_loop = self.inside_loop; // Save previous context.
+        self.inside_loop = true; // We are now in a loop context. Modify parser.
         let mut statements: Vec<Stmt> = Vec::new();
         while self.not_eof() && *self.at() != Token::Symbol(Symbol::RightBrace) {
             statements.push(self.parse_stmt());
         }
+        self.inside_loop = prev_inside_loop; // Restore previous context
         self.expect(
             Token::Symbol(Symbol::RightBrace),
             "Expected right brace after `loop` expression.",
