@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     backend::{
         environment::Environment,
-        values::{FunctionVal, NullVal, Val},
+        values::{FunctionVal, NullVal, SpecialVal, SpecialValKeyword, Val},
     },
     frontend::ast::{Expr, Stmt},
     mk_null,
@@ -42,4 +42,30 @@ pub fn evaluate_declare_fn(
     });
 
     env.borrow_mut().declare_var(&name, function, false)
+}
+
+pub fn evaluate_break_stmt(expr: Option<Expr>, env: &Rc<RefCell<Environment>>) -> Val {
+    match expr {
+        Some(expr) => Val::Special(SpecialVal {
+            keyword: SpecialValKeyword::Break,
+            return_value: Some(Box::new(evaluate_expr(expr, env))),
+        }),
+        None => Val::Special(SpecialVal {
+            keyword: SpecialValKeyword::Break,
+            return_value: None,
+        }),
+    }
+}
+
+pub fn evaluate_return_stmt(expr: Option<Expr>, env: &Rc<RefCell<Environment>>) -> Val {
+    match expr {
+        Some(expr) => Val::Special(SpecialVal {
+            keyword: SpecialValKeyword::Return,
+            return_value: Some(Box::new(evaluate_expr(expr, env))),
+        }),
+        None => Val::Special(SpecialVal {
+            keyword: SpecialValKeyword::Return,
+            return_value: None,
+        }),
+    }
 }

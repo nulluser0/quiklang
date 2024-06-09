@@ -13,6 +13,7 @@ pub enum ValueType {
     Object,
     NativeFunction,
     Function,
+    Special, // Stuff like breaks, returns, etc.
 }
 
 pub trait RuntimeVal: std::fmt::Debug {
@@ -110,6 +111,24 @@ impl RuntimeVal for FunctionVal {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum SpecialValKeyword {
+    Break,
+    Return,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct SpecialVal {
+    pub keyword: SpecialValKeyword,
+    pub return_value: Option<Box<Val>>,
+}
+
+impl RuntimeVal for SpecialVal {
+    fn get_type(&self) -> ValueType {
+        ValueType::Special
+    }
+}
+
 // This enum encapsulates any RuntimeVal type to handle them generically.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Val {
@@ -120,6 +139,7 @@ pub enum Val {
     Object(ObjectVal),
     NativeFunction(NativeFunctionVal),
     Function(FunctionVal),
+    Special(SpecialVal),
 }
 
 impl RuntimeVal for Val {
@@ -132,6 +152,7 @@ impl RuntimeVal for Val {
             Val::Object(_) => ValueType::Object,
             Val::NativeFunction(_) => ValueType::NativeFunction,
             Val::Function(_) => ValueType::Function,
+            Val::Special(_) => ValueType::Special,
         }
     }
 }

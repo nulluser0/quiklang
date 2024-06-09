@@ -7,7 +7,9 @@ use crate::frontend::ast::Stmt;
 
 use super::environment::Environment;
 use super::eval::expressions::evaluate_expr;
-use super::eval::statements::{evaluate_declare_fn, evaluate_declare_var};
+use super::eval::statements::{
+    evaluate_break_stmt, evaluate_declare_fn, evaluate_declare_var, evaluate_return_stmt,
+};
 use super::values::Val;
 
 pub fn evaluate(stmt: Stmt, env: &Rc<RefCell<Environment>>) -> Val {
@@ -16,10 +18,10 @@ pub fn evaluate(stmt: Stmt, env: &Rc<RefCell<Environment>>) -> Val {
         Stmt::DeclareStmt(name, is_mutable, expr) => {
             evaluate_declare_var(name, is_mutable, expr, env)
         }
-        Stmt::ReturnStmt(_) => unimplemented!(),
+        Stmt::ReturnStmt(expr) => evaluate_return_stmt(expr, env),
         Stmt::FunctionDeclaration(parameters, name, body, is_async) => {
             evaluate_declare_fn(parameters, name, body, is_async, env)
         }
-        Stmt::BreakStmt(_) => todo!(), // Handle other statement types...
+        Stmt::BreakStmt(expr) => evaluate_break_stmt(expr, env), // Handle other statement types...
     }
 }

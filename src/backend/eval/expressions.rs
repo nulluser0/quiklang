@@ -4,7 +4,10 @@ use crate::{
     backend::{
         environment::Environment,
         interpreter::evaluate,
-        values::{BoolVal, FloatVal, IntegerVal, NullVal, ObjectVal, ToFloat, Val},
+        values::{
+            BoolVal, FloatVal, IntegerVal, NullVal, ObjectVal, SpecialVal, SpecialValKeyword,
+            ToFloat, Val,
+        },
     },
     frontend::ast::{BinaryOp, Expr, Literal, Property, Stmt, UnaryOp},
     mk_float, mk_integer, mk_null,
@@ -38,13 +41,16 @@ pub fn evaluate_while_expr(
         while let Val::Bool(BoolVal { value: true }) = evaluate_expr(condition.clone(), env) {
             // Evaluate the consequent block if the condition is true
             for stmt in &then {
-                if let Stmt::BreakStmt(maybe_expr) = stmt {
-                    return match maybe_expr {
-                        Some(expr) => evaluate_expr(expr.clone(), env),
+                if let Val::Special(SpecialVal {
+                    keyword: SpecialValKeyword::Break,
+                    return_value,
+                }) = evaluate(stmt.clone(), env)
+                {
+                    return match return_value {
+                        Some(val) => *val,
                         None => mk_null!(),
                     };
                 }
-                evaluate(stmt.clone(), env);
             }
         }
     } else {
@@ -57,13 +63,16 @@ pub fn evaluate_while_expr(
 pub fn evaluate_loop_expr(then: Vec<Stmt>, env: &Rc<RefCell<Environment>>) -> Val {
     loop {
         for stmt in &then {
-            if let Stmt::BreakStmt(maybe_expr) = stmt {
-                return match maybe_expr {
-                    Some(expr) => evaluate_expr(expr.clone(), env),
+            if let Val::Special(SpecialVal {
+                keyword: SpecialValKeyword::Break,
+                return_value,
+            }) = evaluate(stmt.clone(), env)
+            {
+                return match return_value {
+                    Some(val) => *val,
                     None => mk_null!(),
                 };
             }
-            evaluate(stmt.clone(), env);
         }
     }
 }
