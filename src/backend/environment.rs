@@ -68,11 +68,12 @@ impl Environment {
     }
 
     pub fn declare_var(&mut self, name: &str, value: Val, is_mutable: bool) -> Val {
-        if self.values.contains_key(name) {
+        if let std::collections::hash_map::Entry::Vacant(e) = self.values.entry(name.to_string()) {
+            e.insert(value.clone());
+        } else {
             println!("Cannot declare variable {} as it is already defined.", name);
             process::exit(1);
         }
-        self.values.insert(name.to_string(), value.clone());
         if is_mutable {
             self.is_mutable.insert(name.to_owned());
         }
@@ -80,32 +81,28 @@ impl Environment {
     }
 
     pub fn assign_var(&mut self, name: &str, value: Val) -> Val {
-        match self.resolve(name) {
-            Ok(result) => result,
-            Err(_) => {
-                println!("Cannot resolve {} as it does not exist.", name);
-                process::exit(1);
-            }
-        };
+        let env = self.resolve(name).unwrap_or_else(|_| {
+            println!("Cannot resolve {} as it does not exist.", name);
+            process::exit(1);
+        });
 
         // immutables (const and let) cannot have its value changed.
-        if !self.is_mutable.contains(name) {
+        if !env.borrow().is_mutable.contains(name) {
             println!("Cannot resolve {} as it is immutable.", name);
             process::exit(1);
         }
 
-        self.values.insert(name.to_string(), value.clone());
+        env.borrow_mut()
+            .values
+            .insert(name.to_string(), value.clone());
         value
     }
 
     pub fn lookup_var(&self, name: &str) -> Val {
-        let env = match self.resolve(name) {
-            Ok(result) => result,
-            Err(_) => {
-                println!("Cannot resolve {} as it does not exist.", name);
-                process::exit(1);
-            }
-        };
+        let env = self.resolve(name).unwrap_or_else(|_| {
+            println!("Cannot resolve {} as it does not exist.", name);
+            process::exit(1);
+        });
         let x = env.borrow().values.get(name).unwrap().clone();
         x
     }
