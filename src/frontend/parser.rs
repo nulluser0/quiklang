@@ -549,7 +549,7 @@ impl Parser {
     }
 
     pub fn produce_ast(&mut self, source_code: String) -> Result<Program, String> {
-        self.tokens = tokenize(source_code);
+        self.tokens = tokenize(&source_code);
         let mut program = Program::new(Vec::new());
 
         while self.not_eof() {

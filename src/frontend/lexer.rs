@@ -131,18 +131,17 @@ fn error_unknown_char(err: char) -> ! {
     process::exit(1);
 }
 
+#[inline]
 fn is_skippable(src: char) -> bool {
     src == ' ' || src == '\n' || src == '\t' || src == '\r'
 }
 
-pub fn tokenize(source_code: String) -> Vec<Token> {
-    let mut tokens: Vec<Token> = Vec::new();
-    let mut src: Vec<char> = source_code.chars().collect();
+pub fn tokenize(source_code: &str) -> Vec<Token> {
+    let mut tokens = Vec::new();
+    let mut chars = source_code.chars().peekable();
 
-    while !src.is_empty() {
-        let character = src[0];
-        let mut drain_char = true;
-        match character {
+    while let Some(&c) = chars.peek() {
+        match c {
             // Symbols:
             '(' => tokens.push(Token::Symbol(Symbol::LeftParen)),
             ')' => tokens.push(Token::Symbol(Symbol::RightParen)),
@@ -153,227 +152,198 @@ pub fn tokenize(source_code: String) -> Vec<Token> {
             ',' => tokens.push(Token::Symbol(Symbol::Comma)),
             ';' => tokens.push(Token::Symbol(Symbol::Semicolon)),
             ':' => tokens.push(Token::Symbol(Symbol::Colon)),
+            '.' => tokens.push(Token::Symbol(Symbol::Dot)),
             '~' => tokens.push(Token::Operator(Operator::BitwiseNot)),
+            '+' => tokens.push(Token::Operator(Operator::Add)),
+            '*' => tokens.push(Token::Operator(Operator::Multiply)),
+            '%' => tokens.push(Token::Operator(Operator::Modulus)),
             '!' => {
-                if src.is_empty() {
-                    break;
-                }
-                if let Some(&'=') = src.get(1) {
+                chars.next();
+                if chars.peek() == Some(&'=') {
+                    chars.next();
                     tokens.push(Token::Operator(Operator::NotEqual));
-                    drain_char = false;
-                    src.drain(0..2); // Remove '!=' characters
                 } else {
                     tokens.push(Token::Operator(Operator::LogicalNot));
                 }
+                continue;
             }
-            '.' => tokens.push(Token::Symbol(Symbol::Dot)),
-            // Operators:
             '=' => {
-                if src.is_empty() {
-                    break;
-                }
-                if let Some(&'=') = src.get(1) {
+                chars.next();
+                if chars.peek() == Some(&'=') {
+                    chars.next();
                     tokens.push(Token::Operator(Operator::Equal));
-                    drain_char = false;
-                    src.drain(0..2); // Remove '==' characters
                 } else {
                     tokens.push(Token::Operator(Operator::Assign));
                 }
+                continue;
             }
-            '+' => tokens.push(Token::Operator(Operator::Add)),
             '-' => {
-                if src.is_empty() {
-                    break;
-                }
-                if let Some(&'>') = src.get(1) {
+                chars.next();
+                if chars.peek() == Some(&'>') {
+                    chars.next();
                     tokens.push(Token::Symbol(Symbol::Arrow));
-                    drain_char = false;
-                    src.drain(0..2); // Remove '->' characters
                 } else {
                     tokens.push(Token::Operator(Operator::Subtract));
                 }
+                continue;
             }
-            '*' => tokens.push(Token::Operator(Operator::Multiply)),
             '>' => {
-                if src.is_empty() {
-                    break;
-                }
-                if let Some(&'>') = src.get(1) {
-                    tokens.push(Token::Operator(Operator::GreaterThan));
-                    drain_char = false;
-                    src.drain(0..2); // Remove '>>' characters
-                } else if let Some(&'=') = src.get(1) {
+                chars.next();
+                if chars.peek() == Some(&'=') {
+                    chars.next();
                     tokens.push(Token::Operator(Operator::GreaterOrEqual));
-                    drain_char = false;
-                    src.drain(0..2); // Remove '>=' characters
+                } else if chars.peek() == Some(&'>') {
+                    chars.next();
+                    tokens.push(Token::Operator(Operator::GreaterThan));
                 } else {
                     tokens.push(Token::Operator(Operator::Pipe));
                 }
+                continue;
             }
             '<' => {
-                if src.is_empty() {
-                    break;
-                }
-                if let Some(&'<') = src.get(1) {
-                    tokens.push(Token::Operator(Operator::LessThan));
-                    drain_char = false;
-                    src.drain(0..2); // Remove '<<' characters
-                } else if let Some(&'=') = src.get(1) {
+                chars.next();
+                if chars.peek() == Some(&'=') {
+                    chars.next();
                     tokens.push(Token::Operator(Operator::LessOrEqual));
-                    drain_char = false;
-                    src.drain(0..2); // Remove '<=' characters
+                } else if chars.peek() == Some(&'<') {
+                    chars.next();
+                    tokens.push(Token::Operator(Operator::LessThan));
                 } else {
-                    error_unknown_char(character);
+                    error_unknown_char(c);
                 }
+                continue;
             }
             '&' => {
-                if src.is_empty() {
-                    break;
-                }
-                if let Some(&'&') = src.get(1) {
+                chars.next();
+                if chars.peek() == Some(&'&') {
+                    chars.next();
                     tokens.push(Token::Operator(Operator::And));
-                    drain_char = false;
-                    src.drain(0..2); // Remove '&&' characters
                 } else {
-                    error_unknown_char(character);
+                    error_unknown_char(c);
                 }
+                continue;
             }
             '|' => {
-                if src.is_empty() {
-                    break;
-                }
-                if let Some(&'|') = src.get(1) {
+                chars.next();
+                if chars.peek() == Some(&'|') {
+                    chars.next();
                     tokens.push(Token::Operator(Operator::Or));
-                    drain_char = false;
-                    src.drain(0..2); // Remove '||' characters
                 } else {
                     tokens.push(Token::Symbol(Symbol::DataBracket));
                 }
+                continue;
             }
-            '%' => tokens.push(Token::Operator(Operator::Modulus)),
 
             // Multicharacter tokens:
             _ => {
-                // Numeric literal
-                if character.is_ascii_digit() {
-                    let mut num: i64 = 0;
-                    let mut decimal_num: f64 = 0.0;
-                    let mut decimal_place: f64 = 1.0;
-                    let mut is_decimal = false;
+                if c.is_ascii_digit() {
+                    let mut num_str = String::new();
+                    let mut is_float = false;
 
-                    while !src.is_empty() {
-                        if let Some(&number) = src.first() {
-                            if number.is_ascii_digit() {
-                                // Convert the char digit to its numeric value
-                                let digit_value = number.to_digit(10).unwrap() as i64;
-                                if is_decimal {
-                                    decimal_place *= 0.1;
-                                    decimal_num += digit_value as f64 * decimal_place;
-                                } else {
-                                    num = num * 10 + digit_value;
-                                }
-                                src.drain(0..1); // Remove the processed character
-                            } else if number == '.' && !is_decimal {
-                                // Handle the decimal point
-                                is_decimal = true;
-                                src.drain(0..1); // Remove the decimal point
-                            } else {
-                                break; // Break the loop if the character is not a numeric digit or a single decimal point
-                            }
+                    while let Some(&digit) = chars.peek() {
+                        if digit.is_ascii_digit() {
+                            num_str.push(digit);
+                        } else if digit == '.' && !is_float {
+                            is_float = true;
+                            num_str.push(digit);
+                        } else {
+                            break;
                         }
+                        chars.next();
                     }
 
-                    drain_char = false;
-
-                    if is_decimal {
-                        let final_num = num as f64 + decimal_num;
-                        tokens.push(Token::FloatLiteral(final_num));
+                    if is_float {
+                        let float_val: f64 = num_str.parse().unwrap();
+                        tokens.push(Token::FloatLiteral(float_val));
                     } else {
-                        tokens.push(Token::IntegerLiteral(num));
+                        let int_val: i64 = num_str.parse().unwrap();
+                        tokens.push(Token::IntegerLiteral(int_val));
                     }
-                } else if character.is_ascii_alphabetic() || character == '_' {
+                    continue;
+                }
+
+                if c.is_ascii_alphabetic() || c == '_' {
                     let mut word = String::new();
-                    while !src.is_empty() {
-                        if let Some(&alpha) = src.first() {
-                            if alpha.is_ascii_alphanumeric() || alpha == '_' {
-                                word.push(alpha);
-                                src.drain(0..1);
-                            } else {
-                                break;
-                            }
+                    while let Some(&alpha) = chars.peek() {
+                        if alpha.is_ascii_alphanumeric() || alpha == '_' {
+                            word.push(alpha);
+                            chars.next();
+                        } else {
+                            break;
                         }
                     }
-                    drain_char = false;
-                    // Before pushing word, ensure check for reserved keywords.
+
                     match Keyword::from_str(&word) {
                         Ok(keyword) => tokens.push(Token::Keyword(keyword)),
                         Err(_) => tokens.push(Token::Identifier(word)),
                     }
-                // String literal
-                } else if character == '"' {
-                    // Handle string literals
+                    continue;
+                }
+
+                if c == '"' {
+                    chars.next();
                     let mut string_literal = String::new();
-                    src.drain(0..1); // Remove the opening quote
-                    while !src.is_empty() {
-                        if let Some(&c) = src.first() {
-                            if c == '"' {
-                                break;
-                            } else if c == '\\' && Some(&'"') == src.get(1) {
-                                src.drain(0..1);
-                                string_literal.push(c);
-                                src.drain(0..1);
-                            } else {
-                                string_literal.push(c);
-                                src.drain(0..1);
+                    while let Some(&ch) = chars.peek() {
+                        if ch == '"' {
+                            break;
+                        } else if ch == '\\' {
+                            chars.next();
+                            if let Some(&next_ch) = chars.peek() {
+                                if next_ch == '"' {
+                                    string_literal.push('"');
+                                    chars.next();
+                                } else {
+                                    string_literal.push('\\');
+                                    string_literal.push(next_ch);
+                                    chars.next();
+                                }
                             }
+                        } else {
+                            string_literal.push(ch);
+                            chars.next();
                         }
                     }
-                    if src.is_empty() {
-                        drain_char = false;
-                    }
+                    chars.next(); // Consume closing quote
                     tokens.push(Token::StringLiteral(string_literal));
-                } else if character == '/' {
-                    if let Some(&'/') = src.get(1) {
-                        // It is a comment. Ignore all characters until new line.
-                        src.drain(0..2);
-                        while !src.is_empty() {
-                            if let Some(&commented_character) = src.first() {
-                                if commented_character == '\n' {
+                    continue;
+                }
+
+                if c == '/' {
+                    chars.next();
+                    if chars.peek() == Some(&'/') {
+                        chars.next();
+                        while let Some(&commented_character) = chars.peek() {
+                            if commented_character == '\n' {
+                                break;
+                            } else {
+                                chars.next();
+                            }
+                        }
+                    } else if chars.peek() == Some(&'*') {
+                        chars.next();
+                        while let Some(&commented_character) = chars.peek() {
+                            if commented_character == '*' {
+                                chars.next();
+                                if chars.peek() == Some(&'/') {
+                                    chars.next();
                                     break;
-                                } else {
-                                    src.drain(0..1); // Remove the processed character
                                 }
+                            } else {
+                                chars.next();
                             }
                         }
-                        drain_char = false;
-                    } else if let Some(&'*') = src.get(1) {
-                        // It is a multiline comment. Ignore all characters until '*/'.
-                        src.drain(0..2);
-                        while !src.is_empty() {
-                            if let Some(&commented_character) = src.first() {
-                                if commented_character == '*' {
-                                    src.drain(0..1);
-                                    if !src.is_empty() && Some(&'/') == src.get(1) {
-                                        src.drain(0..1);
-                                        break;
-                                    }
-                                } else {
-                                    src.drain(0..1); // Remove the processed character
-                                }
-                            }
-                        }
-                        drain_char = false;
                     } else {
                         tokens.push(Token::Operator(Operator::Divide));
                     }
-                } else if !is_skippable(character) {
-                    error_unknown_char(character);
+                    continue;
+                }
+
+                if !is_skippable(c) {
+                    error_unknown_char(c);
                 }
             }
         }
-        if drain_char {
-            src.drain(0..1); // Remove processed character from the source
-        }
+        chars.next(); // Consume the current character
     }
     tokens.push(Token::EOF);
 

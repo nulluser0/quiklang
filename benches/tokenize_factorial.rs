@@ -17,7 +17,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("tokenize_factorial", |b| {
         b.iter(|| {
-            let tokens = tokenize(black_box(source_code.clone()));
+            let tokens = tokenize(black_box(&source_code));
             // Use the tokens to prevent optimization removal
             let total_length: usize = tokens.iter().map(|t| format!("{:?}", t).len()).sum();
             black_box(total_length);
