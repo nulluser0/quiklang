@@ -35,21 +35,6 @@ fn setup_env(env: &mut Environment) {
     env.declare_var("drop", mk_native_fn!(native_drop), false);
 }
 
-pub fn resolve(&self, varname: &str) -> Result<Rc<RefCell<Environment>>, String> {
-    if self.values.contains_key(varname) {
-        return Ok(self);
-    }
-
-    if let Some(parent) = &self.parent {
-        return parent.borrow().resolve(varname);
-    }
-
-    Err(format!(
-        "Cannot resolve '{}', as it does not exist.",
-        varname
-    ))
-}
-
 impl Environment {
     pub fn new() -> Self {
         let mut env = Environment {
@@ -69,13 +54,16 @@ impl Environment {
         }
     }
 
-    pub fn resolve(&self, varname: &str) -> Result<Rc<RefCell<Environment>>, String> {
-        if self.values.contains_key(varname) {
-            return Ok(self);
+    pub fn resolve(
+        env: &Rc<RefCell<Environment>>,
+        varname: &str,
+    ) -> Result<Rc<RefCell<Environment>>, String> {
+        if env.borrow().values.contains_key(varname) {
+            return Ok(env.clone());
         }
 
-        if let Some(parent) = &self.parent {
-            return parent.borrow().resolve(varname);
+        if let Some(parent) = &env.borrow().parent {
+            return Self::resolve(parent, varname);
         }
 
         Err(format!(
@@ -97,38 +85,39 @@ impl Environment {
         value
     }
 
-    pub fn assign_var(&mut self, name: &str, value: Val) -> Val {
-        let env = self.resolve(name).unwrap_or_else(|_| {
+    pub fn assign_var(env: &Rc<RefCell<Environment>>, name: &str, value: Val) -> Val {
+        let containing_env = Self::resolve(env, name).unwrap_or_else(|_| {
             println!("Cannot resolve {} as it does not exist.", name);
             process::exit(1);
         });
 
         // immutables (const and let) cannot have its value changed.
-        if !env.borrow().is_mutable.contains(name) {
+        if !containing_env.borrow().is_mutable.contains(name) {
             println!("Cannot resolve {} as it is immutable.", name);
             process::exit(1);
         }
 
-        env.borrow_mut()
+        containing_env
+            .borrow_mut()
             .values
             .insert(name.to_string(), value.clone());
         value
     }
 
-    pub fn drop_var(&mut self, name: &str) {
-        let env = self.resolve(name).unwrap_or_else(|_| {
+    pub fn drop_var(env: &Rc<RefCell<Environment>>, name: &str) {
+        let containing_env = Self::resolve(env, name).unwrap_or_else(|_| {
             println!("Cannot resolve {} as it does not exist.", name);
             process::exit(1);
         });
 
-        println!("b: {:#?}", env);
+        println!("b: {:#?}", containing_env);
 
-        env.borrow_mut().values.remove(name).unwrap();
-        println!("a: {:#?}", env);
+        containing_env.borrow_mut().values.remove(name).unwrap();
+        println!("a: {:#?}", containing_env);
     }
 
-    pub fn lookup_var(&self, name: &str) -> Val {
-        let env = self.resolve(name).unwrap_or_else(|_| {
+    pub fn lookup_var(env: &Rc<RefCell<Environment>>, name: &str) -> Val {
+        let env = Self::resolve(env, name).unwrap_or_else(|_| {
             println!("Cannot resolve {} as it does not exist.", name);
             process::exit(1);
         });
