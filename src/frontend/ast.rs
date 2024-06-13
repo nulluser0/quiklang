@@ -19,7 +19,10 @@ pub enum Expr {
     Literal(Literal),
     Array(Vec<Expr>),
     Identifier(String),
-    AssignmentExpr(Box<Expr>, Box<Expr>), // Assignee, Expr
+    AssignmentExpr {
+        assignee: Box<Expr>,
+        expr: Box<Expr>,
+    }, // Assignee, Expr
     BinaryOp {
         op: BinaryOp,
         left: Box<Expr>,
@@ -28,9 +31,19 @@ pub enum Expr {
     UnaryOp(UnaryOp, Box<Expr>),
     FunctionCall(Vec<Expr>, Box<Expr>), // Args, Caller
     Member(Box<Expr>, Box<Expr>, bool), // Object, Property, Computed? (a[b] = true), (a.b = false)
-    IfExpr(Box<Expr>, Vec<Stmt>, Option<Vec<Stmt>>), // Condition, Then, Optional Else
-    ForExpr(Box<Expr>, Vec<Stmt>),      // For item in iterable, Do Stmts
-    WhileExpr(Box<Expr>, Vec<Stmt>),    // While Condition, Do Stmts
+    IfExpr {
+        condition: Box<Expr>,
+        then: Vec<Stmt>,
+        else_stmt: Option<Vec<Stmt>>,
+    }, // Condition, Then, Optional Else
+    ForExpr {
+        item: Box<Expr>,
+        then: Vec<Stmt>,
+    }, // For item in iterable, Do Stmts
+    WhileExpr {
+        condition: Box<Expr>,
+        then: Vec<Stmt>,
+    }, // While Condition, Do Stmts
     ForeverLoopExpr(Vec<Stmt>),         // Forever loop! Has vec of stmts.
     SpecialNull, // Literally just returns null. Should ONLY be returned as a result of a semicolon.
 }
@@ -47,10 +60,19 @@ impl std::fmt::Display for Expr {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Stmt {
     ExprStmt(Expr),
-    DeclareStmt(String, bool, Option<Expr>), // Name, is_mutable, expr
+    DeclareStmt {
+        name: String,
+        is_mutable: bool,
+        expr: Option<Expr>,
+    },
     ReturnStmt(Option<Expr>),
     BreakStmt(Option<Expr>),
-    FunctionDeclaration(Vec<String>, String, Vec<Stmt>, bool), // Parameters, Name, Body, Is async?
+    FunctionDeclaration {
+        parameters: Vec<String>,
+        name: String,
+        body: Vec<Stmt>,
+        is_async: bool,
+    }, // Parameters, Name, Body, Is async?
 }
 
 #[derive(Debug, PartialEq, Clone)]

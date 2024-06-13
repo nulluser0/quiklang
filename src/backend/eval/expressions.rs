@@ -20,13 +20,15 @@ pub fn evaluate_expr(expr: Expr, env: &Rc<RefCell<Environment>>) -> Val {
         Expr::BinaryOp { op, left, right } => evaluate_binary_op(op, *left, *right, env),
         Expr::UnaryOp(op, expr) => evaluate_unary_op(op, *expr, env),
         Expr::FunctionCall(args, caller) => evaluate_call_expr(args, *caller, env),
-        Expr::AssignmentExpr(assignee, expr) => evaluate_assignment(*assignee, *expr, env),
+        Expr::AssignmentExpr { assignee, expr } => evaluate_assignment(*assignee, *expr, env),
         Expr::Member(_, _, _) => todo!("{:?}", expr),
-        Expr::IfExpr(condition, then, else_stmt) => {
-            evaluate_if_expr(*condition, then, else_stmt, env)
-        }
-        Expr::ForExpr(_, _) => todo!("{:?}", expr),
-        Expr::WhileExpr(condition, then) => evaluate_while_expr(*condition, then, env),
+        Expr::IfExpr {
+            condition,
+            then,
+            else_stmt,
+        } => evaluate_if_expr(*condition, then, else_stmt, env),
+        Expr::ForExpr { .. } => todo!("ForExpr"),
+        Expr::WhileExpr { condition, then } => evaluate_while_expr(*condition, then, env),
         Expr::ForeverLoopExpr(then) => evaluate_loop_expr(then, env),
         Expr::Array(_) => todo!("{:?}", expr),
         Expr::SpecialNull => mk_null!(),

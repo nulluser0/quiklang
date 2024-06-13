@@ -142,7 +142,12 @@ impl Parser {
             Token::Symbol(Symbol::RightBrace),
             "Closing brace expected inside function declaration.",
         );
-        Stmt::FunctionDeclaration(params, name, body, is_async)
+        Stmt::FunctionDeclaration {
+            parameters: params,
+            name,
+            body,
+            is_async,
+        }
     }
 
     // `let (mut) ident(: type) = expr`
@@ -171,15 +176,22 @@ impl Parser {
             if is_const {
                 panic!("Must assign value to `const` expression. No value provided.");
             }
-            return Stmt::DeclareStmt(identifier.to_string(), is_mutable, None);
+            return Stmt::DeclareStmt {
+                name: identifier.to_string(),
+                is_mutable,
+                expr: None,
+            };
         }
 
         self.expect(
             Token::Operator(Operator::Assign),
             "Expected assign token `=` following identifier in var declaration.",
         );
-        let declaration =
-            Stmt::DeclareStmt(identifier.to_string(), is_mutable, Some(self.parse_expr()));
+        let declaration = Stmt::DeclareStmt {
+            name: identifier.to_string(),
+            is_mutable,
+            expr: Some(self.parse_expr()),
+        };
         self.expect(
             Token::Symbol(Symbol::Semicolon),
             "Variable declaration is a statement. It must end with a semicolon.",
@@ -196,7 +208,10 @@ impl Parser {
         if *self.at() == Token::Operator(Operator::Assign) {
             let _ = self.eat(); // Advance after.
             let value = self.parse_assignment_expr();
-            return Expr::AssignmentExpr(Box::new(left), Box::new(value));
+            return Expr::AssignmentExpr {
+                assignee: Box::new(left),
+                expr: Box::new(value),
+            };
         }
         left
     }
@@ -488,7 +503,10 @@ impl Parser {
             Token::Symbol(Symbol::RightBrace),
             "Expected right brace after `while` expression.",
         );
-        Expr::WhileExpr(Box::new(condition), statements)
+        Expr::WhileExpr {
+            condition: Box::new(condition),
+            then: statements,
+        }
     }
 
     fn parse_loop_expr(&mut self) -> Expr {
@@ -545,7 +563,11 @@ impl Parser {
                 alternative = Some(else_block);
             }
         }
-        Expr::IfExpr(Box::new(condition), consequent, alternative)
+        Expr::IfExpr {
+            condition: Box::new(condition),
+            then: consequent,
+            else_stmt: alternative,
+        }
     }
 
     pub fn produce_ast(&mut self, source_code: String) -> Result<Program, String> {
