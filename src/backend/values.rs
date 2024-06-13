@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::frontend::ast::Stmt;
+use crate::frontend::ast::{Expr, Stmt};
 
 use super::environment::Environment;
 
@@ -83,7 +83,7 @@ impl RuntimeVal for ObjectVal {
     }
 }
 
-type NativeFunctionCallback = fn(Vec<Val>, &Rc<RefCell<Environment>>) -> Val;
+type NativeFunctionCallback = fn(Vec<Val>, &Rc<RefCell<Environment>>, Vec<Expr>) -> Val;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct NativeFunctionVal {

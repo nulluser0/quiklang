@@ -8,7 +8,7 @@ use std::rc::Rc;
 use crate::backend::values::{BoolVal, NativeFunctionVal, NullVal, Val};
 use crate::{mk_bool, mk_native_fn, mk_null};
 
-use super::native_fn::{native_println, native_time};
+use super::native_fn::{native_drop, native_forget, native_println, native_time};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Environment {
@@ -31,6 +31,8 @@ fn setup_env(env: &mut Environment) {
     // Define a native built-in method
     env.declare_var("println", mk_native_fn!(native_println), false);
     env.declare_var("time", mk_native_fn!(native_time), false);
+    env.declare_var("forget", mk_native_fn!(native_forget), false);
+    env.declare_var("drop", mk_native_fn!(native_drop), false);
 }
 
 impl Environment {
@@ -96,6 +98,16 @@ impl Environment {
             .values
             .insert(name.to_string(), value.clone());
         value
+    }
+
+    pub fn drop_var(&mut self, name: &str) -> Val {
+        let env = self.resolve(name).unwrap_or_else(|_| {
+            println!("Cannot resolve {} as it does not exist.", name);
+            process::exit(1);
+        });
+
+        let x = env.borrow_mut().values.remove(name).unwrap();
+        x
     }
 
     pub fn lookup_var(&self, name: &str) -> Val {
