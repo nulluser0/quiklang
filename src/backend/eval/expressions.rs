@@ -151,11 +151,11 @@ pub fn evaluate_assignment(assignee: Expr, expr: Expr, env: &Rc<RefCell<Environm
         _ => panic!("Invalid LHS in assignment expression. {:?}", assignee),
     };
     let value = evaluate_expr(expr, env);
-    env.borrow_mut().assign_var(&varname, value)
+    Environment::assign_var(env, &varname, value)
 }
 
 pub fn evaluate_identifier(identifier: String, env: &Rc<RefCell<Environment>>) -> Val {
-    env.borrow().lookup_var(&identifier)
+    Environment::lookup_var(env, &identifier)
 }
 
 pub fn evaluate_literal(literal: Literal, env: &Rc<RefCell<Environment>>) -> Val {

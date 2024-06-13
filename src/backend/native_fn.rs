@@ -36,7 +36,7 @@ pub fn native_drop(args: Vec<Expr>, env: &Rc<RefCell<Environment>>) -> Val {
     for raw_expr in args {
         if let Expr::Identifier(ident) = raw_expr {
             println!("f;dsaj");
-            env.borrow_mut().drop_var(&ident);
+            Environment::drop_var(env, &ident);
         }
         println!("{:#?}", env);
     }
