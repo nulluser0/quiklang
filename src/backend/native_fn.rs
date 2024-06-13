@@ -35,10 +35,8 @@ pub fn native_forget(args: Vec<Expr>, _env: &Rc<RefCell<Environment>>) -> Val {
 pub fn native_drop(args: Vec<Expr>, env: &Rc<RefCell<Environment>>) -> Val {
     for raw_expr in args {
         if let Expr::Identifier(ident) = raw_expr {
-            println!("f;dsaj");
             Environment::drop_var(env, &ident);
         }
-        println!("{:#?}", env);
     }
     mk_null!()
 }

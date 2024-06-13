@@ -110,10 +110,7 @@ impl Environment {
             process::exit(1);
         });
 
-        println!("b: {:#?}", containing_env);
-
         containing_env.borrow_mut().values.remove(name).unwrap();
-        println!("a: {:#?}", containing_env);
     }
 
     pub fn lookup_var(env: &Rc<RefCell<Environment>>, name: &str) -> Val {
