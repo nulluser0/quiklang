@@ -83,7 +83,7 @@ impl RuntimeVal for ObjectVal {
     }
 }
 
-type NativeFunctionCallback = fn(Vec<Val>, &Rc<RefCell<Environment>>, Vec<Expr>) -> Val;
+type NativeFunctionCallback = fn(Vec<Expr>, &Rc<RefCell<Environment>>) -> Val;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct NativeFunctionVal {

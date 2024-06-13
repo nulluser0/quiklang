@@ -180,15 +180,14 @@ pub fn evaluate_object_expr(obj: Vec<Property>, env: &Rc<RefCell<Environment>>) 
 }
 
 pub fn evaluate_call_expr(args: Vec<Expr>, caller: Expr, env: &Rc<RefCell<Environment>>) -> Val {
-    let evaluated_args: Vec<Val> = args
-        .clone()
-        .into_iter()
-        .map(|expr| evaluate_expr(expr, env))
-        .collect();
     let function = evaluate_expr(caller, env);
     match &function {
-        Val::NativeFunction(callable) => (callable.call)(evaluated_args, env, args),
+        Val::NativeFunction(callable) => (callable.call)(args, env),
         Val::Function(fn_value) => {
+            let evaluated_args: Vec<Val> = args
+                .into_iter()
+                .map(|expr| evaluate_expr(expr, env))
+                .collect();
             let scope = Rc::new(RefCell::new(Environment::new_with_parent(
                 fn_value.declaration_env.clone(),
             )));
