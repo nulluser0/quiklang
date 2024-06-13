@@ -6,13 +6,17 @@ use crate::{
 };
 
 pub fn run(input: String, env: &Rc<RefCell<Environment>>) {
+    let parent_env = env
+        .borrow()
+        .get_parent()
+        .expect("Env should have a root env!");
     let mut parser = parser::Parser::new();
     match parser.produce_ast(input) {
         Ok(program) => {
             // println!("{:#?}", program);
 
             for stmt in program.statements {
-                let _ = evaluate(stmt, env);
+                let _ = evaluate(stmt, env, &parent_env);
             }
         }
         Err(e) => {

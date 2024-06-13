@@ -63,6 +63,7 @@ pub enum Stmt {
     DeclareStmt {
         name: String,
         is_mutable: bool,
+        is_global: bool,
         expr: Option<Expr>,
     },
     ReturnStmt(Option<Expr>),

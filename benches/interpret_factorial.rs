@@ -31,9 +31,15 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("interpret_factorial", |b| {
         b.iter(|| {
-            let env = Rc::new(RefCell::new(Environment::new()));
+            let env = Rc::new(RefCell::new(Environment::new_with_parent(Rc::new(
+                RefCell::new(Environment::new()),
+            ))));
+            let parent_env = env
+                .borrow()
+                .get_parent()
+                .expect("env must have parent env.");
             for stmt in &program.statements {
-                let _ = evaluate(stmt.clone(), &env);
+                let _ = evaluate(stmt.clone(), &env, &parent_env);
             }
         })
     });

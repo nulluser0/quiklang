@@ -150,9 +150,17 @@ impl Parser {
         }
     }
 
-    // `let (mut) ident(: type) = expr`
+    // `let (global) (mut) ident(: type) = expr`
     fn parse_var_declaration(&mut self, is_const: bool) -> Stmt {
         let _ = self.eat(); // remove unneeded let/const token.
+        let is_global = match self.at() {
+            Token::Keyword(Keyword::Global) => {
+                let _ = self.eat(); // We now know global keyword us used. Advance.
+                true
+            }
+            _ => false, // No mut keyword, variable is immutable.
+        };
+
         let is_mutable = match self.at() {
             Token::Keyword(Keyword::Mut) => {
                 let _ = self.eat(); // We now know mut keyword us used. Advance.
@@ -179,6 +187,7 @@ impl Parser {
             return Stmt::DeclareStmt {
                 name: identifier.to_string(),
                 is_mutable,
+                is_global,
                 expr: None,
             };
         }
@@ -190,6 +199,7 @@ impl Parser {
         let declaration = Stmt::DeclareStmt {
             name: identifier.to_string(),
             is_mutable,
+            is_global,
             expr: Some(self.parse_expr()),
         };
         self.expect(

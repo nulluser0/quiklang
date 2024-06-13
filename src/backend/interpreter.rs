@@ -12,21 +12,26 @@ use super::eval::statements::{
 };
 use super::values::Val;
 
-pub fn evaluate(stmt: Stmt, env: &Rc<RefCell<Environment>>) -> Val {
+pub fn evaluate(
+    stmt: Stmt,
+    env: &Rc<RefCell<Environment>>,
+    parent_env: &Rc<RefCell<Environment>>,
+) -> Val {
     match stmt {
-        Stmt::ExprStmt(expr) => evaluate_expr(expr, env),
+        Stmt::ExprStmt(expr) => evaluate_expr(expr, env, parent_env),
         Stmt::DeclareStmt {
             name,
             is_mutable,
+            is_global,
             expr,
-        } => evaluate_declare_var(name, is_mutable, expr, env),
-        Stmt::ReturnStmt(expr) => evaluate_return_stmt(expr, env),
+        } => evaluate_declare_var(name, is_mutable, is_global, expr, env, parent_env),
+        Stmt::ReturnStmt(expr) => evaluate_return_stmt(expr, env, parent_env),
         Stmt::FunctionDeclaration {
             parameters,
             name,
             body,
             is_async,
         } => evaluate_declare_fn(parameters, name, body, is_async, env),
-        Stmt::BreakStmt(expr) => evaluate_break_stmt(expr, env), // Handle other statement types...
+        Stmt::BreakStmt(expr) => evaluate_break_stmt(expr, env, parent_env), // Handle other statement types...
     }
 }

@@ -46,6 +46,13 @@ impl Environment {
         env
     }
 
+    pub fn get_parent(&self) -> Result<Rc<RefCell<Environment>>, String> {
+        match &self.parent {
+            Some(result) => Ok(result.clone()),
+            None => Err("No parent found!".to_string()),
+        }
+    }
+
     pub fn new_with_parent(parent: Rc<RefCell<Environment>>) -> Self {
         Environment {
             values: HashMap::new(),

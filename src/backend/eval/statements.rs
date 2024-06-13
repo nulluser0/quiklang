@@ -14,16 +14,24 @@ use super::expressions::evaluate_expr;
 pub fn evaluate_declare_var(
     name: String,
     is_mutable: bool,
+    is_global: bool,
     expr: Option<Expr>,
     env: &Rc<RefCell<Environment>>,
+    parent_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     let value: Val = if let Some(val) = expr {
-        evaluate_expr(val, env)
+        evaluate_expr(val, env, parent_env)
     } else {
         mk_null!()
     };
 
-    env.borrow_mut().declare_var(&name, value, is_mutable)
+    if is_global {
+        parent_env
+            .borrow_mut()
+            .declare_var(&name, value, is_mutable)
+    } else {
+        env.borrow_mut().declare_var(&name, value, is_mutable)
+    }
 }
 
 pub fn evaluate_declare_fn(
@@ -38,17 +46,20 @@ pub fn evaluate_declare_fn(
         parameters,
         body,
         is_async,
-        declaration_env: env.clone(),
     });
 
     env.borrow_mut().declare_var(&name, function, false)
 }
 
-pub fn evaluate_break_stmt(expr: Option<Expr>, env: &Rc<RefCell<Environment>>) -> Val {
+pub fn evaluate_break_stmt(
+    expr: Option<Expr>,
+    env: &Rc<RefCell<Environment>>,
+    parent_env: &Rc<RefCell<Environment>>,
+) -> Val {
     match expr {
         Some(expr) => Val::Special(SpecialVal {
             keyword: SpecialValKeyword::Break,
-            return_value: Some(Box::new(evaluate_expr(expr, env))),
+            return_value: Some(Box::new(evaluate_expr(expr, env, parent_env))),
         }),
         None => Val::Special(SpecialVal {
             keyword: SpecialValKeyword::Break,
@@ -57,11 +68,15 @@ pub fn evaluate_break_stmt(expr: Option<Expr>, env: &Rc<RefCell<Environment>>) -
     }
 }
 
-pub fn evaluate_return_stmt(expr: Option<Expr>, env: &Rc<RefCell<Environment>>) -> Val {
+pub fn evaluate_return_stmt(
+    expr: Option<Expr>,
+    env: &Rc<RefCell<Environment>>,
+    parent_env: &Rc<RefCell<Environment>>,
+) -> Val {
     match expr {
         Some(expr) => Val::Special(SpecialVal {
             keyword: SpecialValKeyword::Return,
-            return_value: Some(Box::new(evaluate_expr(expr, env))),
+            return_value: Some(Box::new(evaluate_expr(expr, env, parent_env))),
         }),
         None => Val::Special(SpecialVal {
             keyword: SpecialValKeyword::Return,
