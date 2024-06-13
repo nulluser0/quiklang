@@ -35,6 +35,21 @@ fn setup_env(env: &mut Environment) {
     env.declare_var("drop", mk_native_fn!(native_drop), false);
 }
 
+pub fn resolve(&self, varname: &str) -> Result<Rc<RefCell<Environment>>, String> {
+    if self.values.contains_key(varname) {
+        return Ok(self);
+    }
+
+    if let Some(parent) = &self.parent {
+        return parent.borrow().resolve(varname);
+    }
+
+    Err(format!(
+        "Cannot resolve '{}', as it does not exist.",
+        varname
+    ))
+}
+
 impl Environment {
     pub fn new() -> Self {
         let mut env = Environment {
@@ -56,7 +71,7 @@ impl Environment {
 
     pub fn resolve(&self, varname: &str) -> Result<Rc<RefCell<Environment>>, String> {
         if self.values.contains_key(varname) {
-            return Ok(Rc::new(RefCell::new(self.clone())));
+            return Ok(self);
         }
 
         if let Some(parent) = &self.parent {
@@ -100,14 +115,16 @@ impl Environment {
         value
     }
 
-    pub fn drop_var(&mut self, name: &str) -> Val {
+    pub fn drop_var(&mut self, name: &str) {
         let env = self.resolve(name).unwrap_or_else(|_| {
             println!("Cannot resolve {} as it does not exist.", name);
             process::exit(1);
         });
 
-        let x = env.borrow_mut().values.remove(name).unwrap();
-        x
+        println!("b: {:#?}", env);
+
+        env.borrow_mut().values.remove(name).unwrap();
+        println!("a: {:#?}", env);
     }
 
     pub fn lookup_var(&self, name: &str) -> Val {
