@@ -104,6 +104,14 @@ impl Environment {
             process::exit(1);
         }
 
+        match Val::is_same_type(containing_env.borrow().values.get(name).unwrap(), &value) {
+            Ok(()) => {}
+            Err(e) => {
+                println!("{}", e);
+                process::exit(1);
+            }
+        }
+
         containing_env
             .borrow_mut()
             .values

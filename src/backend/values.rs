@@ -155,6 +155,21 @@ pub enum Val {
     Special(SpecialVal),
 }
 
+impl Val {
+    pub fn is_same_type(val1: &Val, val2: &Val) -> Result<(), String> {
+        let type1 = val1.get_type();
+        let type2 = val2.get_type();
+
+        if type1 != type2 {
+            return Err(format!(
+                "Type mismatch: {:?} is not the same as {:?}",
+                type1, type2
+            ));
+        }
+        Ok(())
+    }
+}
+
 impl RuntimeVal for Val {
     fn get_type(&self) -> ValueType {
         match self {
