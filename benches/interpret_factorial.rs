@@ -34,12 +34,12 @@ fn criterion_benchmark(c: &mut Criterion) {
             let env = Rc::new(RefCell::new(Environment::new_with_parent(Rc::new(
                 RefCell::new(Environment::new()),
             ))));
-            let parent_env = env
+            let root_env = env
                 .borrow()
                 .get_parent()
                 .expect("env must have parent env.");
             for stmt in &program.statements {
-                let _ = evaluate(stmt.clone(), &env, &parent_env);
+                let _ = evaluate(stmt.clone(), &env, &root_env);
             }
         })
     });

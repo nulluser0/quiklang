@@ -17,18 +17,16 @@ pub fn evaluate_declare_var(
     is_global: bool,
     expr: Option<Expr>,
     env: &Rc<RefCell<Environment>>,
-    parent_env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     let value: Val = if let Some(val) = expr {
-        evaluate_expr(val, env, parent_env)
+        evaluate_expr(val, env, root_env)
     } else {
         mk_null!()
     };
 
     if is_global {
-        parent_env
-            .borrow_mut()
-            .declare_var(&name, value, is_mutable)
+        root_env.borrow_mut().declare_var(&name, value, is_mutable)
     } else {
         env.borrow_mut().declare_var(&name, value, is_mutable)
     }
@@ -54,12 +52,12 @@ pub fn evaluate_declare_fn(
 pub fn evaluate_break_stmt(
     expr: Option<Expr>,
     env: &Rc<RefCell<Environment>>,
-    parent_env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     match expr {
         Some(expr) => Val::Special(SpecialVal {
             keyword: SpecialValKeyword::Break,
-            return_value: Some(Box::new(evaluate_expr(expr, env, parent_env))),
+            return_value: Some(Box::new(evaluate_expr(expr, env, root_env))),
         }),
         None => Val::Special(SpecialVal {
             keyword: SpecialValKeyword::Break,
@@ -71,12 +69,12 @@ pub fn evaluate_break_stmt(
 pub fn evaluate_return_stmt(
     expr: Option<Expr>,
     env: &Rc<RefCell<Environment>>,
-    parent_env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     match expr {
         Some(expr) => Val::Special(SpecialVal {
             keyword: SpecialValKeyword::Return,
-            return_value: Some(Box::new(evaluate_expr(expr, env, parent_env))),
+            return_value: Some(Box::new(evaluate_expr(expr, env, root_env))),
         }),
         None => Val::Special(SpecialVal {
             keyword: SpecialValKeyword::Return,

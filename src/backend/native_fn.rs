@@ -8,11 +8,11 @@ use crate::backend::values::{IntegerVal, NullVal};
 pub fn native_println(
     args: Vec<Expr>,
     env: &Rc<RefCell<Environment>>,
-    parent_env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     let evaluated_args: Vec<Val> = args
         .into_iter()
-        .map(|expr| evaluate_expr(expr, env, parent_env))
+        .map(|expr| evaluate_expr(expr, env, root_env))
         .collect();
     for arg in evaluated_args {
         println!("{:?}", arg); // for now, just use debug print.
@@ -24,7 +24,7 @@ pub fn native_println(
 pub fn native_time(
     _args: Vec<Expr>,
     _env: &Rc<RefCell<Environment>>,
-    _parent_env: &Rc<RefCell<Environment>>,
+    _root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     let time = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_secs() as i64,
@@ -36,7 +36,7 @@ pub fn native_time(
 pub fn native_forget(
     args: Vec<Expr>,
     _env: &Rc<RefCell<Environment>>,
-    _parent_env: &Rc<RefCell<Environment>>,
+    _root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     for arg in args {
         std::mem::forget(arg)
@@ -47,7 +47,7 @@ pub fn native_forget(
 pub fn native_drop(
     args: Vec<Expr>,
     env: &Rc<RefCell<Environment>>,
-    _parent_env: &Rc<RefCell<Environment>>,
+    _root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     for raw_expr in args {
         if let Expr::Identifier(ident) = raw_expr {

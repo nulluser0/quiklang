@@ -16,30 +16,26 @@ use crate::{
 pub fn evaluate_expr(
     expr: Expr,
     env: &Rc<RefCell<Environment>>,
-    parent_env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     match expr {
-        Expr::Literal(literal) => evaluate_literal(literal, env, parent_env),
+        Expr::Literal(literal) => evaluate_literal(literal, env, root_env),
         Expr::Identifier(identifier) => evaluate_identifier(identifier, env),
-        Expr::BinaryOp { op, left, right } => {
-            evaluate_binary_op(op, *left, *right, env, parent_env)
-        }
-        Expr::UnaryOp(op, expr) => evaluate_unary_op(op, *expr, env, parent_env),
-        Expr::FunctionCall(args, caller) => evaluate_call_expr(args, *caller, env, parent_env),
+        Expr::BinaryOp { op, left, right } => evaluate_binary_op(op, *left, *right, env, root_env),
+        Expr::UnaryOp(op, expr) => evaluate_unary_op(op, *expr, env, root_env),
+        Expr::FunctionCall(args, caller) => evaluate_call_expr(args, *caller, env, root_env),
         Expr::AssignmentExpr { assignee, expr } => {
-            evaluate_assignment(*assignee, *expr, env, parent_env)
+            evaluate_assignment(*assignee, *expr, env, root_env)
         }
         Expr::Member(_, _, _) => todo!("{:?}", expr),
         Expr::IfExpr {
             condition,
             then,
             else_stmt,
-        } => evaluate_if_expr(*condition, then, else_stmt, env, parent_env),
+        } => evaluate_if_expr(*condition, then, else_stmt, env, root_env),
         Expr::ForExpr { .. } => todo!("ForExpr"),
-        Expr::WhileExpr { condition, then } => {
-            evaluate_while_expr(*condition, then, env, parent_env)
-        }
-        Expr::ForeverLoopExpr(then) => evaluate_loop_expr(then, env, parent_env),
+        Expr::WhileExpr { condition, then } => evaluate_while_expr(*condition, then, env, root_env),
+        Expr::ForeverLoopExpr(then) => evaluate_loop_expr(then, env, root_env),
         Expr::Array(_) => todo!("{:?}", expr),
         Expr::SpecialNull => mk_null!(),
     }
@@ -49,11 +45,11 @@ pub fn evaluate_while_expr(
     condition: Expr,
     then: Vec<Stmt>,
     env: &Rc<RefCell<Environment>>,
-    parent_env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
-    if let Val::Bool(_) = evaluate_expr(condition.clone(), env, parent_env) {
+    if let Val::Bool(_) = evaluate_expr(condition.clone(), env, root_env) {
         while let Val::Bool(BoolVal { value: true }) =
-            evaluate_expr(condition.clone(), env, parent_env)
+            evaluate_expr(condition.clone(), env, root_env)
         {
             // Evaluate the consequent block if the condition is true
             let scope = Rc::new(RefCell::new(Environment::new_with_parent(env.clone())));
@@ -61,7 +57,7 @@ pub fn evaluate_while_expr(
                 if let Val::Special(SpecialVal {
                     keyword: SpecialValKeyword::Break,
                     return_value,
-                }) = evaluate(stmt.clone(), &scope, parent_env)
+                }) = evaluate(stmt.clone(), &scope, root_env)
                 {
                     return return_value.map_or(mk_null!(), |val| *val);
                 }
@@ -77,7 +73,7 @@ pub fn evaluate_while_expr(
 pub fn evaluate_loop_expr(
     then: Vec<Stmt>,
     env: &Rc<RefCell<Environment>>,
-    parent_env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     loop {
         let scope = Rc::new(RefCell::new(Environment::new_with_parent(env.clone())));
@@ -85,7 +81,7 @@ pub fn evaluate_loop_expr(
             if let Val::Special(SpecialVal {
                 keyword: SpecialValKeyword::Break,
                 return_value,
-            }) = evaluate(stmt.clone(), &scope, parent_env)
+            }) = evaluate(stmt.clone(), &scope, root_env)
             {
                 return return_value.map_or(mk_null!(), |val| *val);
             }
@@ -97,9 +93,9 @@ pub fn evaluate_unary_op(
     op: UnaryOp,
     expr: Expr,
     env: &Rc<RefCell<Environment>>,
-    parent_env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
-    let evaluated_expr = evaluate_expr(expr, env, parent_env);
+    let evaluated_expr = evaluate_expr(expr, env, root_env);
     match op {
         UnaryOp::LogicalNot => {
             if let Val::Bool(condition_bool) = evaluated_expr {
@@ -136,17 +132,17 @@ pub fn evaluate_if_expr(
     then: Vec<Stmt>,
     else_stmt: Option<Vec<Stmt>>,
     env: &Rc<RefCell<Environment>>,
-    parent_env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     // Evaluate the condition. If it is true, then complete then, else do the else_stmt (or ignore if statement.)
-    let condition_value = evaluate_expr(condition, env, parent_env);
+    let condition_value = evaluate_expr(condition, env, root_env);
 
     // Check if the condition evaluates to true
     if let Val::Bool(condition_bool) = condition_value {
         if condition_bool.value {
             // Evaluate the consequent block if the condition is true
             for stmt in then {
-                let result = evaluate(stmt, env, parent_env);
+                let result = evaluate(stmt, env, root_env);
                 match result {
                     Val::Null(_) => {}
                     val => return val,
@@ -155,7 +151,7 @@ pub fn evaluate_if_expr(
         } else if let Some(alt) = else_stmt {
             // Evaluate the alternative block if the condition is false and an alternative is provided
             for stmt in alt {
-                let result = evaluate(stmt, env, parent_env);
+                let result = evaluate(stmt, env, root_env);
                 match result {
                     Val::Null(_) => {}
                     val => return val,
@@ -174,13 +170,13 @@ pub fn evaluate_assignment(
     assignee: Expr,
     expr: Expr,
     env: &Rc<RefCell<Environment>>,
-    parent_env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     let varname = match assignee {
         Expr::Identifier(name) => name,
         _ => panic!("Invalid LHS in assignment expression. {:?}", assignee),
     };
-    let value = evaluate_expr(expr, env, parent_env);
+    let value = evaluate_expr(expr, env, root_env);
     Environment::assign_var(env, &varname, value)
 }
 
@@ -191,20 +187,20 @@ pub fn evaluate_identifier(identifier: String, env: &Rc<RefCell<Environment>>) -
 pub fn evaluate_literal(
     literal: Literal,
     env: &Rc<RefCell<Environment>>,
-    parent_env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     match literal {
         Literal::Integer(value) => mk_integer!(value) as Val,
         Literal::Float(value) => mk_float!(value) as Val,
         Literal::String(_) => unimplemented!(),
-        Literal::Object(object) => evaluate_object_expr(object, env, parent_env),
+        Literal::Object(object) => evaluate_object_expr(object, env, root_env),
     }
 }
 
 pub fn evaluate_object_expr(
     obj: Vec<Property>,
     env: &Rc<RefCell<Environment>>,
-    parent_env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     let mut object = ObjectVal {
         properties: HashMap::new(),
@@ -212,7 +208,7 @@ pub fn evaluate_object_expr(
     for property in obj {
         let runtime_val: Option<Val> = property
             .value
-            .map(|expr| evaluate_expr(expr, env, parent_env));
+            .map(|expr| evaluate_expr(expr, env, root_env));
         object.properties.insert(property.key, runtime_val);
     }
 
@@ -223,25 +219,23 @@ pub fn evaluate_call_expr(
     args: Vec<Expr>,
     caller: Expr,
     env: &Rc<RefCell<Environment>>,
-    parent_env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
-    let function = evaluate_expr(caller, env, parent_env);
+    let function = evaluate_expr(caller, env, root_env);
     match &function {
-        Val::NativeFunction(callable) => (callable.call)(args, env, parent_env),
+        Val::NativeFunction(callable) => (callable.call)(args, env, root_env),
         Val::Function(fn_value) => {
             let evaluated_args: Vec<Val> = args
                 .into_iter()
-                .map(|expr| evaluate_expr(expr, env, parent_env))
+                .map(|expr| evaluate_expr(expr, env, root_env))
                 .collect();
-            let scope = Rc::new(RefCell::new(Environment::new_with_parent(
-                parent_env.clone(),
-            )));
+            let scope = Rc::new(RefCell::new(Environment::new_with_parent(root_env.clone())));
             for (varname, arg) in fn_value.parameters.iter().zip(evaluated_args.iter()) {
                 scope.borrow_mut().declare_var(varname, arg.clone(), false);
             }
             let mut result: Val = mk_null!();
             for stmt in &fn_value.body {
-                result = evaluate(stmt.clone(), &scope, parent_env);
+                result = evaluate(stmt.clone(), &scope, root_env);
                 if let Val::Special(SpecialVal {
                     keyword: SpecialValKeyword::Return,
                     return_value,
@@ -261,10 +255,10 @@ pub fn evaluate_binary_op(
     left: Expr,
     right: Expr,
     env: &Rc<RefCell<Environment>>,
-    parent_env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
 ) -> Val {
-    let left_val = evaluate_expr(left, env, parent_env);
-    let right_val = evaluate_expr(right, env, parent_env);
+    let left_val = evaluate_expr(left, env, root_env);
+    let right_val = evaluate_expr(right, env, root_env);
 
     match (left_val, right_val) {
         (Val::Integer(l), Val::Integer(r)) => match op {

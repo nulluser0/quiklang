@@ -6,7 +6,7 @@ use crate::{
 };
 
 pub fn run(input: String, env: &Rc<RefCell<Environment>>) {
-    let parent_env = env
+    let root_env = env
         .borrow()
         .get_parent()
         .expect("Env should have a root env!");
@@ -16,7 +16,7 @@ pub fn run(input: String, env: &Rc<RefCell<Environment>>) {
             // println!("{:#?}", program);
 
             for stmt in program.statements {
-                let _ = evaluate(stmt, env, &parent_env);
+                let _ = evaluate(stmt, env, &root_env);
             }
         }
         Err(e) => {
