@@ -418,11 +418,9 @@ impl Parser {
         {
             let operator = self.eat();
             let property: Expr;
-            let computed: bool;
 
-            // Non-computed properties (like obj.expr):
+            // obj.expr
             if operator == Token::Symbol(Symbol::Dot) {
-                computed = false;
                 // Get identifier
                 property = self.parse_primary_expr();
                 match property {
@@ -433,14 +431,13 @@ impl Parser {
                 }
             } else {
                 // This allows obj[computed value]
-                computed = true;
                 property = self.parse_expr();
                 self.expect(
                     Token::Symbol(Symbol::RightBracket),
                     "Missing right bracket in computed value.",
                 );
             }
-            object = Expr::Member(Box::new(object), Box::new(property), computed);
+            object = Expr::Member(Box::new(object), Box::new(property));
         }
         object
     }

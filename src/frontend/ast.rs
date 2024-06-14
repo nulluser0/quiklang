@@ -34,7 +34,7 @@ pub enum Expr {
     },
     UnaryOp(UnaryOp, Box<Expr>),
     FunctionCall(Vec<Expr>, Box<Expr>), // Args, Caller
-    Member(Box<Expr>, Box<Expr>, bool), // Object, Property, Computed? (a[b] = true), (a.b = false)
+    Member(Box<Expr>, Box<Expr>),       // Object, Property
     IfExpr {
         condition: Box<Expr>,
         then: Vec<Stmt>,

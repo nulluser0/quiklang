@@ -27,7 +27,7 @@ pub fn evaluate_expr(
         Expr::AssignmentExpr { assignee, expr } => {
             evaluate_assignment(*assignee, *expr, env, root_env)
         }
-        Expr::Member(_, _, _) => todo!("{:?}", expr),
+        Expr::Member(object, property) => evaluate_member_expr(*object, *property, env, root_env),
         Expr::IfExpr {
             condition,
             then,
@@ -187,6 +187,26 @@ pub fn evaluate_assignment(
     };
     let value = evaluate_expr(expr, env, root_env);
     Environment::assign_var(env, &varname, value)
+}
+
+pub fn evaluate_member_expr(
+    object: Expr,
+    property: Expr,
+    env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
+) -> Val {
+    let object = evaluate_expr(object, env, root_env);
+    let property = match property {
+        Expr::Identifier(result) => result,
+        _ => panic!("Cannot find member of non-identifier."),
+    };
+    match object {
+        Val::Object(ObjectVal { properties }) => match properties.get(&property) {
+            Some(result) => result.clone().unwrap_or(mk_null!()),
+            None => mk_null!(),
+        },
+        _ => panic!("Cannot get a member of a non-object type."),
+    }
 }
 
 pub fn evaluate_identifier(identifier: String, env: &Rc<RefCell<Environment>>) -> Val {
