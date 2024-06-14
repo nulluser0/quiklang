@@ -206,6 +206,13 @@ macro_rules! mk_bool {
 }
 
 #[macro_export]
+macro_rules! mk_string {
+    ($n:expr) => {
+        Val::String(StringVal { value: $n })
+    };
+}
+
+#[macro_export]
 macro_rules! mk_float {
     ($n:expr) => {
         Val::Float(FloatVal { value: $n })

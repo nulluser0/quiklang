@@ -6,11 +6,11 @@ use crate::{
         interpreter::evaluate,
         values::{
             BoolVal, FloatVal, IntegerVal, NullVal, ObjectVal, SpecialVal, SpecialValKeyword,
-            ToFloat, Val,
+            StringVal, ToFloat, Val,
         },
     },
     frontend::ast::{BinaryOp, Expr, Literal, Property, Stmt, UnaryOp},
-    mk_float, mk_integer, mk_null,
+    mk_float, mk_integer, mk_null, mk_string,
 };
 
 pub fn evaluate_expr(
@@ -38,6 +38,7 @@ pub fn evaluate_expr(
         Expr::ForeverLoopExpr(then) => evaluate_loop_expr(then, env, root_env),
         Expr::Array(_) => todo!("{:?}", expr),
         Expr::SpecialNull => mk_null!(),
+        Expr::ConcatOp { left, right } => evaluate_concatenation_expr(*left, *right, env, root_env),
     }
 }
 
@@ -192,7 +193,7 @@ pub fn evaluate_literal(
     match literal {
         Literal::Integer(value) => mk_integer!(value) as Val,
         Literal::Float(value) => mk_float!(value) as Val,
-        Literal::String(_) => unimplemented!(),
+        Literal::String(value) => mk_string!(value) as Val,
         Literal::Object(object) => evaluate_object_expr(object, env, root_env),
     }
 }
@@ -247,6 +248,23 @@ pub fn evaluate_call_expr(
             result
         }
         _ => panic!("Cannot call value that is not a function: {:?}", function),
+    }
+}
+
+pub fn evaluate_concatenation_expr(
+    left: Expr,
+    right: Expr,
+    env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
+) -> Val {
+    let left_val = evaluate_expr(left, env, root_env);
+    let right_val = evaluate_expr(right, env, root_env);
+
+    match (left_val, right_val) {
+        (Val::String(StringVal { value: l }), Val::String(StringVal { value: r })) => {
+            Val::String(StringVal { value: l + &r })
+        }
+        _ => panic!("Concatenation operations are only supported for strings"),
     }
 }
 

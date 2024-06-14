@@ -26,7 +26,7 @@ pub enum Expr {
     ConcatOp {
         left: Box<Expr>,
         right: Box<Expr>,
-    }
+    },
     BinaryOp {
         op: BinaryOp,
         left: Box<Expr>,
