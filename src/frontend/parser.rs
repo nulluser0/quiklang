@@ -585,6 +585,7 @@ impl Parser {
         if *self.at() == Token::Keyword(Keyword::Else) {
             self.eat(); // Advance from else
             if *self.at() == Token::Keyword(Keyword::If) {
+                self.eat();
                 alternative = Some(vec![Stmt::ExprStmt(self.parse_if_expr())])
             } else {
                 self.expect(
