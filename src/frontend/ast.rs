@@ -48,7 +48,8 @@ pub enum Expr {
         condition: Box<Expr>,
         then: Vec<Stmt>,
     }, // While Condition, Do Stmts
-    ForeverLoopExpr(Vec<Stmt>),         // Forever loop! Has vec of stmts.
+    BlockExpr(Vec<Stmt>), // A block expr, literally the same as `let x; {x=10} let y;` in rust.
+    ForeverLoopExpr(Vec<Stmt>), // Forever loop! Has vec of stmts.
     SpecialNull, // Literally just returns null. Should ONLY be returned as a result of a semicolon.
 }
 

@@ -452,6 +452,7 @@ impl Parser {
             Token::Keyword(Keyword::If) => self.parse_if_expr() as Expr,
             Token::Keyword(Keyword::While) => self.parse_while_expr() as Expr,
             Token::Keyword(Keyword::Loop) => self.parse_loop_expr() as Expr,
+            Token::Keyword(Keyword::Block) => self.parse_block_expr() as Expr,
             // Identifier
             Token::Identifier(name) => Expr::Identifier(name.to_string()) as Expr,
             // Literals
@@ -532,6 +533,22 @@ impl Parser {
             condition: Box::new(condition),
             then: statements,
         }
+    }
+
+    fn parse_block_expr(&mut self) -> Expr {
+        self.expect(
+            Token::Symbol(Symbol::LeftBrace),
+            "Expected left brace before `block` expression.",
+        );
+        let mut statements: Vec<Stmt> = Vec::new();
+        while self.not_eof() && *self.at() != Token::Symbol(Symbol::RightBrace) {
+            statements.push(self.parse_stmt());
+        }
+        self.expect(
+            Token::Symbol(Symbol::RightBrace),
+            "Expected right brace after `while` expression.",
+        );
+        Expr::BlockExpr(statements)
     }
 
     fn parse_loop_expr(&mut self) -> Expr {

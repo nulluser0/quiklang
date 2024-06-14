@@ -39,6 +39,7 @@ pub fn evaluate_expr(
         Expr::Array(_) => todo!("{:?}", expr),
         Expr::SpecialNull => mk_null!(),
         Expr::ConcatOp { left, right } => evaluate_concatenation_expr(*left, *right, env, root_env),
+        Expr::BlockExpr(then) => evaluate_block_expr(then, env, root_env),
     }
 }
 
@@ -90,6 +91,19 @@ pub fn evaluate_loop_expr(
     }
 }
 
+pub fn evaluate_block_expr(
+    then: Vec<Stmt>,
+    env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
+) -> Val {
+    let scope = Rc::new(RefCell::new(Environment::new_with_parent(env.clone())));
+    let mut result = mk_null!();
+    for stmt in then {
+        result = evaluate(stmt, &scope, root_env);
+    }
+    result
+}
+
 pub fn evaluate_unary_op(
     op: UnaryOp,
     expr: Expr,
@@ -138,25 +152,19 @@ pub fn evaluate_if_expr(
     // Evaluate the condition. If it is true, then complete then, else do the else_stmt (or ignore if statement.)
     let condition_value = evaluate_expr(condition, env, root_env);
 
+    let mut result = mk_null!();
+
     // Check if the condition evaluates to true
     if let Val::Bool(condition_bool) = condition_value {
         if condition_bool.value {
             // Evaluate the consequent block if the condition is true
             for stmt in then {
-                let result = evaluate(stmt, env, root_env);
-                match result {
-                    Val::Null(_) => {}
-                    val => return val,
-                }
+                result = evaluate(stmt, env, root_env);
             }
         } else if let Some(alt) = else_stmt {
             // Evaluate the alternative block if the condition is false and an alternative is provided
             for stmt in alt {
-                let result = evaluate(stmt, env, root_env);
-                match result {
-                    Val::Null(_) => {}
-                    val => return val,
-                }
+                result = evaluate(stmt, env, root_env);
             }
         }
     } else {
@@ -164,7 +172,7 @@ pub fn evaluate_if_expr(
         panic!("If condition must evaluate to a boolean value.");
     }
     // TODO: Handle cases where Exprs do not return a value using the semicolon.
-    mk_null!()
+    result
 }
 
 pub fn evaluate_assignment(

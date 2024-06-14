@@ -60,6 +60,7 @@ pub enum Keyword {
     For,    // for
     Loop,   // loop
     Global, // global
+    Block,  // block
 }
 
 impl FromStr for Keyword {
@@ -84,6 +85,7 @@ impl FromStr for Keyword {
             "for" => Ok(Keyword::For),
             "loop" => Ok(Keyword::Loop),
             "global" => Ok(Keyword::Global),
+            "block" => Ok(Keyword::Block),
             _ => Err(format!("{} is not a keyword.", s)),
         }
     }
