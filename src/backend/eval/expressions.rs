@@ -259,6 +259,9 @@ pub fn evaluate_call_expr(
                 .map(|expr| evaluate_expr(expr, env, root_env))
                 .collect();
             let scope = Rc::new(RefCell::new(Environment::new_with_parent(root_env.clone())));
+            scope
+                .borrow_mut()
+                .declare_var(&fn_value.name, Val::Function(fn_value.clone()), false);
             for (varname, arg) in fn_value.parameters.iter().zip(evaluated_args.iter()) {
                 scope.borrow_mut().declare_var(varname, arg.clone(), false);
             }

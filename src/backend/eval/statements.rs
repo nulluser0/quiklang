@@ -39,12 +39,12 @@ pub fn evaluate_declare_fn(
     is_async: bool,
     env: &Rc<RefCell<Environment>>,
 ) -> Val {
-    let function: Val = Val::Function(FunctionVal {
+    let function: Val = Val::Function(Rc::new(FunctionVal {
         name: name.clone(),
         parameters,
         body,
         is_async,
-    });
+    }));
 
     env.borrow_mut().declare_var(&name, function, false)
 }

@@ -151,7 +151,7 @@ pub enum Val {
     Bool(BoolVal),
     Object(ObjectVal),
     NativeFunction(NativeFunctionVal),
-    Function(FunctionVal),
+    Function(Rc<FunctionVal>),
     Special(SpecialVal),
 }
 
@@ -196,7 +196,10 @@ impl std::fmt::Display for Val {
             Val::Bool(BoolVal { value }) => write!(f, "{}", value),
             Val::Object(ObjectVal { properties }) => write!(f, "{:?}", properties),
             Val::NativeFunction(NativeFunctionVal { call }) => write!(f, "fn:{:?}", call),
-            Val::Function(FunctionVal { name, .. }) => write!(f, "fn:{}", name),
+            Val::Function(ref fn_val) => {
+                let function_val = fn_val.as_ref();
+                write!(f, "fn:{}", function_val.name)
+            }
             Val::Special(SpecialVal { keyword, .. }) => write!(f, "{:?}", keyword),
         }
     }
