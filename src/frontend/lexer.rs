@@ -146,7 +146,9 @@ fn is_skippable(src: char) -> bool {
 }
 
 pub fn tokenize(source_code: &str) -> Vec<Token> {
-    let mut tokens = Vec::new();
+    let estimated_capacity = source_code.len() / 5; // The number can be changed depending.
+                                                    // A bigger number results in a smaller initial allocation size.
+    let mut tokens = Vec::with_capacity(estimated_capacity);
     let mut chars = source_code.chars().peekable();
     while let Some(&c) = chars.peek() {
         if is_skippable(c) {
