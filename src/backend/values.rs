@@ -166,7 +166,7 @@ impl std::fmt::Display for Val {
             Val::Bool(BoolVal { value }) => write!(f, "{}", value),
             Val::Object(ObjectVal { properties }) => write!(f, "{:?}", properties),
             Val::NativeFunction(NativeFunctionVal { call }) => write!(f, "fn:{:?}", call),
-            Val::Function(FunctionVal { name, .. }) => write!(f, "{}", name),
+            Val::Function(FunctionVal { name, .. }) => write!(f, "fn:{}", name),
             Val::Special(SpecialVal { keyword, .. }) => write!(f, "{:?}", keyword),
         }
     }
