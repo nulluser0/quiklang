@@ -15,8 +15,7 @@ pub fn native_println(
         .map(|expr| evaluate_expr(expr, env, root_env))
         .collect();
     for arg in evaluated_args {
-        println!("{:?}", arg); // for now, just use debug print.
-                               // TODO: Add actual std::fmt::Display impl for Val enums.
+        println!("{}", arg);
     }
     mk_null!()
 }

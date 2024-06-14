@@ -157,6 +157,21 @@ impl RuntimeVal for Val {
     }
 }
 
+impl std::fmt::Display for Val {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Val::Null(_) => write!(f, "null"),
+            Val::Float(FloatVal { value }) => write!(f, "{}", value),
+            Val::Integer(IntegerVal { value }) => write!(f, "{}", value),
+            Val::Bool(BoolVal { value }) => write!(f, "{}", value),
+            Val::Object(ObjectVal { properties }) => write!(f, "{:?}", properties),
+            Val::NativeFunction(NativeFunctionVal { call }) => write!(f, "fn:{:?}", call),
+            Val::Function(FunctionVal { name, .. }) => write!(f, "{}", name),
+            Val::Special(SpecialVal { keyword, .. }) => write!(f, "{:?}", keyword),
+        }
+    }
+}
+
 // Macros cuz why not
 #[macro_export]
 macro_rules! mk_null {
