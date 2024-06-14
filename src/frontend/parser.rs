@@ -274,7 +274,7 @@ impl Parser {
     }
 
     fn parse_relational_expr(&mut self) -> Expr {
-        let mut left = self.parse_additive_expr();
+        let mut left = self.parse_concatenation_expr();
         while matches!(
             self.at(),
             Token::Operator(Operator::GreaterThan)
@@ -297,7 +297,7 @@ impl Parser {
                     process::exit(1);
                 }
             };
-            let right = self.parse_additive_expr();
+            let right = self.parse_concatenation_expr();
             left = Expr::BinaryOp {
                 op: operator,
                 left: Box::new(left),
