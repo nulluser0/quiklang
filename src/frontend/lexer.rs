@@ -1,6 +1,10 @@
 // Lexer
 
-use std::{process, str::FromStr};
+use std::{
+    iter::Peekable,
+    process,
+    str::{Chars, FromStr},
+};
 
 #[derive(Debug, PartialEq)]
 pub enum Token {
@@ -138,219 +142,239 @@ fn error_unknown_char(err: char) -> ! {
 
 #[inline]
 fn is_skippable(src: char) -> bool {
-    src == ' ' || src == '\n' || src == '\t' || src == '\r'
+    src.is_whitespace()
 }
 
 pub fn tokenize(source_code: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut chars = source_code.chars().peekable();
-
     while let Some(&c) = chars.peek() {
+        if is_skippable(c) {
+            chars.next();
+            continue;
+        }
+
         match c {
-            // Symbols:
-            '(' => tokens.push(Token::Symbol(Symbol::LeftParen)),
-            ')' => tokens.push(Token::Symbol(Symbol::RightParen)),
-            '{' => tokens.push(Token::Symbol(Symbol::LeftBrace)),
-            '}' => tokens.push(Token::Symbol(Symbol::RightBrace)),
-            '[' => tokens.push(Token::Symbol(Symbol::LeftBracket)),
-            ']' => tokens.push(Token::Symbol(Symbol::RightBracket)),
-            ',' => tokens.push(Token::Symbol(Symbol::Comma)),
-            ';' => tokens.push(Token::Symbol(Symbol::Semicolon)),
-            ':' => tokens.push(Token::Symbol(Symbol::Colon)),
-            '.' => tokens.push(Token::Symbol(Symbol::Dot)),
-            '~' => tokens.push(Token::Operator(Operator::BitwiseNot)),
-            '+' => tokens.push(Token::Operator(Operator::Add)),
-            '*' => tokens.push(Token::Operator(Operator::Multiply)),
-            '%' => tokens.push(Token::Operator(Operator::Modulus)),
-            '!' => {
-                chars.next();
-                if chars.peek() == Some(&'=') {
-                    chars.next();
-                    tokens.push(Token::Operator(Operator::NotEqual));
-                } else {
-                    tokens.push(Token::Operator(Operator::LogicalNot));
-                }
-                continue;
+            '(' | ')' | '{' | '}' | '[' | ']' | ',' | ';' | ':' | '.' | '~' | '+' | '*' | '%'
+            | '!' | '=' | '-' | '>' | '<' | '&' | '|' => {
+                tokenize_operator_or_symbol(c, &mut chars, &mut tokens);
             }
-            '=' => {
-                chars.next();
-                if chars.peek() == Some(&'=') {
-                    chars.next();
-                    tokens.push(Token::Operator(Operator::Equal));
-                } else {
-                    tokens.push(Token::Operator(Operator::Assign));
-                }
-                continue;
+            '"' => {
+                tokenize_string_literal(&mut chars, &mut tokens);
             }
-            '-' => {
-                chars.next();
-                if chars.peek() == Some(&'>') {
-                    chars.next();
-                    tokens.push(Token::Symbol(Symbol::Arrow));
-                } else {
-                    tokens.push(Token::Operator(Operator::Subtract));
-                }
-                continue;
+            '/' => {
+                tokenize_comment_or_divide(&mut chars, &mut tokens);
             }
-            '>' => {
-                chars.next();
-                if chars.peek() == Some(&'=') {
-                    chars.next();
-                    tokens.push(Token::Operator(Operator::GreaterOrEqual));
-                } else if chars.peek() == Some(&'>') {
-                    chars.next();
-                    tokens.push(Token::Operator(Operator::GreaterThan));
-                } else {
-                    tokens.push(Token::Operator(Operator::Pipe));
-                }
-                continue;
+            _ if c.is_ascii_digit() => {
+                tokenize_number(&mut chars, &mut tokens);
             }
-            '<' => {
-                chars.next();
-                if chars.peek() == Some(&'=') {
-                    chars.next();
-                    tokens.push(Token::Operator(Operator::LessOrEqual));
-                } else if chars.peek() == Some(&'<') {
-                    chars.next();
-                    tokens.push(Token::Operator(Operator::LessThan));
-                } else {
-                    error_unknown_char(c);
-                }
-                continue;
+            _ if c.is_ascii_alphabetic() || c == '_' => {
+                tokenize_identifier_or_keyword(&mut chars, &mut tokens);
             }
-            '&' => {
-                chars.next();
-                if chars.peek() == Some(&'&') {
-                    chars.next();
-                    tokens.push(Token::Operator(Operator::And));
-                } else {
-                    tokens.push(Token::Operator(Operator::Concat));
-                }
-                continue;
-            }
-            '|' => {
-                chars.next();
-                if chars.peek() == Some(&'|') {
-                    chars.next();
-                    tokens.push(Token::Operator(Operator::Or));
-                } else {
-                    tokens.push(Token::Symbol(Symbol::DataBracket));
-                }
-                continue;
-            }
+            _ => error_unknown_char(c),
+        }
+    }
 
-            // Multicharacter tokens:
-            _ => {
-                if c.is_ascii_digit() {
-                    let mut num_str = String::new();
-                    let mut is_float = false;
+    tokens.push(Token::EOF);
+    tokens
+}
 
-                    while let Some(&digit) = chars.peek() {
-                        if digit.is_ascii_digit() {
-                            num_str.push(digit);
-                        } else if digit == '.' && !is_float {
-                            is_float = true;
-                            num_str.push(digit);
-                        } else {
-                            break;
-                        }
-                        chars.next();
+fn tokenize_comment_or_divide(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
+    chars.next(); // Consume the '/'
+    match chars.peek() {
+        Some('/') => {
+            // Single-line comment
+            chars.next(); // Consume the second '/'
+            while let Some(&ch) = chars.peek() {
+                if ch == '\n' {
+                    break; // End of comment
+                }
+                chars.next();
+            }
+        }
+        Some('*') => {
+            // Multi-line comment
+            chars.next(); // Consume the '*'
+            loop {
+                match (chars.next(), chars.peek()) {
+                    (Some('*'), Some('/')) => {
+                        chars.next(); // Consume the '/'
+                        break; // End of comment
                     }
-
-                    if is_float {
-                        let float_val: f64 = num_str.parse().unwrap();
-                        tokens.push(Token::FloatLiteral(float_val));
-                    } else {
-                        let int_val: i64 = num_str.parse().unwrap();
-                        tokens.push(Token::IntegerLiteral(int_val));
-                    }
-                    continue;
-                }
-
-                if c.is_ascii_alphabetic() || c == '_' {
-                    let mut word = String::new();
-                    while let Some(&alpha) = chars.peek() {
-                        if alpha.is_ascii_alphanumeric() || alpha == '_' {
-                            word.push(alpha);
-                            chars.next();
-                        } else {
-                            break;
-                        }
-                    }
-
-                    match Keyword::from_str(&word) {
-                        Ok(keyword) => tokens.push(Token::Keyword(keyword)),
-                        Err(_) => tokens.push(Token::Identifier(word)),
-                    }
-                    continue;
-                }
-
-                if c == '"' {
-                    chars.next();
-                    let mut string_literal = String::new();
-                    while let Some(&ch) = chars.peek() {
-                        if ch == '"' {
-                            break;
-                        } else if ch == '\\' {
-                            chars.next();
-                            if let Some(&next_ch) = chars.peek() {
-                                if next_ch == '"' {
-                                    string_literal.push('"');
-                                    chars.next();
-                                } else {
-                                    string_literal.push('\\');
-                                    string_literal.push(next_ch);
-                                    chars.next();
-                                }
-                            }
-                        } else {
-                            string_literal.push(ch);
-                            chars.next();
-                        }
-                    }
-                    chars.next(); // Consume closing quote
-                    tokens.push(Token::StringLiteral(string_literal));
-                    continue;
-                }
-
-                if c == '/' {
-                    chars.next();
-                    if chars.peek() == Some(&'/') {
-                        chars.next();
-                        while let Some(&commented_character) = chars.peek() {
-                            if commented_character == '\n' {
-                                break;
-                            } else {
-                                chars.next();
-                            }
-                        }
-                    } else if chars.peek() == Some(&'*') {
-                        chars.next();
-                        while let Some(&commented_character) = chars.peek() {
-                            if commented_character == '*' {
-                                chars.next();
-                                if chars.peek() == Some(&'/') {
-                                    chars.next();
-                                    break;
-                                }
-                            } else {
-                                chars.next();
-                            }
-                        }
-                    } else {
-                        tokens.push(Token::Operator(Operator::Divide));
-                    }
-                    continue;
-                }
-
-                if !is_skippable(c) {
-                    error_unknown_char(c);
+                    (Some(_), None) => break, // EOF without closing comment
+                    (None, _) => break,       // Handle EOF gracefully
+                    _ => {}                   // Continue scanning
                 }
             }
         }
-        chars.next(); // Consume the current character
+        _ => {
+            // It's a divide operator
+            tokens.push(Token::Operator(Operator::Divide));
+        }
     }
-    tokens.push(Token::EOF);
+}
 
-    tokens
+fn tokenize_operator_or_symbol(c: char, chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
+    match c {
+        '(' => tokens.push(Token::Symbol(Symbol::LeftParen)),
+        ')' => tokens.push(Token::Symbol(Symbol::RightParen)),
+        '{' => tokens.push(Token::Symbol(Symbol::LeftBrace)),
+        '}' => tokens.push(Token::Symbol(Symbol::RightBrace)),
+        '[' => tokens.push(Token::Symbol(Symbol::LeftBracket)),
+        ']' => tokens.push(Token::Symbol(Symbol::RightBracket)),
+        ',' => tokens.push(Token::Symbol(Symbol::Comma)),
+        ';' => tokens.push(Token::Symbol(Symbol::Semicolon)),
+        ':' => tokens.push(Token::Symbol(Symbol::Colon)),
+        '.' => tokens.push(Token::Symbol(Symbol::Dot)),
+        '~' => tokens.push(Token::Operator(Operator::BitwiseNot)),
+        '+' => tokens.push(Token::Operator(Operator::Add)),
+        '*' => tokens.push(Token::Operator(Operator::Multiply)),
+        '%' => tokens.push(Token::Operator(Operator::Modulus)),
+        '!' | '=' | '-' | '>' | '<' | '&' | '|' => {
+            handle_complex_operators(c, chars, tokens);
+        }
+        _ => unreachable!(),
+    }
+    chars.next();
+}
+
+fn handle_complex_operators(c: char, chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
+    // Current character already known, peek next to decide on multi-character operators
+    match c {
+        '!' => {
+            if matches!(chars.peek(), Some(&'=')) {
+                chars.next(); // Consume '='
+                tokens.push(Token::Operator(Operator::NotEqual));
+            } else {
+                tokens.push(Token::Operator(Operator::LogicalNot));
+            }
+        }
+        '=' => {
+            if matches!(chars.peek(), Some(&'=')) {
+                chars.next(); // Consume '='
+                tokens.push(Token::Operator(Operator::Equal));
+            } else {
+                tokens.push(Token::Operator(Operator::Assign));
+            }
+        }
+        '-' => {
+            if matches!(chars.peek(), Some(&'>')) {
+                chars.next(); // Consume '>'
+                tokens.push(Token::Symbol(Symbol::Arrow)); // '->'
+            } else {
+                tokens.push(Token::Operator(Operator::Subtract));
+            }
+        }
+        '>' => {
+            match chars.peek() {
+                Some(&'=') => {
+                    chars.next(); // Consume '='
+                    tokens.push(Token::Operator(Operator::GreaterOrEqual));
+                }
+                Some(&'>') => {
+                    chars.next(); // Consume '>'
+                    tokens.push(Token::Operator(Operator::GreaterThan));
+                }
+                _ => {
+                    tokens.push(Token::Operator(Operator::Pipe));
+                }
+            }
+        }
+        '<' => {
+            match chars.peek() {
+                Some(&'=') => {
+                    chars.next(); // Consume '='
+                    tokens.push(Token::Operator(Operator::LessOrEqual));
+                }
+                Some(&'<') => {
+                    chars.next(); // Consume '<'
+                    tokens.push(Token::Operator(Operator::LessThan));
+                }
+                _ => error_unknown_char('<'), // Handle error or unexpected character
+            }
+        }
+        '&' => {
+            if matches!(chars.peek(), Some(&'&')) {
+                chars.next(); // Consume '&'
+                tokens.push(Token::Operator(Operator::And));
+            } else {
+                tokens.push(Token::Operator(Operator::Concat));
+            }
+        }
+        '|' => {
+            if matches!(chars.peek(), Some(&'|')) {
+                chars.next(); // Consume '|'
+                tokens.push(Token::Operator(Operator::Or));
+            } else {
+                error_unknown_char('|');
+            }
+        }
+        _ => unreachable!(
+            "handle_complex_operators called with unexpected character: {}",
+            c
+        ),
+    }
+}
+
+fn tokenize_number(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
+    let mut number = String::new();
+    while let Some(&next) = chars.peek() {
+        if next.is_ascii_digit() || next == '.' {
+            number.push(chars.next().unwrap());
+        } else {
+            break;
+        }
+    }
+    if number.contains('.') {
+        tokens.push(Token::FloatLiteral(number.parse().unwrap()));
+    } else {
+        tokens.push(Token::IntegerLiteral(number.parse().unwrap()));
+    }
+}
+
+fn tokenize_identifier_or_keyword(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
+    let mut identifier = String::new();
+    while let Some(&next) = chars.peek() {
+        if next.is_ascii_alphanumeric() || next == '_' {
+            identifier.push(chars.next().unwrap());
+        } else {
+            break;
+        }
+    }
+    match Keyword::from_str(&identifier) {
+        Ok(keyword) => tokens.push(Token::Keyword(keyword)),
+        Err(_) => tokens.push(Token::Identifier(identifier)),
+    }
+}
+
+fn tokenize_string_literal(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
+    chars.next(); // Consume the initial quote
+    let mut literal = String::new();
+    while let Some(&ch) = chars.peek() {
+        match ch {
+            '"' => {
+                chars.next(); // Consume the closing quote
+                break;
+            }
+            '\\' => {
+                chars.next(); // Consume the backslash
+                if let Some(&escaped) = chars.peek() {
+                    literal.push(match escaped {
+                        'n' => '\n',
+                        't' => '\t',
+                        'r' => '\r',
+                        '\\' => '\\',
+                        '"' => '"',
+                        _ => escaped,
+                    });
+                    chars.next(); // Consume the escaped character
+                }
+            }
+            _ => {
+                literal.push(ch);
+                chars.next();
+            }
+        }
+    }
+    tokens.push(Token::StringLiteral(literal));
 }
