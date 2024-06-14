@@ -56,11 +56,12 @@ pub fn evaluate_while_expr(
             evaluate_expr(condition.clone(), env, parent_env)
         {
             // Evaluate the consequent block if the condition is true
+            let scope = Rc::new(RefCell::new(Environment::new_with_parent(env.clone())));
             for stmt in &then {
                 if let Val::Special(SpecialVal {
                     keyword: SpecialValKeyword::Break,
                     return_value,
-                }) = evaluate(stmt.clone(), env, parent_env)
+                }) = evaluate(stmt.clone(), &scope, parent_env)
                 {
                     return return_value.map_or(mk_null!(), |val| *val);
                 }
@@ -79,11 +80,12 @@ pub fn evaluate_loop_expr(
     parent_env: &Rc<RefCell<Environment>>,
 ) -> Val {
     loop {
+        let scope = Rc::new(RefCell::new(Environment::new_with_parent(env.clone())));
         for stmt in &then {
             if let Val::Special(SpecialVal {
                 keyword: SpecialValKeyword::Break,
                 return_value,
-            }) = evaluate(stmt.clone(), env, parent_env)
+            }) = evaluate(stmt.clone(), &scope, parent_env)
             {
                 return return_value.map_or(mk_null!(), |val| *val);
             }
