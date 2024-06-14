@@ -23,6 +23,10 @@ pub enum Expr {
         assignee: Box<Expr>,
         expr: Box<Expr>,
     }, // Assignee, Expr
+    ConcatOp {
+        left: Box<Expr>,
+        right: Box<Expr>,
+    }
     BinaryOp {
         op: BinaryOp,
         left: Box<Expr>,

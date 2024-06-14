@@ -104,6 +104,7 @@ pub enum Operator {
     Equal,          // ==
     NotEqual,       // !=
     LogicalNot,     // !
+    Concat,         // &
     And,            // &&
     Or,             // ||
     Pipe,           // >
@@ -221,7 +222,7 @@ pub fn tokenize(source_code: &str) -> Vec<Token> {
                     chars.next();
                     tokens.push(Token::Operator(Operator::And));
                 } else {
-                    error_unknown_char(c);
+                    tokens.push(Token::Operator(Operator::Concat));
                 }
                 continue;
             }

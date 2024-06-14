@@ -7,6 +7,7 @@ use super::environment::Environment;
 #[derive(Debug, PartialEq)]
 pub enum ValueType {
     Null,
+    String,
     Float,
     Integer,
     Bool,
@@ -26,6 +27,17 @@ pub struct NullVal;
 impl RuntimeVal for NullVal {
     fn get_type(&self) -> ValueType {
         ValueType::Null
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct StringVal {
+    pub value: String,
+}
+
+impl RuntimeVal for StringVal {
+    fn get_type(&self) -> ValueType {
+        ValueType::String
     }
 }
 
@@ -133,6 +145,7 @@ impl RuntimeVal for SpecialVal {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Val {
     Null(NullVal),
+    String(StringVal),
     Float(FloatVal),
     Integer(IntegerVal),
     Bool(BoolVal),
@@ -146,6 +159,7 @@ impl RuntimeVal for Val {
     fn get_type(&self) -> ValueType {
         match self {
             Val::Null(_) => ValueType::Null,
+            Val::String(_) => ValueType::String,
             Val::Float(_) => ValueType::Float,
             Val::Integer(_) => ValueType::Integer,
             Val::Bool(_) => ValueType::Bool,
@@ -161,6 +175,7 @@ impl std::fmt::Display for Val {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Val::Null(_) => write!(f, "null"),
+            Val::String(StringVal { value }) => write!(f, "{}", value),
             Val::Float(FloatVal { value }) => write!(f, "{}", value),
             Val::Integer(IntegerVal { value }) => write!(f, "{}", value),
             Val::Bool(BoolVal { value }) => write!(f, "{}", value),

@@ -307,6 +307,20 @@ impl Parser {
         left
     }
 
+    fn parse_concatenation_expr(&mut self) -> Expr {
+        let mut left = self.parse_additive_expr();
+
+        while matches!(self.at(), Token::Operator(Operator::Concat)) {
+            self.eat();
+            let right = self.parse_additive_expr();
+            left = Expr::ConcatOp {
+                left: Box::new(left),
+                right: Box::new(right),
+            }
+        }
+        left
+    }
+
     fn parse_additive_expr(&mut self) -> Expr {
         let mut left = self.parse_multiplicative_expr();
 
@@ -441,6 +455,7 @@ impl Parser {
             // Identifier
             Token::Identifier(name) => Expr::Identifier(name.to_string()) as Expr,
             // Literals
+            Token::StringLiteral(string) => Expr::Literal(Literal::String(string)) as Expr,
             Token::IntegerLiteral(integer) => Expr::Literal(Literal::Integer(integer)) as Expr,
             Token::FloatLiteral(float) => Expr::Literal(Literal::Float(float)) as Expr,
             // Token::StringLiteral(_) => todo!(),
