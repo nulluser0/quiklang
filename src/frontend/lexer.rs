@@ -233,6 +233,7 @@ fn tokenize_operator_or_symbol(c: char, chars: &mut Peekable<Chars>, tokens: &mu
         '*' => tokens.push(Token::Operator(Operator::Multiply)),
         '%' => tokens.push(Token::Operator(Operator::Modulus)),
         '!' | '=' | '-' | '>' | '<' | '&' | '|' => {
+            chars.next();
             handle_complex_operators(c, chars, tokens);
         }
         _ => unreachable!(),
