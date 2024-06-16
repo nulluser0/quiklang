@@ -309,7 +309,7 @@ fn handle_complex_operators(c: char, chars: &mut Peekable<Chars>, tokens: &mut V
                 chars.next(); // Consume '|'
                 tokens.push(Token::Operator(Operator::Or));
             } else {
-                error_unknown_char('|');
+                tokens.push(Token::Symbol(Symbol::DataBracket));
             }
         }
         _ => unreachable!(
