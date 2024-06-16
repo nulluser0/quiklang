@@ -6,7 +6,7 @@ use std::{
     str::{Chars, FromStr},
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     // Keywords
     Keyword(Keyword),
@@ -45,7 +45,7 @@ impl std::fmt::Display for Token {
 }
 
 // Keywords
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Keyword {
     Import, // import
     Fn,     // fn
@@ -96,7 +96,7 @@ impl FromStr for Keyword {
 }
 
 // Operators
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Operator {
     Assign,         // =
     Add,            // +
@@ -119,7 +119,7 @@ pub enum Operator {
 }
 
 // Symbols/Delimiters
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Symbol {
     LeftParen,    // (
     RightParen,   // )

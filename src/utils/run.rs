@@ -20,7 +20,7 @@ pub fn run(input: String, env: &Rc<RefCell<Environment>>) {
             }
         }
         Err(e) => {
-            println!("Error: {:?}", e);
+            println!("Error: {}", e);
         }
     }
 }
