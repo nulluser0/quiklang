@@ -2,3 +2,5 @@
 /code.quik
 /.VSCodeCounter
 /gitignored
+perf.*
+flamegraph.svg
