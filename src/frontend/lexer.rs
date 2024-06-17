@@ -235,6 +235,7 @@ fn tokenize_operator_or_symbol(c: char, chars: &mut Peekable<Chars>, tokens: &mu
         '!' | '=' | '-' | '>' | '<' | '&' | '|' => {
             chars.next();
             handle_complex_operators(c, chars, tokens);
+            return;
         }
         _ => unreachable!(),
     }
