@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 criterion = "0.5.1"
+thiserror = "1.0.61"
 
 [lib]
 name = "quiklang"

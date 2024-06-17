@@ -1,6 +1,9 @@
 // Parser
 
-use crate::frontend::ast::{BinaryOp, Program, Property};
+use crate::{
+    errors::ParserError,
+    frontend::ast::{BinaryOp, Program, Property},
+};
 
 use super::{
     ast::{Expr, Literal, Stmt, UnaryOp},
@@ -630,88 +633,3 @@ impl Parser {
         Ok(program)
     }
 }
-
-#[derive(Debug)]
-pub enum ParserError {
-    UnexpectedToken {
-        expected: Token,
-        found: Token,
-        position: usize,
-        message: String,
-    },
-    MissingAsyncFn,
-    BreakOutsideLoop(usize),
-    ReturnOutsideFunction(usize),
-    MissingFunctionIdentifier(usize),
-    InvalidFunctionParameter(usize),
-    MutConstConflict(usize),
-    MissingIdentifier(usize),
-    ConstWithoutValue(usize),
-    ObjectLiteralKeyExpected(usize),
-    InvalidOperator(usize, Token),
-    InvalidDotProperty(usize, Expr),
-    // ... other error variants
-}
-
-impl std::fmt::Display for ParserError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParserError::UnexpectedToken {
-                expected,
-                found,
-                position,
-                message,
-            } => {
-                write!(
-                    f,
-                    "Error at position {}: {}. Expected {:?}, but found {:?}",
-                    position, message, expected, found
-                )
-            }
-            ParserError::MissingAsyncFn => write!(f, "Error: `async` must be followed by `fn`"),
-            ParserError::BreakOutsideLoop(pos) => write!(
-                f,
-                "Error at position {}: `break` found outside of loop context",
-                pos
-            ),
-            ParserError::ReturnOutsideFunction(pos) => write!(
-                f,
-                "Error at position {}: `return` found outside of function context",
-                pos
-            ),
-            ParserError::MissingFunctionIdentifier(pos) => {
-                write!(f, "Error at position {}: Missing function identifier", pos)
-            }
-            ParserError::InvalidFunctionParameter(pos) => {
-                write!(f, "Error at position {}: Invalid function parameter", pos)
-            }
-            ParserError::MutConstConflict(pos) => write!(
-                f,
-                "Error at position {}: Cannot use `mut` with `const`",
-                pos
-            ),
-            ParserError::MissingIdentifier(pos) => {
-                write!(f, "Error at position {}: Missing identifier", pos)
-            }
-            ParserError::ConstWithoutValue(pos) => write!(
-                f,
-                "Error at position {}: `const` must have an assigned value",
-                pos
-            ),
-            ParserError::ObjectLiteralKeyExpected(pos) => {
-                write!(f, "Error at position {}: Object literal key expected", pos)
-            }
-            ParserError::InvalidOperator(pos, token) => {
-                write!(f, "Error at position {}: Invalid operator {:?}", pos, token)
-            }
-            ParserError::InvalidDotProperty(pos, expr) => write!(
-                f,
-                "Error at position {}: Invalid property access using dot operator {:?}",
-                pos, expr
-            ),
-            // ... other error variants
-        }
-    }
-}
-
-impl std::error::Error for ParserError {}
