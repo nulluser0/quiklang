@@ -49,7 +49,7 @@ fn run_file(file_path: &str) {
     }
 
     let env = Rc::new(RefCell::new(Environment::new_with_parent(Rc::new(
-        RefCell::new(Environment::new()),
+        RefCell::new(Environment::default()),
     ))));
     run(content, &env)
 }
@@ -58,7 +58,7 @@ fn repl() {
     println!("QuikLang REPL v{}", env!("CARGO_PKG_VERSION"));
 
     let env = Rc::new(RefCell::new(Environment::new_with_parent(Rc::new(
-        RefCell::new(Environment::new()),
+        RefCell::new(Environment::default()),
     ))));
 
     loop {

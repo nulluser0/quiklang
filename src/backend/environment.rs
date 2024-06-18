@@ -20,31 +20,32 @@ pub struct Environment {
 
 impl Default for Environment {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Unable to create a new root Environment. This should not happen. If this still occur, please report this issue!")
     }
 }
 
-fn setup_env(env: &mut Environment) {
+fn setup_env(env: &mut Environment) -> Result<(), RuntimeError> {
     // Create Default Global Environment
-    env.declare_var("null", mk_null!(), false);
-    env.declare_var("true", mk_bool!(true), false);
-    env.declare_var("false", mk_bool!(false), false);
+    env.declare_var("null", mk_null!(), false)?;
+    env.declare_var("true", mk_bool!(true), false)?;
+    env.declare_var("false", mk_bool!(false), false)?;
     // Define a native built-in method
-    env.declare_var("println", mk_native_fn!(native_println), false);
-    env.declare_var("time", mk_native_fn!(native_time), false);
-    env.declare_var("forget", mk_native_fn!(native_forget), false);
-    env.declare_var("drop", mk_native_fn!(native_drop), false);
+    env.declare_var("println", mk_native_fn!(native_println), false)?;
+    env.declare_var("time", mk_native_fn!(native_time), false)?;
+    env.declare_var("forget", mk_native_fn!(native_forget), false)?;
+    env.declare_var("drop", mk_native_fn!(native_drop), false)?;
+    Ok(())
 }
 
 impl Environment {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, RuntimeError> {
         let mut env = Environment {
             values: HashMap::new(),
             is_mutable: HashSet::new(),
             parent: None,
         };
-        setup_env(&mut env);
-        env
+        setup_env(&mut env)?;
+        Ok(env)
     }
 
     pub fn get_parent(&self) -> Result<Rc<RefCell<Environment>>, String> {

@@ -20,7 +20,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("run_factorial", |b| {
         b.iter(|| {
             let env = Rc::new(RefCell::new(Environment::new_with_parent(Rc::new(
-                RefCell::new(Environment::new()),
+                RefCell::new(Environment::default()),
             ))));
             run(black_box(source_code.clone()), &env);
         })

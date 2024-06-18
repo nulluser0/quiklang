@@ -216,11 +216,9 @@ pub fn evaluate_member_expr(
             Some(result) => Ok(result.clone().unwrap_or(mk_null!())),
             None => Ok(mk_null!()),
         },
-        _ => {
-            return Err(RuntimeError::RuntimeError(
-                "Cannot get a member of a non-object type.".to_string(),
-            ))
-        }
+        _ => Err(RuntimeError::RuntimeError(
+            "Cannot get a member of a non-object type.".to_string(),
+        )),
     }
 }
 
@@ -279,11 +277,15 @@ pub fn evaluate_call_expr(
                 .collect();
             let evaluated_args = evaluated_args?;
             let scope = Rc::new(RefCell::new(Environment::new_with_parent(root_env.clone())));
-            scope
-                .borrow_mut()
-                .declare_var(&fn_value.name, Val::Function(fn_value.clone()), false);
+            scope.borrow_mut().declare_var(
+                &fn_value.name,
+                Val::Function(fn_value.clone()),
+                false,
+            )?;
             for (varname, arg) in fn_value.parameters.iter().zip(evaluated_args.iter()) {
-                scope.borrow_mut().declare_var(varname, arg.clone(), false);
+                scope
+                    .borrow_mut()
+                    .declare_var(varname, arg.clone(), false)?;
             }
             let mut result: Val = mk_null!();
             for stmt in &fn_value.body {
@@ -368,7 +370,7 @@ pub fn evaluate_binary_op(
             BinaryOp::NotEqual => Ok(Val::Bool(BoolVal {
                 value: l.value != r.value,
             })),
-            e => return Err(RuntimeError::UnsupportedBinaryOp(e)),
+            e => Err(RuntimeError::UnsupportedBinaryOp(e)),
         },
         (Val::Float(l), Val::Float(r)) => {
             match op {
@@ -405,7 +407,7 @@ pub fn evaluate_binary_op(
                 BinaryOp::NotEqual => Ok(Val::Bool(BoolVal {
                     value: l.value != r.value,
                 })),
-                e => return Err(RuntimeError::UnsupportedBinaryOp(e)),
+                e => Err(RuntimeError::UnsupportedBinaryOp(e)),
             }
         }
         (Val::Integer(l), Val::Float(r)) => {
@@ -443,7 +445,7 @@ pub fn evaluate_binary_op(
                 BinaryOp::NotEqual => Ok(Val::Bool(BoolVal {
                     value: l.to_float() != r.value,
                 })),
-                e => return Err(RuntimeError::UnsupportedBinaryOp(e)),
+                e => Err(RuntimeError::UnsupportedBinaryOp(e)),
             }
         }
         (Val::Float(l), Val::Integer(r)) => {
@@ -481,15 +483,13 @@ pub fn evaluate_binary_op(
                 BinaryOp::NotEqual => Ok(Val::Bool(BoolVal {
                     value: l.value != r.to_float(),
                 })),
-                e => return Err(RuntimeError::UnsupportedBinaryOp(e)),
+                e => Err(RuntimeError::UnsupportedBinaryOp(e)),
             }
         }
-        e => {
-            return Err(RuntimeError::TypeError {
-                message: "Binary operations are only for integers and floats.".to_string(),
-                expected: ValueType::Integer,
-                found: e.0.get_type(),
-            })
-        }
+        e => Err(RuntimeError::TypeError {
+            message: "Binary operations are only for integers and floats.".to_string(),
+            expected: ValueType::Integer,
+            found: e.0.get_type(),
+        }),
     }
 }

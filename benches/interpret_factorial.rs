@@ -32,7 +32,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("interpret_factorial", |b| {
         b.iter(|| {
             let env = Rc::new(RefCell::new(Environment::new_with_parent(Rc::new(
-                RefCell::new(Environment::new()),
+                RefCell::new(Environment::default()),
             ))));
             let root_env = env
                 .borrow()
