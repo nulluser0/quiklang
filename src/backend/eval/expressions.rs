@@ -176,7 +176,11 @@ pub fn evaluate_if_expr(
         }
     } else {
         // Error: If condition doesn't evaluate to a boolean value
-        panic!("If condition must evaluate to a boolean value.");
+        return Err(RuntimeError::TypeError {
+            message: "If expression must evaluate to a bool.".to_string(),
+            expected: ValueType::Bool,
+            found: condition_value.get_type(),
+        });
     }
     // TODO: Handle cases where Exprs do not return a value using the semicolon.
     Ok(result)
