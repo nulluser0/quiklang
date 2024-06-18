@@ -2,6 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     backend::{environment::Environment, interpreter::evaluate},
+    errors::Error,
     frontend::parser,
 };
 
@@ -16,11 +17,19 @@ pub fn run(input: String, env: &Rc<RefCell<Environment>>) {
             // println!("{:#?}", program);
 
             for stmt in program.statements {
-                let _ = evaluate(stmt, env, &root_env);
+                match evaluate(stmt, env, &root_env) {
+                    Ok(_) => continue,
+                    Err(e) => {
+                        print_e(Error::RuntimeError(e));
+                        break;
+                    }
+                };
             }
         }
-        Err(e) => {
-            println!("E: {}", e);
-        }
+        Err(e) => print_e(e),
     }
+}
+
+fn print_e(e: Error) {
+    println!("E: {}", e);
 }
