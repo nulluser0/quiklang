@@ -14,9 +14,11 @@ pub fn native_println(
         .into_iter()
         .map(|expr| evaluate_expr(expr, env, root_env))
         .collect();
+
     for arg in evaluated_args {
-        println!("{}", arg);
+        print!("{}", arg);
     }
+    println!();
     mk_null!()
 }
 
