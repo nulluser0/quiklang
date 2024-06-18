@@ -3,6 +3,21 @@ use thiserror::Error;
 use crate::frontend::{ast::Expr, lexer::Token};
 
 #[derive(Error, Debug)]
+pub enum Error {
+    #[error("Lexer Error: {0}")]
+    LexerError(LexerError),
+
+    #[error("Parser Error: {0}")]
+    ParserError(ParserError),
+    //
+    // #[error("Type Error: {0}")]
+    // TODO: TypeError(TypeError),
+
+    // #[error("Runtime Error: {0}")]
+    // TODO: RuntimeError(RuntimeError),
+}
+
+#[derive(Error, Debug)]
 pub enum LexerError {
     #[error("Unrecognized character '{0}'")]
     UnrecognizedCharacter(char),

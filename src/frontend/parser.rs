@@ -1,7 +1,7 @@
 // Parser
 
 use crate::{
-    errors::ParserError,
+    errors::{Error, ParserError},
     frontend::ast::{BinaryOp, Program, Property},
 };
 
@@ -622,12 +622,14 @@ impl Parser {
         })
     }
 
-    pub fn produce_ast(&mut self, source_code: String) -> Result<Program, ParserError> {
-        self.tokens = tokenize(&source_code).map_err(ParserError::LexerErrorAsParseError)?;
+    pub fn produce_ast(&mut self, source_code: String) -> Result<Program, Error> {
+        self.tokens = tokenize(&source_code).map_err(Error::LexerError)?;
         let mut program = Program::new(Vec::new());
 
         while self.not_eof() {
-            program.statements.push(self.parse_stmt()?); // SHOULD BE PARSE_STMT!!!
+            program
+                .statements
+                .push(self.parse_stmt().map_err(Error::ParserError)?);
         }
 
         Ok(program)
