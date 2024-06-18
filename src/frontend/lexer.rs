@@ -2,9 +2,10 @@
 
 use std::{
     iter::Peekable,
-    process,
     str::{Chars, FromStr},
 };
+
+use crate::errors::LexerError;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
@@ -135,17 +136,12 @@ pub enum Symbol {
     Arrow,        // ->
 }
 
-fn error_unknown_char(err: char) -> ! {
-    println!("Unrecognized character found in source: {:#?}", err);
-    process::exit(1);
-}
-
 #[inline]
 fn is_skippable(src: char) -> bool {
     src.is_whitespace()
 }
 
-pub fn tokenize(source_code: &str) -> Vec<Token> {
+pub fn tokenize(source_code: &str) -> Result<Vec<Token>, LexerError> {
     let estimated_capacity = source_code.len() / 5; // The number can be changed depending.
                                                     // A bigger number results in a smaller initial allocation size.
     let mut tokens = Vec::with_capacity(estimated_capacity);
@@ -159,29 +155,32 @@ pub fn tokenize(source_code: &str) -> Vec<Token> {
         match c {
             '(' | ')' | '{' | '}' | '[' | ']' | ',' | ';' | ':' | '.' | '~' | '+' | '*' | '%'
             | '!' | '=' | '-' | '>' | '<' | '&' | '|' => {
-                tokenize_operator_or_symbol(c, &mut chars, &mut tokens);
+                tokenize_operator_or_symbol(c, &mut chars, &mut tokens)?;
             }
             '"' => {
-                tokenize_string_literal(&mut chars, &mut tokens);
+                tokenize_string_literal(&mut chars, &mut tokens)?;
             }
             '/' => {
-                tokenize_comment_or_divide(&mut chars, &mut tokens);
+                tokenize_comment_or_divide(&mut chars, &mut tokens)?;
             }
             _ if c.is_ascii_digit() => {
-                tokenize_number(&mut chars, &mut tokens);
+                tokenize_number(&mut chars, &mut tokens)?;
             }
             _ if c.is_ascii_alphabetic() || c == '_' => {
-                tokenize_identifier_or_keyword(&mut chars, &mut tokens);
+                tokenize_identifier_or_keyword(&mut chars, &mut tokens)?;
             }
-            _ => error_unknown_char(c),
+            _ => return Err(LexerError::UnrecognizedCharacter(c)),
         }
     }
 
     tokens.push(Token::EOF);
-    tokens
+    Ok(tokens)
 }
 
-fn tokenize_comment_or_divide(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
+fn tokenize_comment_or_divide(
+    chars: &mut Peekable<Chars>,
+    tokens: &mut Vec<Token>,
+) -> Result<(), LexerError> {
     chars.next(); // Consume the '/'
     match chars.peek() {
         Some('/') => {
@@ -214,9 +213,14 @@ fn tokenize_comment_or_divide(chars: &mut Peekable<Chars>, tokens: &mut Vec<Toke
             tokens.push(Token::Operator(Operator::Divide));
         }
     }
+    Ok(())
 }
 
-fn tokenize_operator_or_symbol(c: char, chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
+fn tokenize_operator_or_symbol(
+    c: char,
+    chars: &mut Peekable<Chars>,
+    tokens: &mut Vec<Token>,
+) -> Result<(), LexerError> {
     match c {
         '(' => tokens.push(Token::Symbol(Symbol::LeftParen)),
         ')' => tokens.push(Token::Symbol(Symbol::RightParen)),
@@ -234,39 +238,55 @@ fn tokenize_operator_or_symbol(c: char, chars: &mut Peekable<Chars>, tokens: &mu
         '%' => tokens.push(Token::Operator(Operator::Modulus)),
         '!' | '=' | '-' | '>' | '<' | '&' | '|' => {
             chars.next();
-            handle_complex_operators(c, chars, tokens);
-            return;
+            handle_complex_operators(c, chars, tokens)?;
+            return Ok(());
         }
-        _ => unreachable!(),
+        _ => {
+            return Err(LexerError::InternalError(format!(
+                "Unresolved character {}",
+                c
+            )))
+        }
     }
     chars.next();
+    Ok(())
 }
 
-fn handle_complex_operators(c: char, chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
+fn handle_complex_operators(
+    c: char,
+    chars: &mut Peekable<Chars>,
+    tokens: &mut Vec<Token>,
+) -> Result<(), LexerError> {
     // Current character already known, peek next to decide on multi-character operators
     match c {
         '!' => {
             if matches!(chars.peek(), Some(&'=')) {
                 chars.next(); // Consume '='
                 tokens.push(Token::Operator(Operator::NotEqual));
+                Ok(())
             } else {
                 tokens.push(Token::Operator(Operator::LogicalNot));
+                Ok(())
             }
         }
         '=' => {
             if matches!(chars.peek(), Some(&'=')) {
                 chars.next(); // Consume '='
                 tokens.push(Token::Operator(Operator::Equal));
+                Ok(())
             } else {
                 tokens.push(Token::Operator(Operator::Assign));
+                Ok(())
             }
         }
         '-' => {
             if matches!(chars.peek(), Some(&'>')) {
                 chars.next(); // Consume '>'
                 tokens.push(Token::Symbol(Symbol::Arrow)); // '->'
+                Ok(())
             } else {
                 tokens.push(Token::Operator(Operator::Subtract));
+                Ok(())
             }
         }
         '>' => {
@@ -274,13 +294,16 @@ fn handle_complex_operators(c: char, chars: &mut Peekable<Chars>, tokens: &mut V
                 Some(&'=') => {
                     chars.next(); // Consume '='
                     tokens.push(Token::Operator(Operator::GreaterOrEqual));
+                    Ok(())
                 }
                 Some(&'>') => {
                     chars.next(); // Consume '>'
                     tokens.push(Token::Operator(Operator::GreaterThan));
+                    Ok(())
                 }
                 _ => {
                     tokens.push(Token::Operator(Operator::Pipe));
+                    Ok(())
                 }
             }
         }
@@ -289,38 +312,44 @@ fn handle_complex_operators(c: char, chars: &mut Peekable<Chars>, tokens: &mut V
                 Some(&'=') => {
                     chars.next(); // Consume '='
                     tokens.push(Token::Operator(Operator::LessOrEqual));
+                    Ok(())
                 }
                 Some(&'<') => {
                     chars.next(); // Consume '<'
                     tokens.push(Token::Operator(Operator::LessThan));
+                    Ok(())
                 }
-                _ => error_unknown_char('<'), // Handle error or unexpected character
+                _ => Err(LexerError::UnrecognizedCharacter(c)), // Handle error or unexpected character
             }
         }
         '&' => {
             if matches!(chars.peek(), Some(&'&')) {
                 chars.next(); // Consume '&'
                 tokens.push(Token::Operator(Operator::And));
+                Ok(())
             } else {
                 tokens.push(Token::Operator(Operator::Concat));
+                Ok(())
             }
         }
         '|' => {
             if matches!(chars.peek(), Some(&'|')) {
                 chars.next(); // Consume '|'
                 tokens.push(Token::Operator(Operator::Or));
+                Ok(())
             } else {
                 tokens.push(Token::Symbol(Symbol::DataBracket));
+                Ok(())
             }
         }
-        _ => unreachable!(
+        _ => Err(LexerError::InternalError(format!(
             "handle_complex_operators called with unexpected character: {}",
             c
-        ),
+        ))),
     }
 }
 
-fn tokenize_number(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
+fn tokenize_number(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) -> Result<(), LexerError> {
     let mut number = String::new();
     while let Some(&next) = chars.peek() {
         if next.is_ascii_digit() || next == '.' {
@@ -330,13 +359,25 @@ fn tokenize_number(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
         }
     }
     if number.contains('.') {
-        tokens.push(Token::FloatLiteral(number.parse().unwrap()));
+        tokens.push(Token::FloatLiteral(
+            number
+                .parse()
+                .map_err(|_| LexerError::InvalidNumberFormat(number.clone()))?,
+        ));
     } else {
-        tokens.push(Token::IntegerLiteral(number.parse().unwrap()));
+        tokens.push(Token::IntegerLiteral(
+            number
+                .parse()
+                .map_err(|_| LexerError::InvalidNumberFormat(number.clone()))?,
+        ));
     }
+    Ok(())
 }
 
-fn tokenize_identifier_or_keyword(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
+fn tokenize_identifier_or_keyword(
+    chars: &mut Peekable<Chars>,
+    tokens: &mut Vec<Token>,
+) -> Result<(), LexerError> {
     let mut identifier = String::new();
     while let Some(&next) = chars.peek() {
         if next.is_ascii_alphanumeric() || next == '_' {
@@ -346,12 +387,21 @@ fn tokenize_identifier_or_keyword(chars: &mut Peekable<Chars>, tokens: &mut Vec<
         }
     }
     match Keyword::from_str(&identifier) {
-        Ok(keyword) => tokens.push(Token::Keyword(keyword)),
-        Err(_) => tokens.push(Token::Identifier(identifier)),
+        Ok(keyword) => {
+            tokens.push(Token::Keyword(keyword));
+            Ok(())
+        }
+        Err(_) => {
+            tokens.push(Token::Identifier(identifier));
+            Ok(())
+        }
     }
 }
 
-fn tokenize_string_literal(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) {
+fn tokenize_string_literal(
+    chars: &mut Peekable<Chars>,
+    tokens: &mut Vec<Token>,
+) -> Result<(), LexerError> {
     chars.next(); // Consume the initial quote
     let mut literal = String::new();
     while let Some(&ch) = chars.peek() {
@@ -381,4 +431,5 @@ fn tokenize_string_literal(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>)
         }
     }
     tokens.push(Token::StringLiteral(literal));
+    Ok(())
 }
