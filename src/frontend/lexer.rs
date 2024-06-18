@@ -408,7 +408,8 @@ fn tokenize_string_literal(
         match ch {
             '"' => {
                 chars.next(); // Consume the closing quote
-                break;
+                tokens.push(Token::StringLiteral(literal));
+                return Ok(());
             }
             '\\' => {
                 chars.next(); // Consume the backslash
@@ -430,6 +431,5 @@ fn tokenize_string_literal(
             }
         }
     }
-    tokens.push(Token::StringLiteral(literal));
-    Ok(())
+    Err(LexerError::UnterminatedStringLiteral)
 }

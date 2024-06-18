@@ -2,6 +2,7 @@ use thiserror::Error;
 
 use crate::frontend::{ast::Expr, lexer::Token};
 
+// Universal Errors used by functions like parser::produce_ast()
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Lexer Error: {0}")]
@@ -17,6 +18,7 @@ pub enum Error {
     // TODO: RuntimeError(RuntimeError),
 }
 
+// Lexer-specific Errors
 #[derive(Error, Debug)]
 pub enum LexerError {
     #[error("Unrecognized character '{0}'")]
@@ -35,6 +37,7 @@ pub enum LexerError {
     InternalError(String),
 }
 
+// Parser-specific Errors
 #[derive(Error, Debug)]
 pub enum ParserError {
     #[error("Lexer Error: {0}")]
