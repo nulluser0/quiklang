@@ -6,6 +6,7 @@ use std::process;
 use std::rc::Rc;
 
 use crate::backend::values::{BoolVal, NativeFunctionVal, NullVal, Val};
+use crate::errors::RuntimeError;
 use crate::{mk_bool, mk_native_fn, mk_null};
 
 use super::native_fn::{native_drop, native_forget, native_println, native_time};
@@ -64,7 +65,7 @@ impl Environment {
     pub fn resolve(
         env: &Rc<RefCell<Environment>>,
         varname: &str,
-    ) -> Result<Rc<RefCell<Environment>>, String> {
+    ) -> Result<Rc<RefCell<Environment>>, RuntimeError> {
         if env.borrow().values.contains_key(varname) {
             return Ok(env.clone());
         }
@@ -73,35 +74,36 @@ impl Environment {
             return Self::resolve(parent, varname);
         }
 
-        Err(format!(
-            "Cannot resolve '{}', as it does not exist.",
-            varname
-        ))
+        Err(RuntimeError::UndefinedVariable(varname.to_string()))
     }
 
-    pub fn declare_var(&mut self, name: &str, value: Val, is_mutable: bool) -> Val {
+    pub fn declare_var(
+        &mut self,
+        name: &str,
+        value: Val,
+        is_mutable: bool,
+    ) -> Result<Val, RuntimeError> {
         if let std::collections::hash_map::Entry::Vacant(e) = self.values.entry(name.to_string()) {
             e.insert(value.clone());
         } else {
-            println!("Cannot declare variable {} as it is already defined.", name);
-            process::exit(1);
+            return Err(RuntimeError::DeclaredExistingVariable(name.to_string()));
         }
         if is_mutable {
             self.is_mutable.insert(name.to_owned());
         }
-        value
+        Ok(value)
     }
 
-    pub fn assign_var(env: &Rc<RefCell<Environment>>, name: &str, value: Val) -> Val {
-        let containing_env = Self::resolve(env, name).unwrap_or_else(|_| {
-            println!("Cannot resolve {} as it does not exist.", name);
-            process::exit(1);
-        });
+    pub fn assign_var(
+        env: &Rc<RefCell<Environment>>,
+        name: &str,
+        value: Val,
+    ) -> Result<Val, RuntimeError> {
+        let containing_env = Self::resolve(env, name)?;
 
         // immutables (const and let) cannot have its value changed.
         if !containing_env.borrow().is_mutable.contains(name) {
-            println!("Cannot resolve {} as it is immutable.", name);
-            process::exit(1);
+            return Err(RuntimeError::ImmutableVariableEdit(name.to_string()));
         }
 
         match Val::is_same_type(containing_env.borrow().values.get(name).unwrap(), &value) {
@@ -116,7 +118,7 @@ impl Environment {
             .borrow_mut()
             .values
             .insert(name.to_string(), value.clone());
-        value
+        Ok(value)
     }
 
     pub fn drop_var(env: &Rc<RefCell<Environment>>, name: &str) {
@@ -128,12 +130,9 @@ impl Environment {
         containing_env.borrow_mut().values.remove(name).unwrap();
     }
 
-    pub fn lookup_var(env: &Rc<RefCell<Environment>>, name: &str) -> Val {
-        let env = Self::resolve(env, name).unwrap_or_else(|_| {
-            println!("Cannot resolve {} as it does not exist.", name);
-            process::exit(1);
-        });
+    pub fn lookup_var(env: &Rc<RefCell<Environment>>, name: &str) -> Result<Val, RuntimeError> {
+        let env = Self::resolve(env, name)?;
         let x = env.borrow().values.get(name).unwrap().clone();
-        x
+        Ok(x)
     }
 }

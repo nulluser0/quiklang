@@ -134,6 +134,26 @@ impl From<Operator> for BinaryOp {
     }
 }
 
+impl std::fmt::Display for BinaryOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BinaryOp::Add => write!(f, "Add"),
+            BinaryOp::Subtract => write!(f, "Subtract"),
+            BinaryOp::Multiply => write!(f, "Multiply"),
+            BinaryOp::Divide => write!(f, "Divide"),
+            BinaryOp::GreaterThan => write!(f, "GreaterThan"),
+            BinaryOp::LessThan => write!(f, "LessThan"),
+            BinaryOp::GreaterOrEqual => write!(f, "GreaterOrEqual"),
+            BinaryOp::LessOrEqual => write!(f, "LessOrEqual"),
+            BinaryOp::Equal => write!(f, "Equal"),
+            BinaryOp::NotEqual => write!(f, "NotEqual"),
+            BinaryOp::And => write!(f, "And"),
+            BinaryOp::Or => write!(f, "Or"),
+            BinaryOp::Modulus => write!(f, "Modulus"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum UnaryOp {
     LogicalNot,         // !

@@ -3,6 +3,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::errors::RuntimeError;
 use crate::frontend::ast::Stmt;
 
 use super::environment::Environment;
@@ -16,7 +17,7 @@ pub fn evaluate(
     stmt: Stmt,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Val {
+) -> Result<Val, RuntimeError> {
     match stmt {
         Stmt::ExprStmt(expr) => evaluate_expr(expr, env, root_env),
         Stmt::DeclareStmt {

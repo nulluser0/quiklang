@@ -7,6 +7,7 @@ use crate::{
         environment::Environment,
         values::{FunctionVal, NullVal, SpecialVal, SpecialValKeyword, Val},
     },
+    errors::RuntimeError,
     frontend::ast::{Expr, Stmt},
     mk_null,
 };
@@ -20,9 +21,9 @@ pub fn evaluate_declare_var(
     expr: Option<Expr>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Val {
+) -> Result<Val, RuntimeError> {
     let value: Val = if let Some(val) = expr {
-        evaluate_expr(val, env, root_env)
+        evaluate_expr(val, env, root_env)?
     } else {
         mk_null!()
     };
@@ -40,7 +41,7 @@ pub fn evaluate_declare_fn(
     body: Vec<Stmt>,
     is_async: bool,
     env: &Rc<RefCell<Environment>>,
-) -> Val {
+) -> Result<Val, RuntimeError> {
     let function: Val = Val::Function(Rc::new(FunctionVal {
         name: name.clone(),
         parameters,
@@ -55,16 +56,16 @@ pub fn evaluate_break_stmt(
     expr: Option<Expr>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Val {
+) -> Result<Val, RuntimeError> {
     match expr {
-        Some(expr) => Val::Special(SpecialVal {
+        Some(expr) => Ok(Val::Special(SpecialVal {
             keyword: SpecialValKeyword::Break,
-            return_value: Some(Box::new(evaluate_expr(expr, env, root_env))),
-        }),
-        None => Val::Special(SpecialVal {
+            return_value: Some(Box::new(evaluate_expr(expr, env, root_env)?)),
+        })),
+        None => Ok(Val::Special(SpecialVal {
             keyword: SpecialValKeyword::Break,
             return_value: None,
-        }),
+        })),
     }
 }
 
@@ -72,15 +73,15 @@ pub fn evaluate_return_stmt(
     expr: Option<Expr>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Val {
+) -> Result<Val, RuntimeError> {
     match expr {
-        Some(expr) => Val::Special(SpecialVal {
+        Some(expr) => Ok(Val::Special(SpecialVal {
             keyword: SpecialValKeyword::Return,
-            return_value: Some(Box::new(evaluate_expr(expr, env, root_env))),
-        }),
-        None => Val::Special(SpecialVal {
+            return_value: Some(Box::new(evaluate_expr(expr, env, root_env)?)),
+        })),
+        None => Ok(Val::Special(SpecialVal {
             keyword: SpecialValKeyword::Return,
             return_value: None,
-        }),
+        })),
     }
 }

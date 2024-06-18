@@ -1,6 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::frontend::ast::{Expr, Stmt};
+use crate::{
+    errors::RuntimeError,
+    frontend::ast::{Expr, Stmt},
+};
 
 use super::environment::Environment;
 
@@ -15,6 +18,22 @@ pub enum ValueType {
     NativeFunction,
     Function,
     Special, // Stuff like breaks, returns, etc.
+}
+
+impl std::fmt::Display for ValueType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ValueType::Null => write!(f, "Null"),
+            ValueType::String => write!(f, "String"),
+            ValueType::Float => write!(f, "Float"),
+            ValueType::Integer => write!(f, "Integer"),
+            ValueType::Bool => write!(f, "Bool"),
+            ValueType::Object => write!(f, "Object"),
+            ValueType::NativeFunction => write!(f, "NativeFunction"),
+            ValueType::Function => write!(f, "Function"),
+            ValueType::Special => write!(f, "Special"),
+        }
+    }
 }
 
 pub trait RuntimeVal: std::fmt::Debug {
@@ -95,8 +114,11 @@ impl RuntimeVal for ObjectVal {
     }
 }
 
-type NativeFunctionCallback =
-    fn(Vec<Expr>, &Rc<RefCell<Environment>>, &Rc<RefCell<Environment>>) -> Val;
+type NativeFunctionCallback = fn(
+    Vec<Expr>,
+    &Rc<RefCell<Environment>>,
+    &Rc<RefCell<Environment>>,
+) -> Result<Val, RuntimeError>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct NativeFunctionVal {

@@ -1,21 +1,27 @@
 use thiserror::Error;
 
-use crate::frontend::{ast::Expr, lexer::Token};
+use crate::{
+    backend::values::ValueType,
+    frontend::{
+        ast::{BinaryOp, Expr},
+        lexer::Token,
+    },
+};
 
 // Universal Errors used by functions like parser::produce_ast()
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Lexer Error: {0}")]
-    LexerError(LexerError),
+    LexerError(#[from] LexerError),
 
     #[error("Parser Error: {0}")]
-    ParserError(ParserError),
+    ParserError(#[from] ParserError),
     //
     // #[error("Type Error: {0}")]
-    // TODO: TypeError(TypeError),
+    // TODO: TypeError(#[from] TypeError),
     //
     #[error("Runtime Error: {0}")]
-    RuntimeError(RuntimeError),
+    RuntimeError(#[from] RuntimeError),
 }
 
 // Lexer-specific Errors
@@ -94,24 +100,35 @@ pub enum ParserError {
 // Interpreter-specific Errors
 #[derive(Error, Debug)]
 pub enum RuntimeError {
-    #[error("Undefined variable '{0}'")]
+    // Variables
+    #[error("Cannot resolve non-existent variable '{0}'")]
     UndefinedVariable(String),
 
-    #[error("Type mismatch: expected {expected}, found {found}")]
-    TypeError { expected: String, found: String },
+    #[error("Cannot declare already existing variable '{0}'")]
+    DeclaredExistingVariable(String),
 
-    #[error("Division by zero")]
-    DivisionByZero,
+    #[error("Cannot assign to immutable variable '{0}'")]
+    ImmutableVariableEdit(String),
 
-    #[error("Function '{0}' not callable")]
-    NotCallable(String),
+    #[error("Type mismatch: {message} - expected {expected}, found {found}")]
+    TypeError {
+        message: String,
+        expected: ValueType,
+        found: ValueType,
+    },
 
-    #[error("Index out of bounds: {0}")]
-    IndexOutOfBounds(usize),
+    #[error("Invalid assignee for assignment expression: '{0}'. Did you mean to use '==' instead of '='?")]
+    InvalidAssignExpr(String),
 
-    #[error("Property '{0}' not found")]
-    PropertyNotFound(String),
+    #[error("Unsupported Binary Operation: {0}")]
+    UnsupportedBinaryOp(BinaryOp),
 
+    // #[error("Index out of bounds: {0}")]
+    // IndexOutOfBounds(usize),
+
+    // #[error("Property '{0}' not found")]
+    // PropertyNotFound(String),
+    //
     #[error("Other runtime error: {0}")]
     RuntimeError(String),
 }
