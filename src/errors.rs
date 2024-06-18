@@ -21,17 +21,25 @@ pub enum Error {
 // Lexer-specific Errors
 #[derive(Error, Debug)]
 pub enum LexerError {
-    #[error("Unrecognized character '{0}'")]
-    UnrecognizedCharacter(char),
+    #[error("Unrecognized character '{character}' at {line}:{col}")]
+    UnrecognizedCharacter {
+        character: char,
+        line: usize,
+        col: usize,
+    },
 
-    #[error("Invalid number format: {0}")]
-    InvalidNumberFormat(String),
+    #[error("Invalid number format: {invalid_string} at {line}:{col}")]
+    InvalidNumberFormat {
+        invalid_string: String,
+        line: usize,
+        col: usize,
+    },
 
-    #[error("Unterminated string literal")]
-    UnterminatedStringLiteral,
+    #[error("Unterminated string literal at {line}:{col}")]
+    UnterminatedStringLiteral { line: usize, col: usize },
 
-    #[error("Unexpected end of file")]
-    UnexpectedEOF,
+    #[error("Unexpected end of file at {line}:{col}")]
+    UnexpectedEOF { line: usize, col: usize },
 
     #[error("Internal error: {0}")]
     InternalError(String),

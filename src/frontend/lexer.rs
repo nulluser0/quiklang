@@ -141,11 +141,46 @@ fn is_skippable(src: char) -> bool {
     src.is_whitespace()
 }
 
+// Custom made struct to implement line and col.
+struct CharStream<'a> {
+    chars: Peekable<Chars<'a>>,
+    line: usize,
+    col: usize,
+}
+
+impl<'a> CharStream<'a> {
+    fn new(source_code: &'a str) -> Self {
+        CharStream {
+            chars: source_code.chars().peekable(),
+            line: 1,
+            col: 1,
+        }
+    }
+
+    fn next(&mut self) -> Option<char> {
+        if let Some(c) = self.chars.next() {
+            if c == '\n' {
+                self.line += 1;
+                self.col = 1;
+            } else {
+                self.col += 1;
+            }
+            Some(c)
+        } else {
+            None
+        }
+    }
+
+    fn peek(&mut self) -> Option<&char> {
+        self.chars.peek()
+    }
+}
+
 pub fn tokenize(source_code: &str) -> Result<Vec<Token>, LexerError> {
     let estimated_capacity = source_code.len() / 5; // The number can be changed depending.
                                                     // A bigger number results in a smaller initial allocation size.
     let mut tokens = Vec::with_capacity(estimated_capacity);
-    let mut chars = source_code.chars().peekable();
+    let mut chars = CharStream::new(source_code);
     while let Some(&c) = chars.peek() {
         if is_skippable(c) {
             chars.next();
@@ -169,7 +204,13 @@ pub fn tokenize(source_code: &str) -> Result<Vec<Token>, LexerError> {
             _ if c.is_ascii_alphabetic() || c == '_' => {
                 tokenize_identifier_or_keyword(&mut chars, &mut tokens)?;
             }
-            _ => return Err(LexerError::UnrecognizedCharacter(c)),
+            _ => {
+                return Err(LexerError::UnrecognizedCharacter {
+                    character: c,
+                    line: chars.line,
+                    col: chars.col,
+                })
+            }
         }
     }
 
@@ -178,7 +219,7 @@ pub fn tokenize(source_code: &str) -> Result<Vec<Token>, LexerError> {
 }
 
 fn tokenize_comment_or_divide(
-    chars: &mut Peekable<Chars>,
+    chars: &mut CharStream,
     tokens: &mut Vec<Token>,
 ) -> Result<(), LexerError> {
     chars.next(); // Consume the '/'
@@ -218,7 +259,7 @@ fn tokenize_comment_or_divide(
 
 fn tokenize_operator_or_symbol(
     c: char,
-    chars: &mut Peekable<Chars>,
+    chars: &mut CharStream,
     tokens: &mut Vec<Token>,
 ) -> Result<(), LexerError> {
     match c {
@@ -254,7 +295,7 @@ fn tokenize_operator_or_symbol(
 
 fn handle_complex_operators(
     c: char,
-    chars: &mut Peekable<Chars>,
+    chars: &mut CharStream,
     tokens: &mut Vec<Token>,
 ) -> Result<(), LexerError> {
     // Current character already known, peek next to decide on multi-character operators
@@ -319,7 +360,11 @@ fn handle_complex_operators(
                     tokens.push(Token::Operator(Operator::LessThan));
                     Ok(())
                 }
-                _ => Err(LexerError::UnrecognizedCharacter(c)), // Handle error or unexpected character
+                _ => Err(LexerError::UnrecognizedCharacter {
+                    character: c,
+                    line: chars.line,
+                    col: chars.col,
+                }), // Handle error or unexpected character
             }
         }
         '&' => {
@@ -343,13 +388,13 @@ fn handle_complex_operators(
             }
         }
         _ => Err(LexerError::InternalError(format!(
-            "handle_complex_operators called with unexpected character: {}",
-            c
+            "handle_complex_operators called with unexpected character: {} @ {} {}",
+            c, chars.line, chars.col
         ))),
     }
 }
 
-fn tokenize_number(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) -> Result<(), LexerError> {
+fn tokenize_number(chars: &mut CharStream, tokens: &mut Vec<Token>) -> Result<(), LexerError> {
     let mut number = String::new();
     while let Some(&next) = chars.peek() {
         if next.is_ascii_digit() || next == '.' {
@@ -359,23 +404,27 @@ fn tokenize_number(chars: &mut Peekable<Chars>, tokens: &mut Vec<Token>) -> Resu
         }
     }
     if number.contains('.') {
-        tokens.push(Token::FloatLiteral(
-            number
-                .parse()
-                .map_err(|_| LexerError::InvalidNumberFormat(number.clone()))?,
-        ));
+        tokens.push(Token::FloatLiteral(number.parse().map_err(|_| {
+            LexerError::InvalidNumberFormat {
+                invalid_string: number.clone(),
+                line: chars.line,
+                col: chars.col,
+            }
+        })?));
     } else {
-        tokens.push(Token::IntegerLiteral(
-            number
-                .parse()
-                .map_err(|_| LexerError::InvalidNumberFormat(number.clone()))?,
-        ));
+        tokens.push(Token::IntegerLiteral(number.parse().map_err(|_| {
+            LexerError::InvalidNumberFormat {
+                invalid_string: number.clone(),
+                line: chars.line,
+                col: chars.col,
+            }
+        })?));
     }
     Ok(())
 }
 
 fn tokenize_identifier_or_keyword(
-    chars: &mut Peekable<Chars>,
+    chars: &mut CharStream,
     tokens: &mut Vec<Token>,
 ) -> Result<(), LexerError> {
     let mut identifier = String::new();
@@ -399,7 +448,7 @@ fn tokenize_identifier_or_keyword(
 }
 
 fn tokenize_string_literal(
-    chars: &mut Peekable<Chars>,
+    chars: &mut CharStream,
     tokens: &mut Vec<Token>,
 ) -> Result<(), LexerError> {
     chars.next(); // Consume the initial quote
@@ -431,5 +480,8 @@ fn tokenize_string_literal(
             }
         }
     }
-    Err(LexerError::UnterminatedStringLiteral)
+    Err(LexerError::UnterminatedStringLiteral {
+        line: chars.line,
+        col: chars.col,
+    })
 }
