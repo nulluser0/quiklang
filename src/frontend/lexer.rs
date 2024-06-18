@@ -451,12 +451,15 @@ fn tokenize_string_literal(
     chars: &mut CharStream,
     tokens: &mut Vec<Token>,
 ) -> Result<(), LexerError> {
+    let start_line = chars.line;
+    let start_col = chars.col;
     chars.next(); // Consume the initial quote
     let mut literal = String::new();
     while let Some(&ch) = chars.peek() {
         match ch {
             '"' => {
                 chars.next(); // Consume the closing quote
+
                 tokens.push(Token::StringLiteral(literal));
                 return Ok(());
             }
@@ -481,7 +484,7 @@ fn tokenize_string_literal(
         }
     }
     Err(LexerError::UnterminatedStringLiteral {
-        line: chars.line,
-        col: chars.col,
+        line: start_line,
+        col: start_col,
     })
 }

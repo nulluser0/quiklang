@@ -35,7 +35,7 @@ pub enum LexerError {
         col: usize,
     },
 
-    #[error("Unterminated string literal at {line}:{col}")]
+    #[error("Unterminated string literal at string beginning at {line}:{col}")]
     UnterminatedStringLiteral { line: usize, col: usize },
 
     #[error("Unexpected end of file at {line}:{col}")]
