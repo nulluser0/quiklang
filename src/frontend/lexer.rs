@@ -8,7 +8,14 @@ use std::{
 use crate::errors::LexerError;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Token {
+pub struct Token {
+    pub token: TokenType,
+    pub line: usize,
+    pub col: usize,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum TokenType {
     // Keywords
     Keyword(Keyword),
 
@@ -30,17 +37,17 @@ pub enum Token {
     EOF,
 }
 
-impl std::fmt::Display for Token {
+impl std::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Token::Keyword(keyword) => write!(f, "{:?}", keyword),
-            Token::Identifier(name) => write!(f, "{}", name),
-            Token::IntegerLiteral(value) => write!(f, "{}", value),
-            Token::FloatLiteral(value) => write!(f, "{}", value),
-            Token::StringLiteral(value) => write!(f, "{}", value),
-            Token::Operator(operator) => write!(f, "{:?}", operator),
-            Token::Symbol(symbol) => write!(f, "{:?}", symbol),
-            Token::EOF => write!(f, "EOF"),
+            TokenType::Keyword(keyword) => write!(f, "{:?}", keyword),
+            TokenType::Identifier(name) => write!(f, "{}", name),
+            TokenType::IntegerLiteral(value) => write!(f, "{}", value),
+            TokenType::FloatLiteral(value) => write!(f, "{}", value),
+            TokenType::StringLiteral(value) => write!(f, "{}", value),
+            TokenType::Operator(operator) => write!(f, "{:?}", operator),
+            TokenType::Symbol(symbol) => write!(f, "{:?}", symbol),
+            TokenType::EOF => write!(f, "EOF"),
         }
     }
 }
@@ -179,8 +186,8 @@ impl<'a> CharStream<'a> {
 pub fn tokenize(source_code: &str) -> Result<Vec<Token>, LexerError> {
     let estimated_capacity = source_code.len() / 5; // The number can be changed depending.
                                                     // A bigger number results in a smaller initial allocation size.
-    let mut tokens = Vec::with_capacity(estimated_capacity);
-    let mut chars = CharStream::new(source_code);
+    let mut tokens: Vec<Token> = Vec::with_capacity(estimated_capacity);
+    let mut chars: CharStream = CharStream::new(source_code);
     while let Some(&c) = chars.peek() {
         if is_skippable(c) {
             chars.next();
@@ -214,7 +221,11 @@ pub fn tokenize(source_code: &str) -> Result<Vec<Token>, LexerError> {
         }
     }
 
-    tokens.push(Token::EOF);
+    tokens.push(Token {
+        token: TokenType::EOF,
+        line: chars.line,
+        col: chars.col,
+    });
     Ok(tokens)
 }
 
@@ -251,7 +262,11 @@ fn tokenize_comment_or_divide(
         }
         _ => {
             // It's a divide operator
-            tokens.push(Token::Operator(Operator::Divide));
+            tokens.push(Token {
+                token: TokenType::Operator(Operator::Divide),
+                line: chars.line,
+                col: chars.col,
+            });
         }
     }
     Ok(())
@@ -263,20 +278,76 @@ fn tokenize_operator_or_symbol(
     tokens: &mut Vec<Token>,
 ) -> Result<(), LexerError> {
     match c {
-        '(' => tokens.push(Token::Symbol(Symbol::LeftParen)),
-        ')' => tokens.push(Token::Symbol(Symbol::RightParen)),
-        '{' => tokens.push(Token::Symbol(Symbol::LeftBrace)),
-        '}' => tokens.push(Token::Symbol(Symbol::RightBrace)),
-        '[' => tokens.push(Token::Symbol(Symbol::LeftBracket)),
-        ']' => tokens.push(Token::Symbol(Symbol::RightBracket)),
-        ',' => tokens.push(Token::Symbol(Symbol::Comma)),
-        ';' => tokens.push(Token::Symbol(Symbol::Semicolon)),
-        ':' => tokens.push(Token::Symbol(Symbol::Colon)),
-        '.' => tokens.push(Token::Symbol(Symbol::Dot)),
-        '~' => tokens.push(Token::Operator(Operator::BitwiseNot)),
-        '+' => tokens.push(Token::Operator(Operator::Add)),
-        '*' => tokens.push(Token::Operator(Operator::Multiply)),
-        '%' => tokens.push(Token::Operator(Operator::Modulus)),
+        '(' => tokens.push(Token {
+            token: TokenType::Symbol(Symbol::LeftParen),
+            line: chars.line,
+            col: chars.col,
+        }),
+        ')' => tokens.push(Token {
+            token: TokenType::Symbol(Symbol::RightParen),
+            line: chars.line,
+            col: chars.col,
+        }),
+        '{' => tokens.push(Token {
+            token: TokenType::Symbol(Symbol::LeftBrace),
+            line: chars.line,
+            col: chars.col,
+        }),
+        '}' => tokens.push(Token {
+            token: TokenType::Symbol(Symbol::RightBrace),
+            line: chars.line,
+            col: chars.col,
+        }),
+        '[' => tokens.push(Token {
+            token: TokenType::Symbol(Symbol::LeftBracket),
+            line: chars.line,
+            col: chars.col,
+        }),
+        ']' => tokens.push(Token {
+            token: TokenType::Symbol(Symbol::RightBracket),
+            line: chars.line,
+            col: chars.col,
+        }),
+        ',' => tokens.push(Token {
+            token: TokenType::Symbol(Symbol::Comma),
+            line: chars.line,
+            col: chars.col,
+        }),
+        ';' => tokens.push(Token {
+            token: TokenType::Symbol(Symbol::Semicolon),
+            line: chars.line,
+            col: chars.col,
+        }),
+        ':' => tokens.push(Token {
+            token: TokenType::Symbol(Symbol::Colon),
+            line: chars.line,
+            col: chars.col,
+        }),
+        '.' => tokens.push(Token {
+            token: TokenType::Symbol(Symbol::Dot),
+            line: chars.line,
+            col: chars.col,
+        }),
+        '~' => tokens.push(Token {
+            token: TokenType::Operator(Operator::BitwiseNot),
+            line: chars.line,
+            col: chars.col,
+        }),
+        '+' => tokens.push(Token {
+            token: TokenType::Operator(Operator::Add),
+            line: chars.line,
+            col: chars.col,
+        }),
+        '*' => tokens.push(Token {
+            token: TokenType::Operator(Operator::Multiply),
+            line: chars.line,
+            col: chars.col,
+        }),
+        '%' => tokens.push(Token {
+            token: TokenType::Operator(Operator::Modulus),
+            line: chars.line,
+            col: chars.col,
+        }),
         '!' | '=' | '-' | '>' | '<' | '&' | '|' => {
             chars.next();
             handle_complex_operators(c, chars, tokens)?;
@@ -302,48 +373,75 @@ fn handle_complex_operators(
     match c {
         '!' => {
             if matches!(chars.peek(), Some(&'=')) {
+                tokens.push(Token {
+                    token: TokenType::Operator(Operator::NotEqual),
+                    line: chars.line,
+                    col: chars.col,
+                });
                 chars.next(); // Consume '='
-                tokens.push(Token::Operator(Operator::NotEqual));
                 Ok(())
             } else {
-                tokens.push(Token::Operator(Operator::LogicalNot));
+                tokens.push(Token {
+                    token: TokenType::Operator(Operator::LogicalNot),
+                    line: chars.line,
+                    col: chars.col,
+                });
                 Ok(())
             }
         }
         '=' => {
             if matches!(chars.peek(), Some(&'=')) {
+                tokens.push(Token {
+                    token: TokenType::Operator(Operator::Equal),
+                    line: chars.line,
+                    col: chars.col,
+                });
                 chars.next(); // Consume '='
-                tokens.push(Token::Operator(Operator::Equal));
                 Ok(())
             } else {
-                tokens.push(Token::Operator(Operator::Assign));
+                tokens.push(Token {
+                    token: TokenType::Operator(Operator::Assign),
+                    line: chars.line,
+                    col: chars.col,
+                });
                 Ok(())
             }
         }
         '-' => {
             if matches!(chars.peek(), Some(&'>')) {
+                tokens.push(Token {
+                    token: TokenType::Symbol(Symbol::Arrow),
+                    line: chars.line,
+                    col: chars.col,
+                });
                 chars.next(); // Consume '>'
-                tokens.push(Token::Symbol(Symbol::Arrow)); // '->'
                 Ok(())
             } else {
-                tokens.push(Token::Operator(Operator::Subtract));
+                tokens.push(Token {
+                    token: TokenType::Operator(Operator::Subtract),
+                    line: chars.line,
+                    col: chars.col,
+                });
                 Ok(())
             }
         }
         '>' => {
             match chars.peek() {
                 Some(&'=') => {
+                    tokens.push(Token {
+                        token: TokenType::Operator(Operator::GreaterOrEqual),
+                        line: chars.line,
+                        col: chars.col,
+                    });
                     chars.next(); // Consume '='
-                    tokens.push(Token::Operator(Operator::GreaterOrEqual));
-                    Ok(())
-                }
-                Some(&'>') => {
-                    chars.next(); // Consume '>'
-                    tokens.push(Token::Operator(Operator::GreaterThan));
                     Ok(())
                 }
                 _ => {
-                    tokens.push(Token::Operator(Operator::Pipe));
+                    tokens.push(Token {
+                        token: TokenType::Operator(Operator::GreaterThan),
+                        line: chars.line,
+                        col: chars.col,
+                    });
                     Ok(())
                 }
             }
@@ -351,39 +449,57 @@ fn handle_complex_operators(
         '<' => {
             match chars.peek() {
                 Some(&'=') => {
+                    tokens.push(Token {
+                        token: TokenType::Operator(Operator::LessOrEqual),
+                        line: chars.line,
+                        col: chars.col,
+                    });
                     chars.next(); // Consume '='
-                    tokens.push(Token::Operator(Operator::LessOrEqual));
                     Ok(())
                 }
-                Some(&'<') => {
-                    chars.next(); // Consume '<'
-                    tokens.push(Token::Operator(Operator::LessThan));
+                _ => {
+                    tokens.push(Token {
+                        token: TokenType::Operator(Operator::LessThan),
+                        line: chars.line,
+                        col: chars.col,
+                    });
                     Ok(())
                 }
-                _ => Err(LexerError::UnrecognizedCharacter {
-                    character: c,
-                    line: chars.line,
-                    col: chars.col,
-                }), // Handle error or unexpected character
             }
         }
         '&' => {
             if matches!(chars.peek(), Some(&'&')) {
+                tokens.push(Token {
+                    token: TokenType::Operator(Operator::And),
+                    line: chars.line,
+                    col: chars.col,
+                });
                 chars.next(); // Consume '&'
-                tokens.push(Token::Operator(Operator::And));
                 Ok(())
             } else {
-                tokens.push(Token::Operator(Operator::Concat));
+                tokens.push(Token {
+                    token: TokenType::Operator(Operator::Concat),
+                    line: chars.line,
+                    col: chars.col,
+                });
                 Ok(())
             }
         }
         '|' => {
             if matches!(chars.peek(), Some(&'|')) {
+                tokens.push(Token {
+                    token: TokenType::Operator(Operator::Or),
+                    line: chars.line,
+                    col: chars.col,
+                });
                 chars.next(); // Consume '|'
-                tokens.push(Token::Operator(Operator::Or));
                 Ok(())
             } else {
-                tokens.push(Token::Symbol(Symbol::DataBracket));
+                tokens.push(Token {
+                    token: TokenType::Symbol(Symbol::DataBracket),
+                    line: chars.line,
+                    col: chars.col,
+                });
                 Ok(())
             }
         }
@@ -396,6 +512,8 @@ fn handle_complex_operators(
 
 fn tokenize_number(chars: &mut CharStream, tokens: &mut Vec<Token>) -> Result<(), LexerError> {
     let mut number = String::new();
+    let starting_line = chars.line;
+    let starting_col = chars.col;
     while let Some(&next) = chars.peek() {
         if next.is_ascii_digit() || next == '.' {
             number.push(chars.next().unwrap());
@@ -404,21 +522,29 @@ fn tokenize_number(chars: &mut CharStream, tokens: &mut Vec<Token>) -> Result<()
         }
     }
     if number.contains('.') {
-        tokens.push(Token::FloatLiteral(number.parse().map_err(|_| {
-            LexerError::InvalidNumberFormat {
-                invalid_string: number.clone(),
-                line: chars.line,
-                col: chars.col,
-            }
-        })?));
+        tokens.push(Token {
+            token: TokenType::FloatLiteral(number.parse().map_err(|_| {
+                LexerError::InvalidNumberFormat {
+                    invalid_string: number.clone(),
+                    line: starting_line,
+                    col: starting_col,
+                }
+            })?),
+            line: starting_line,
+            col: starting_col,
+        });
     } else {
-        tokens.push(Token::IntegerLiteral(number.parse().map_err(|_| {
-            LexerError::InvalidNumberFormat {
-                invalid_string: number.clone(),
-                line: chars.line,
-                col: chars.col,
-            }
-        })?));
+        tokens.push(Token {
+            token: TokenType::IntegerLiteral(number.parse().map_err(|_| {
+                LexerError::InvalidNumberFormat {
+                    invalid_string: number.clone(),
+                    line: starting_line,
+                    col: starting_col,
+                }
+            })?),
+            line: starting_line,
+            col: starting_col,
+        });
     }
     Ok(())
 }
@@ -428,6 +554,8 @@ fn tokenize_identifier_or_keyword(
     tokens: &mut Vec<Token>,
 ) -> Result<(), LexerError> {
     let mut identifier = String::new();
+    let starting_line = chars.line;
+    let starting_col = chars.col;
     while let Some(&next) = chars.peek() {
         if next.is_ascii_alphanumeric() || next == '_' {
             identifier.push(chars.next().unwrap());
@@ -437,11 +565,19 @@ fn tokenize_identifier_or_keyword(
     }
     match Keyword::from_str(&identifier) {
         Ok(keyword) => {
-            tokens.push(Token::Keyword(keyword));
+            tokens.push(Token {
+                token: TokenType::Keyword(keyword),
+                line: starting_line,
+                col: starting_col,
+            });
             Ok(())
         }
         Err(_) => {
-            tokens.push(Token::Identifier(identifier));
+            tokens.push(Token {
+                token: TokenType::Identifier(identifier),
+                line: starting_line,
+                col: starting_col,
+            });
             Ok(())
         }
     }
@@ -451,8 +587,8 @@ fn tokenize_string_literal(
     chars: &mut CharStream,
     tokens: &mut Vec<Token>,
 ) -> Result<(), LexerError> {
-    let start_line = chars.line;
-    let start_col = chars.col;
+    let starting_line = chars.line;
+    let starting_col = chars.col;
     chars.next(); // Consume the initial quote
     let mut literal = String::new();
     while let Some(&ch) = chars.peek() {
@@ -460,7 +596,11 @@ fn tokenize_string_literal(
             '"' => {
                 chars.next(); // Consume the closing quote
 
-                tokens.push(Token::StringLiteral(literal));
+                tokens.push(Token {
+                    token: TokenType::StringLiteral(literal),
+                    line: starting_line,
+                    col: starting_col,
+                });
                 return Ok(());
             }
             '\\' => {
@@ -484,7 +624,7 @@ fn tokenize_string_literal(
         }
     }
     Err(LexerError::UnterminatedStringLiteral {
-        line: start_line,
-        col: start_col,
+        line: starting_line,
+        col: starting_col,
     })
 }

@@ -4,7 +4,7 @@ use crate::{
     backend::values::ValueType,
     frontend::{
         ast::{BinaryOp, Expr},
-        lexer::Token,
+        lexer::TokenType,
     },
 };
 
@@ -54,46 +54,47 @@ pub enum LexerError {
 // Parser-specific Errors
 #[derive(Error, Debug)]
 pub enum ParserError {
-    #[error("at position {position}: {message}. Expected {expected:?}, but found {found:?}")]
+    #[error("at position {line}:{col}: {message}. Expected {expected:?}, but found {found:?}")]
     UnexpectedToken {
-        expected: Token,
-        found: Token,
-        position: usize,
+        expected: TokenType,
+        found: TokenType,
+        line: usize,
+        col: usize,
         message: String,
     },
 
     #[error("`async` must be followed by `fn`")]
     MissingAsyncFn,
 
-    #[error("at position {0}: `break` found outside of loop context")]
-    BreakOutsideLoop(usize),
+    #[error("at position {0}:{1}: `break` found outside of loop context")]
+    BreakOutsideLoop(usize, usize),
 
-    #[error("at position {0}: `return` found outside of function context")]
-    ReturnOutsideFunction(usize),
+    #[error("at position {0}:{1}: `return` found outside of function context")]
+    ReturnOutsideFunction(usize, usize),
 
-    #[error("at position {0}: Missing function identifier")]
-    MissingFunctionIdentifier(usize),
+    #[error("at position {0}:{1}: Missing function identifier")]
+    MissingFunctionIdentifier(usize, usize),
 
-    #[error("at position {0}: Invalid function parameter")]
-    InvalidFunctionParameter(usize),
+    #[error("at position {0}:{1}: Invalid function parameter")]
+    InvalidFunctionParameter(usize, usize),
 
-    #[error("at position {0}: Cannot use `mut` with `const`")]
-    MutConstConflict(usize),
+    #[error("at position {0}:{1}: Cannot use `mut` with `const`")]
+    MutConstConflict(usize, usize),
 
-    #[error("at position {0}: Missing identifier")]
-    MissingIdentifier(usize),
+    #[error("at position {0}:{1}: Missing identifier")]
+    MissingIdentifier(usize, usize),
 
-    #[error("at position {0}: `const` must have an assigned value")]
-    ConstWithoutValue(usize),
+    #[error("at position {0}:{1}: `const` must have an assigned value")]
+    ConstWithoutValue(usize, usize),
 
-    #[error("at position {0}: Object literal key expected")]
-    ObjectLiteralKeyExpected(usize),
+    #[error("at position {0}:{1}: Object literal key expected")]
+    ObjectLiteralKeyExpected(usize, usize),
 
-    #[error("at position {0}: Invalid operator {1:?}")]
-    InvalidOperator(usize, Token),
+    #[error("at position {0}:{1}: Invalid operator {1:?}")]
+    InvalidOperator(usize, usize, TokenType),
 
-    #[error("at position {0}: Invalid property access using dot operator {1:?}")]
-    InvalidDotProperty(usize, Expr),
+    #[error("at position {0}:{1}: Invalid property access using dot operator {1:?}")]
+    InvalidDotProperty(usize, usize, Expr),
     // Add other error variants here if needed
 }
 

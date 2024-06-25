@@ -75,6 +75,6 @@ fn repl() {
             println!("Exiting QuikLang REPL.");
             process::exit(0); // Exit normally
         }
-        run(input, &env);
+        run(input.trim().to_string(), &env);
     }
 }
