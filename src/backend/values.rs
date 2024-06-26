@@ -7,7 +7,7 @@ use crate::{
 
 use super::environment::Environment;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ValueType {
     Null,
     String,
@@ -17,7 +17,7 @@ pub enum ValueType {
     Object,
     NativeFunction,
     Function,
-    Array,
+    Array(Box<ValueType>),
     Special, // Stuff like breaks, returns, etc.
 }
 
@@ -32,7 +32,7 @@ impl std::fmt::Display for ValueType {
             ValueType::Object => write!(f, "Object"),
             ValueType::NativeFunction => write!(f, "NativeFunction"),
             ValueType::Function => write!(f, "Function"),
-            ValueType::Array => write!(f, "Array"),
+            ValueType::Array(inner) => write!(f, "Array<{}>", inner),
             ValueType::Special => write!(f, "Special"),
         }
     }
@@ -136,7 +136,7 @@ impl RuntimeVal for NativeFunctionVal {
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionVal {
     pub name: String,
-    pub parameters: Vec<String>,
+    pub parameters: Vec<(String, ValueType)>,
     pub body: Vec<Stmt>,
     pub is_async: bool,
 }
@@ -150,11 +150,12 @@ impl RuntimeVal for FunctionVal {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ArrayVal {
     pub values: Vec<Val>,
+    pub inner_type: ValueType,
 }
 
 impl RuntimeVal for ArrayVal {
     fn get_type(&self) -> ValueType {
-        ValueType::Array
+        ValueType::Array(Box::new(self.inner_type.clone()))
     }
 }
 
@@ -224,7 +225,10 @@ impl RuntimeVal for Val {
             Val::Object(_) => ValueType::Object,
             Val::NativeFunction(_) => ValueType::NativeFunction,
             Val::Function(_) => ValueType::Function,
-            Val::Array(_) => ValueType::Array,
+            Val::Array(ArrayVal {
+                values: _,
+                inner_type,
+            }) => ValueType::Array(Box::new(inner_type.clone())),
             Val::Special(_) => ValueType::Special,
         }
     }

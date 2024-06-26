@@ -12,7 +12,7 @@ use crate::{
         },
     },
     errors::RuntimeError,
-    frontend::ast::{BinaryOp, Expr, Literal, Property, Stmt, UnaryOp},
+    frontend::ast::{BinaryOp, Expr, Literal, Property, Stmt, Type, UnaryOp},
     mk_float, mk_integer, mk_null, mk_string,
 };
 
@@ -39,7 +39,9 @@ pub fn evaluate_expr(
         Expr::ForExpr { .. } => todo!("ForExpr"),
         Expr::WhileExpr { condition, then } => evaluate_while_expr(*condition, then, env, root_env),
         Expr::ForeverLoopExpr(then) => evaluate_loop_expr(then, env, root_env),
-        Expr::Array(elements, _) => evaluate_array_expr(elements, env, root_env),
+        Expr::Array(elements, elements_type) => {
+            evaluate_array_expr(elements, elements_type, env, root_env)
+        }
         Expr::SpecialNull => Ok(mk_null!()),
         Expr::ConcatOp { left, right } => evaluate_concatenation_expr(*left, *right, env, root_env),
         Expr::BlockExpr(then) => evaluate_block_expr(then, env, root_env),
@@ -48,6 +50,7 @@ pub fn evaluate_expr(
 
 pub fn evaluate_array_expr(
     elements: Vec<Expr>,
+    elements_type: Type,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
 ) -> Result<Val, RuntimeError> {
@@ -57,6 +60,9 @@ pub fn evaluate_array_expr(
     }
     Ok(Val::Array(ArrayVal {
         values: evaluated_elements,
+        inner_type: elements_type
+            .to_val()
+            .expect("Unable to convert Type to ValueType. This should not happen."),
     }))
 }
 
@@ -303,7 +309,7 @@ pub fn evaluate_call_expr(
             for (varname, arg) in fn_value.parameters.iter().zip(evaluated_args.iter()) {
                 scope
                     .borrow_mut()
-                    .declare_var(varname, arg.clone(), false)?;
+                    .declare_var(&varname.0, arg.clone(), false)?;
             }
             let mut result: Val = mk_null!();
             for stmt in &fn_value.body {

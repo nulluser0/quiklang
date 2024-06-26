@@ -1,6 +1,6 @@
 // AST logic
 
-use crate::errors::ParserError;
+use crate::{backend::values::ValueType, errors::ParserError};
 
 use super::lexer::Operator;
 
@@ -28,8 +28,24 @@ pub enum Type {
     Object,
     Null,
     Bool,
+    Array(Box<Type>),
     Mismatch,
     // TODO: Custom(String)
+}
+
+impl Type {
+    pub fn to_val(&self) -> Option<ValueType> {
+        match self {
+            Type::String => Some(ValueType::String),
+            Type::Integer => Some(ValueType::Integer),
+            Type::Float => Some(ValueType::Float),
+            Type::Object => Some(ValueType::Object),
+            Type::Null => Some(ValueType::Null),
+            Type::Bool => Some(ValueType::Bool),
+            Type::Array(inner) => Some(ValueType::Array(Box::new(inner.to_val()?))),
+            Type::Mismatch => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Type {
@@ -41,7 +57,8 @@ impl std::fmt::Display for Type {
             Type::Object => write!(f, "Object"),
             Type::Null => write!(f, "Null"),
             Type::Bool => write!(f, "Bool"),
-            Type::Mismatch => write!(f, "Mismatched Types"),
+            Type::Array(inner) => write!(f, "Array<{}>", inner),
+            Type::Mismatch => write!(f, "(Multiple, Mismatched Return Types)"),
         }
     }
 }
@@ -89,7 +106,7 @@ impl ParsetimeType for Expr {
     fn get_type(&self) -> Result<Type, ParserError> {
         match self {
             Expr::Literal(literal) => literal.get_type(),
-            Expr::Array(_, defined_type) => Ok(defined_type.clone()),
+            Expr::Array(_, defined_type) => Ok(Type::Array(Box::new(defined_type.clone()))),
             Expr::Identifier(_) => todo!("IMPLEMENT IDENTIFIER TYPES"),
             Expr::AssignmentExpr { expr, .. } => expr.get_type(),
             Expr::ConcatOp { .. } => Ok(Type::String),
@@ -190,12 +207,13 @@ pub enum Stmt {
         name: String,
         is_mutable: bool,
         is_global: bool,
+        var_type: Type,
         expr: Option<Expr>,
     },
     ReturnStmt(Option<Expr>),
     BreakStmt(Option<Expr>),
     FunctionDeclaration {
-        parameters: Vec<String>,
+        parameters: Vec<(String, Type)>,
         name: String,
         body: Vec<Stmt>,
         is_async: bool,

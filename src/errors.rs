@@ -75,6 +75,9 @@ pub enum ParserError {
     #[error("at position {0}:{1}: Missing function identifier")]
     MissingFunctionIdentifier(usize, usize),
 
+    #[error("at position {0}:{1}: Missing type for variable declaration")]
+    MissingTypeForVarDeclaration(usize, usize),
+
     #[error("at position {0}:{1}: Invalid function parameter")]
     InvalidFunctionParameter(usize, usize),
 
@@ -98,6 +101,9 @@ pub enum ParserError {
 
     #[error("at position {0}:{1}: Invalid type declaration")]
     InvalidTypeDeclaration(usize, usize),
+
+    #[error("at position {0}:{1}: Multiple return types.")]
+    MultipleReturnTypes(usize, usize),
 
     #[error(
         "at position {line}:{col}: Type error: {message}. Expected {expected}, but found {found}"

@@ -131,11 +131,11 @@ impl Parser {
                 ))
             }
         };
-        let args: Vec<Expr> = self.parse_args()?;
-        let mut params: Vec<String> = Vec::new();
+        let args: Vec<(Expr, Type)> = self.parse_args_with_types()?;
+        let mut params: Vec<(String, Type)> = Vec::new();
         for arg in args {
             match arg {
-                Expr::Identifier(name) => params.push(name),
+                (Expr::Identifier(name), param_type) => params.push((name, param_type)),
                 _ => return Err(ParserError::InvalidFunctionParameter(ident.line, ident.col)),
             }
         }
@@ -147,7 +147,20 @@ impl Parser {
         self.inside_function = true;
         let mut body: Vec<Stmt> = Vec::new();
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
-            body.push(self.parse_stmt()?);
+            let stmt = self.parse_stmt()?;
+            match stmt {
+                Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
+                    body.push(stmt);
+                    while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace)
+                    {
+                        // Reached break or return stmt in its absolute scope (not outside, not inside scope).
+                        // Ignore other stmts after the break/return.
+                        self.eat();
+                    }
+                    break;
+                }
+                _ => body.push(stmt),
+            }
         }
         self.inside_function = prev_inside_function;
         self.expect(
@@ -197,6 +210,13 @@ impl Parser {
             }
         };
 
+        let mut expected_type: Option<Type> = None;
+
+        if self.at().token == TokenType::Symbol(Symbol::Colon) {
+            self.eat();
+            expected_type = Some(self.parse_type_declaration()?);
+        }
+
         if self.at().token == TokenType::Symbol(Symbol::Semicolon) {
             self.eat();
             if is_const {
@@ -205,10 +225,17 @@ impl Parser {
                     declaration.col,
                 ));
             }
+            if expected_type.is_none() {
+                return Err(ParserError::MissingTypeForVarDeclaration(
+                    declaration.line,
+                    declaration.col,
+                ));
+            }
             return Ok(Stmt::DeclareStmt {
                 name: identifier.to_string(),
                 is_mutable,
                 is_global,
+                var_type: expected_type.unwrap(),
                 expr: None,
             });
         }
@@ -217,17 +244,71 @@ impl Parser {
             TokenType::Operator(Operator::Assign),
             "Expected assign token `=` following identifier in var declaration.",
         )?;
+        let expr = self.parse_expr()?;
+        if expected_type.is_none() {
+            return Ok(Stmt::DeclareStmt {
+                name: identifier.to_string(),
+                is_mutable,
+                is_global,
+                var_type: expr.get_type()?,
+                expr: Some(expr),
+            });
+        }
+        if expr.get_type()? != expected_type.clone().unwrap() {
+            return Err(ParserError::TypeError {
+                expected: expected_type.unwrap(),
+                found: expr.get_type()?,
+                line: declaration.line,
+                col: declaration.col,
+                message: "Mismatched types between static declaration and value type".to_string(),
+            });
+        }
         let declaration = Stmt::DeclareStmt {
             name: identifier.to_string(),
             is_mutable,
             is_global,
-            expr: Some(self.parse_expr()?),
+            var_type: expected_type.unwrap(),
+            expr: Some(expr),
         };
         self.expect(
             TokenType::Symbol(Symbol::Semicolon),
             "Variable declaration is a statement. It must end with a semicolon.",
         )?;
         Ok(declaration)
+    }
+
+    fn parse_type_declaration(&mut self) -> Result<Type, ParserError> {
+        let current = self.eat();
+        match current.token {
+            TokenType::Identifier(ident) => match ident.as_str() {
+                "string" => Ok(Type::String),
+                "integer" => Ok(Type::Integer),
+                "float" => Ok(Type::Float),
+                "object" => Ok(Type::Object),
+                "null" => Ok(Type::Null),
+                "bool" => Ok(Type::Bool),
+                "array" => {
+                    self.expect(
+                        TokenType::Operator(Operator::LessThan),
+                        "Expected Left angled bracket (LessThan) '<' for type declaration, array takes another type.",
+                    )?;
+                    let inner = self.parse_type_declaration()?;
+                    self.expect(
+                        TokenType::Operator(Operator::GreaterThan),
+                        "Expected Right angled bracket (GreaterThan) '>' to close type declaration, array takes another type.",
+                    )?;
+                    Ok(Type::Array(Box::new(inner)))
+                }
+                _ => Err(ParserError::InvalidTypeDeclaration(
+                    current.line,
+                    current.col,
+                )),
+            },
+            _ => Err(ParserError::InvalidTypeDeclaration(
+                current.line,
+                current.col,
+            )),
+        }
     }
 
     fn parse_expr(&mut self) -> Result<Expr, ParserError> {
@@ -435,11 +516,45 @@ impl Parser {
         Ok(args)
     }
 
+    fn parse_args_with_types(&mut self) -> Result<Vec<(Expr, Type)>, ParserError> {
+        self.expect(TokenType::Symbol(Symbol::LeftParen), "Expected left paren.")?;
+        let args = match self.at().token == TokenType::Symbol(Symbol::RightParen) {
+            true => vec![],
+            false => self.parse_arguments_list_with_types()?,
+        };
+        self.expect(
+            TokenType::Symbol(Symbol::RightParen),
+            "Missing right paren inside arguments list.",
+        )?;
+        Ok(args)
+    }
+
     fn parse_arguments_list(&mut self) -> Result<Vec<Expr>, ParserError> {
         let mut args = vec![self.parse_expr()?];
         while self.at().token == TokenType::Symbol(Symbol::Comma) && self.not_eof() {
             self.eat();
-            args.push(self.parse_assignment_expr()?);
+            args.push(self.parse_expr()?);
+        }
+        Ok(args)
+    }
+
+    fn parse_arguments_list_with_types(&mut self) -> Result<Vec<(Expr, Type)>, ParserError> {
+        let first = self.parse_expr()?;
+        self.expect(
+            TokenType::Symbol(Symbol::Colon),
+            "Expected colon to define type for args",
+        )?;
+        let first_type = self.parse_type_declaration()?;
+        let mut args: Vec<(Expr, Type)> = vec![(first, first_type)];
+        while self.at().token == TokenType::Symbol(Symbol::Comma) && self.not_eof() {
+            self.eat();
+            let ident = self.parse_expr()?;
+            self.expect(
+                TokenType::Symbol(Symbol::Colon),
+                "Expected colon to define type for args",
+            )?;
+            let ident_type = self.parse_type_declaration()?;
+            args.push((ident, ident_type));
         }
         Ok(args)
     }
@@ -540,6 +655,9 @@ impl Parser {
                     // Parse elements
                     let first = self.parse_expr()?;
                     array_type = first.get_type()?;
+                    if array_type == Type::Mismatch {
+                        return Err(ParserError::MultipleReturnTypes(tk.line, tk.col));
+                    }
                     elements.push(first);
                     while self.at().token == TokenType::Symbol(Symbol::Comma) {
                         let comma_token = self.eat(); // Consume comma
@@ -585,7 +703,20 @@ impl Parser {
         self.inside_loop = true; // We are now in a loop context. Modify parser.
         let mut statements: Vec<Stmt> = Vec::new();
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
-            statements.push(self.parse_stmt()?);
+            let stmt = self.parse_stmt()?;
+            match stmt {
+                Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
+                    statements.push(stmt);
+                    while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace)
+                    {
+                        // Reached break or return stmt in its absolute scope (not outside, not inside scope).
+                        // Ignore other stmts after the break/return.
+                        self.eat();
+                    }
+                    break;
+                }
+                _ => statements.push(stmt),
+            }
         }
         self.inside_loop = prev_inside_loop; // Restore previous context
         self.expect(
@@ -605,7 +736,20 @@ impl Parser {
         )?;
         let mut statements: Vec<Stmt> = Vec::new();
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
-            statements.push(self.parse_stmt()?);
+            let stmt = self.parse_stmt()?;
+            match stmt {
+                Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
+                    statements.push(stmt);
+                    while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace)
+                    {
+                        // Reached break or return stmt in its absolute scope (not outside, not inside scope).
+                        // Ignore other stmts after the break/return.
+                        self.eat();
+                    }
+                    break;
+                }
+                _ => statements.push(stmt),
+            }
         }
         self.expect(
             TokenType::Symbol(Symbol::RightBrace),
@@ -623,7 +767,20 @@ impl Parser {
         self.inside_loop = true; // We are now in a loop context. Modify parser.
         let mut statements: Vec<Stmt> = Vec::new();
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
-            statements.push(self.parse_stmt()?);
+            let stmt = self.parse_stmt()?;
+            match stmt {
+                Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
+                    statements.push(stmt);
+                    while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace)
+                    {
+                        // Reached break or return stmt in its absolute scope (not outside, not inside scope).
+                        // Ignore other stmts after the break/return.
+                        self.eat();
+                    }
+                    break;
+                }
+                _ => statements.push(stmt),
+            }
         }
         self.inside_loop = prev_inside_loop; // Restore previous context
         self.expect(
@@ -641,7 +798,20 @@ impl Parser {
         )?;
         let mut consequent: Vec<Stmt> = Vec::new();
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
-            consequent.push(self.parse_stmt()?);
+            let stmt = self.parse_stmt()?;
+            match stmt {
+                Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
+                    consequent.push(stmt);
+                    while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace)
+                    {
+                        // Reached break or return stmt in its absolute scope (not outside, not inside scope).
+                        // Ignore other stmts after the break/return.
+                        self.eat();
+                    }
+                    break;
+                }
+                _ => consequent.push(stmt),
+            }
         }
         self.expect(
             TokenType::Symbol(Symbol::RightBrace),
@@ -660,7 +830,21 @@ impl Parser {
                 )?;
                 let mut else_block: Vec<Stmt> = Vec::new();
                 while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
-                    else_block.push(self.parse_stmt()?);
+                    let stmt = self.parse_stmt()?;
+                    match stmt {
+                        Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
+                            else_block.push(stmt);
+                            while self.not_eof()
+                                && self.at().token != TokenType::Symbol(Symbol::RightBrace)
+                            {
+                                // Reached break or return stmt in its absolute scope (not outside, not inside scope).
+                                // Ignore other stmts after the break/return.
+                                self.eat();
+                            }
+                            break;
+                        }
+                        _ => else_block.push(stmt),
+                    }
                 }
                 self.expect(
                     TokenType::Symbol(Symbol::RightBrace),

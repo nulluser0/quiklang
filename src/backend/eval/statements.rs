@@ -5,10 +5,10 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     backend::{
         environment::Environment,
-        values::{FunctionVal, NullVal, SpecialVal, SpecialValKeyword, Val},
+        values::{FunctionVal, NullVal, SpecialVal, SpecialValKeyword, Val, ValueType},
     },
     errors::RuntimeError,
-    frontend::ast::{Expr, Stmt},
+    frontend::ast::{Expr, Stmt, Type},
     mk_null,
 };
 
@@ -36,15 +36,26 @@ pub fn evaluate_declare_var(
 }
 
 pub fn evaluate_declare_fn(
-    parameters: Vec<String>,
+    parameters: Vec<(String, Type)>,
     name: String,
     body: Vec<Stmt>,
     is_async: bool,
     env: &Rc<RefCell<Environment>>,
 ) -> Result<Val, RuntimeError> {
+    let parameters_with_valuetype: Vec<(String, ValueType)> = parameters
+        .iter()
+        .map(|(ident, val_type)| {
+            (
+                ident.to_owned(),
+                val_type
+                    .to_val()
+                    .expect("Type conversion to ValueType failed. This should not happen."),
+            )
+        })
+        .collect();
     let function: Val = Val::Function(Rc::new(FunctionVal {
         name: name.clone(),
-        parameters,
+        parameters: parameters_with_valuetype,
         body,
         is_async,
     }));

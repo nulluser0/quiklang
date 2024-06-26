@@ -24,6 +24,7 @@ pub fn evaluate(
             name,
             is_mutable,
             is_global,
+            var_type: _, // TODO: use this if needed
             expr,
         } => evaluate_declare_var(name, is_mutable, is_global, expr, env, root_env),
         Stmt::ReturnStmt(expr) => evaluate_return_stmt(expr, env, root_env),
