@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::{
-    ast::{Expr, Literal, Stmt, UnaryOp},
+    ast::{Expr, Literal, ParsetimeType, Stmt, Type, UnaryOp},
     lexer::{tokenize, Keyword, Operator, Symbol, Token, TokenType},
 };
 
@@ -535,19 +535,65 @@ impl Parser {
             }
             TokenType::Symbol(Symbol::LeftBracket) => {
                 let mut elements: Vec<Expr> = Vec::new();
+                let mut array_type: Option<Type> = None;
                 if self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBracket) {
                     // Parse elements
-                    elements.push(self.parse_expr()?);
+                    let first = self.parse_expr()?;
+                    array_type = Some(first.get_type());
+                    elements.push(first);
                     while self.at().token == TokenType::Symbol(Symbol::Comma) {
-                        self.eat(); // Consume comma
-                        elements.push(self.parse_expr()?);
+                        let comma_token = self.eat(); // Consume comma
+                        let value = self.parse_expr()?;
+                        let value_type = value.get_type();
+                        if value_type != array_type.clone().unwrap() {
+                            return Err(ParserError::TypeError {
+                                expected: array_type.unwrap(),
+                                found: value_type,
+                                line: comma_token.line,
+                                col: comma_token.col,
+                                message: "Mismatched types in array.".to_string(),
+                            });
+                        }
+                        elements.push(value);
                     }
                 }
                 self.expect(
                     TokenType::Symbol(Symbol::RightBracket),
                     "Expected right bracket after array literal.",
                 )?;
-                Ok(Expr::Array(elements))
+                if array_type.is_none() {
+                    self.expect(
+                        TokenType::Symbol(Symbol::Colon),
+                        "Expected type declaration after empty array literal.",
+                    )?;
+                    // TODO: Implement type declaration
+                    let type_declaration = self.eat();
+                    match type_declaration.token {
+                        TokenType::Identifier(ident) => {
+                            array_type = match ident.as_str() {
+                                "string" => Some(Type::String),
+                                "integer" => Some(Type::Integer),
+                                "float" => Some(Type::Float),
+                                "bool" => Some(Type::Bool),
+                                "null" => Some(Type::Null),
+                                "object" => Some(Type::Object),
+                                _ => {
+                                    return Err(ParserError::InvalidTypeDeclaration(
+                                        type_declaration.line,
+                                        type_declaration.col,
+                                    ))
+                                }
+                            }
+                        }
+                        _ => {
+                            return Err(ParserError::InvalidTypeDeclaration(
+                                type_declaration.line,
+                                type_declaration.col,
+                            ))
+                        }
+                    }
+                }
+                Ok(Expr::Array(elements, array_type.unwrap()))
             }
             TokenType::Symbol(Symbol::Semicolon) => Ok(Expr::SpecialNull),
             _ => Err(ParserError::UnexpectedToken {

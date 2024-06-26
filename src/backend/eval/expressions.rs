@@ -39,7 +39,7 @@ pub fn evaluate_expr(
         Expr::ForExpr { .. } => todo!("ForExpr"),
         Expr::WhileExpr { condition, then } => evaluate_while_expr(*condition, then, env, root_env),
         Expr::ForeverLoopExpr(then) => evaluate_loop_expr(then, env, root_env),
-        Expr::Array(elements) => evaluate_array_expr(elements, env, root_env),
+        Expr::Array(elements, _) => evaluate_array_expr(elements, env, root_env),
         Expr::SpecialNull => Ok(mk_null!()),
         Expr::ConcatOp { left, right } => evaluate_concatenation_expr(*left, *right, env, root_env),
         Expr::BlockExpr(then) => evaluate_block_expr(then, env, root_env),

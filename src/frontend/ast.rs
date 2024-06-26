@@ -14,10 +14,38 @@ impl Program {
     }
 }
 
+pub trait ParsetimeType: std::fmt::Debug {
+    fn get_type(&self) -> Type;
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Type {
+    String,
+    Integer,
+    Float,
+    Object,
+    Null,
+    Bool,
+    // TODO: Custom(String)
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::String => write!(f, "String"),
+            Type::Integer => write!(f, "Integer"),
+            Type::Float => write!(f, "Float"),
+            Type::Object => write!(f, "Object"),
+            Type::Null => write!(f, "Null"),
+            Type::Bool => write!(f, "Bool"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     Literal(Literal),
-    Array(Vec<Expr>),
+    Array(Vec<Expr>, Type),
     Identifier(String),
     AssignmentExpr {
         assignee: Box<Expr>,
@@ -51,6 +79,75 @@ pub enum Expr {
     BlockExpr(Vec<Stmt>), // A block expr, literally the same as `let x; {x=10} let y;` in rust.
     ForeverLoopExpr(Vec<Stmt>), // Forever loop! Has vec of stmts.
     SpecialNull, // Literally just returns null. Should ONLY be returned as a result of a semicolon.
+}
+
+impl ParsetimeType for Expr {
+    fn get_type(&self) -> Type {
+        match self {
+            Expr::Literal(literal) => literal.get_type(),
+            Expr::Array(_, defined_type) => defined_type.clone(),
+            Expr::Identifier(_) => todo!("IMPLEMENT IDENTIFIER TYPES"),
+            Expr::AssignmentExpr { expr, .. } => expr.get_type(),
+            Expr::ConcatOp { .. } => Type::String,
+            Expr::BinaryOp { op, left, right } => match op {
+                BinaryOp::Add
+                | BinaryOp::Subtract
+                | BinaryOp::Multiply
+                | BinaryOp::Divide
+                | BinaryOp::Modulus => match (left.get_type(), right.get_type()) {
+                    (Type::Integer, Type::Integer) => Type::Integer,
+                    (Type::Float, Type::Integer)
+                    | (Type::Integer, Type::Float)
+                    | (Type::Float, Type::Float) => Type::Float,
+                    _ => unimplemented!(), // SHOULD NOT HAPPEN!
+                },
+                BinaryOp::GreaterThan
+                | BinaryOp::LessThan
+                | BinaryOp::GreaterOrEqual
+                | BinaryOp::LessOrEqual
+                | BinaryOp::Equal
+                | BinaryOp::NotEqual
+                | BinaryOp::And
+                | BinaryOp::Or => Type::Bool,
+            },
+            Expr::UnaryOp(op, expr) => match op {
+                UnaryOp::LogicalNot => {
+                    // Should be boolean
+                    if expr.get_type() != Type::Bool {
+                        unimplemented!("logical not is not bool")
+                    }
+                    Type::Bool
+                }
+                UnaryOp::ArithmeticNegative | UnaryOp::ArithmeticPositive => {
+                    // Should be float or integer
+                    let expr_type = expr.get_type();
+                    if expr_type != Type::Integer || expr_type != Type::Float {
+                        unimplemented!("arithmetic +/- not int/float")
+                    }
+                    expr_type
+                }
+                UnaryOp::BitwiseNot => {
+                    // Should be integer
+                    if expr.get_type() != Type::Integer {
+                        unimplemented!("bitwise not is not int")
+                    }
+                    Type::Integer
+                }
+            },
+            Expr::FunctionCall(_, _) => todo!("IMPLEMENT FUNCTION RETURN TYPES!"),
+            Expr::Member(_, _) => todo!(),
+            Expr::IfExpr {
+                condition,
+                then,
+                else_stmt,
+            } => todo!(),
+            Expr::ForExpr { item, then } => todo!(),
+            Expr::WhileExpr { condition, then } => todo!(),
+            Expr::BlockExpr(_) => todo!(),
+            Expr::ForeverLoopExpr(_) => todo!(),
+            Expr::SpecialNull => Type::Null,
+        }
+    }
 }
 
 impl std::fmt::Display for Expr {
@@ -88,6 +185,17 @@ pub enum Literal {
     String(String),
     Object(Vec<Property>),
     // Other literal types...
+}
+
+impl ParsetimeType for Literal {
+    fn get_type(&self) -> Type {
+        match self {
+            Literal::Integer(_) => Type::Integer,
+            Literal::Float(_) => Type::Float,
+            Literal::String(_) => Type::String,
+            Literal::Object(_) => Type::Object,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]

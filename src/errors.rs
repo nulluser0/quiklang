@@ -3,7 +3,7 @@ use thiserror::Error;
 use crate::{
     backend::values::ValueType,
     frontend::{
-        ast::{BinaryOp, Expr},
+        ast::{BinaryOp, Expr, Type},
         lexer::TokenType,
     },
 };
@@ -95,7 +95,20 @@ pub enum ParserError {
 
     #[error("at position {0}:{1}: Invalid property access using dot operator {1:?}")]
     InvalidDotProperty(usize, usize, Expr),
-    // Add other error variants here if needed
+
+    #[error("at position {0}:{1}: Invalid type declaration")]
+    InvalidTypeDeclaration(usize, usize),
+
+    #[error(
+        "at position {line}:{col}: Type error: {message}. Expected {expected}, but found {found}"
+    )]
+    TypeError {
+        expected: Type,
+        found: Type,
+        line: usize,
+        col: usize,
+        message: String,
+    },
 }
 
 // Interpreter-specific Errors
