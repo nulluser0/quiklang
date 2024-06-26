@@ -17,6 +17,7 @@ pub enum ValueType {
     Object,
     NativeFunction,
     Function,
+    Array,
     Special, // Stuff like breaks, returns, etc.
 }
 
@@ -31,6 +32,7 @@ impl std::fmt::Display for ValueType {
             ValueType::Object => write!(f, "Object"),
             ValueType::NativeFunction => write!(f, "NativeFunction"),
             ValueType::Function => write!(f, "Function"),
+            ValueType::Array => write!(f, "Array"),
             ValueType::Special => write!(f, "Special"),
         }
     }
@@ -146,6 +148,24 @@ impl RuntimeVal for FunctionVal {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct ArrayVal {
+    pub values: Vec<Val>,
+}
+
+impl RuntimeVal for ArrayVal {
+    fn get_type(&self) -> ValueType {
+        ValueType::Array
+    }
+}
+
+impl std::fmt::Display for ArrayVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let elements: Vec<String> = self.values.iter().map(|val| format!("{}", val)).collect();
+        write!(f, "[{}]", elements.join(", "))
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum SpecialValKeyword {
     Break,
     Return,
@@ -174,6 +194,7 @@ pub enum Val {
     Object(ObjectVal),
     NativeFunction(NativeFunctionVal),
     Function(Rc<FunctionVal>),
+    Array(ArrayVal),
     Special(SpecialVal),
 }
 
@@ -203,6 +224,7 @@ impl RuntimeVal for Val {
             Val::Object(_) => ValueType::Object,
             Val::NativeFunction(_) => ValueType::NativeFunction,
             Val::Function(_) => ValueType::Function,
+            Val::Array(_) => ValueType::Array,
             Val::Special(_) => ValueType::Special,
         }
     }
@@ -222,6 +244,7 @@ impl std::fmt::Display for Val {
                 let function_val = fn_val.as_ref();
                 write!(f, "fn:{}", function_val.name)
             }
+            Val::Array(values) => write!(f, "{}", values),
             Val::Special(SpecialVal { keyword, .. }) => write!(f, "{:?}", keyword),
         }
     }
