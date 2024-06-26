@@ -197,6 +197,9 @@ impl Parser {
         let fn_type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
             root_type_env.clone(),
         )));
+        fn_type_env
+            .borrow_mut()
+            .declare_fn(&name, fn_type.clone(), &declaration)?;
         for (param_name, param_type) in params.iter() {
             fn_type_env.borrow_mut().declare_var(
                 param_name.to_string(),
