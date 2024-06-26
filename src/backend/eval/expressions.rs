@@ -7,7 +7,7 @@ use crate::{
         environment::Environment,
         interpreter::evaluate,
         values::{
-            BoolVal, FloatVal, IntegerVal, NullVal, ObjectVal, RuntimeVal, SpecialVal,
+            ArrayVal, BoolVal, FloatVal, IntegerVal, NullVal, ObjectVal, RuntimeVal, SpecialVal,
             SpecialValKeyword, StringVal, ToFloat, Val, ValueType,
         },
     },
@@ -39,11 +39,25 @@ pub fn evaluate_expr(
         Expr::ForExpr { .. } => todo!("ForExpr"),
         Expr::WhileExpr { condition, then } => evaluate_while_expr(*condition, then, env, root_env),
         Expr::ForeverLoopExpr(then) => evaluate_loop_expr(then, env, root_env),
-        Expr::Array(_) => todo!("{:?}", expr),
+        Expr::Array(elements) => evaluate_array_expr(elements, env, root_env),
         Expr::SpecialNull => Ok(mk_null!()),
         Expr::ConcatOp { left, right } => evaluate_concatenation_expr(*left, *right, env, root_env),
         Expr::BlockExpr(then) => evaluate_block_expr(then, env, root_env),
     }
+}
+
+pub fn evaluate_array_expr(
+    elements: Vec<Expr>,
+    env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
+) -> Result<Val, RuntimeError> {
+    let mut evaluated_elements: Vec<Val> = Vec::new();
+    for element in elements {
+        evaluated_elements.push(evaluate_expr(element, env, root_env)?)
+    }
+    Ok(Val::Array(ArrayVal {
+        values: evaluated_elements,
+    }))
 }
 
 pub fn evaluate_while_expr(
