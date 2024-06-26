@@ -1,5 +1,7 @@
 // AST logic
 
+use crate::errors::ParserError;
+
 use super::lexer::Operator;
 
 // Program struct
@@ -15,7 +17,7 @@ impl Program {
 }
 
 pub trait ParsetimeType: std::fmt::Debug {
-    fn get_type(&self) -> Type;
+    fn get_type(&self) -> Result<Type, ParserError>;
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -26,6 +28,7 @@ pub enum Type {
     Object,
     Null,
     Bool,
+    Mismatch,
     // TODO: Custom(String)
 }
 
@@ -38,6 +41,7 @@ impl std::fmt::Display for Type {
             Type::Object => write!(f, "Object"),
             Type::Null => write!(f, "Null"),
             Type::Bool => write!(f, "Bool"),
+            Type::Mismatch => write!(f, "Mismatched Types"),
         }
     }
 }
@@ -82,24 +86,24 @@ pub enum Expr {
 }
 
 impl ParsetimeType for Expr {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Result<Type, ParserError> {
         match self {
             Expr::Literal(literal) => literal.get_type(),
-            Expr::Array(_, defined_type) => defined_type.clone(),
+            Expr::Array(_, defined_type) => Ok(defined_type.clone()),
             Expr::Identifier(_) => todo!("IMPLEMENT IDENTIFIER TYPES"),
             Expr::AssignmentExpr { expr, .. } => expr.get_type(),
-            Expr::ConcatOp { .. } => Type::String,
+            Expr::ConcatOp { .. } => Ok(Type::String),
             Expr::BinaryOp { op, left, right } => match op {
                 BinaryOp::Add
                 | BinaryOp::Subtract
                 | BinaryOp::Multiply
                 | BinaryOp::Divide
-                | BinaryOp::Modulus => match (left.get_type(), right.get_type()) {
-                    (Type::Integer, Type::Integer) => Type::Integer,
+                | BinaryOp::Modulus => match (left.get_type()?, right.get_type()?) {
+                    (Type::Integer, Type::Integer) => Ok(Type::Integer),
                     (Type::Float, Type::Integer)
                     | (Type::Integer, Type::Float)
-                    | (Type::Float, Type::Float) => Type::Float,
-                    _ => unimplemented!(), // SHOULD NOT HAPPEN!
+                    | (Type::Float, Type::Float) => Ok(Type::Float),
+                    _ => Ok(Type::Mismatch),
                 },
                 BinaryOp::GreaterThan
                 | BinaryOp::LessThan
@@ -108,44 +112,64 @@ impl ParsetimeType for Expr {
                 | BinaryOp::Equal
                 | BinaryOp::NotEqual
                 | BinaryOp::And
-                | BinaryOp::Or => Type::Bool,
+                | BinaryOp::Or => Ok(Type::Bool),
             },
             Expr::UnaryOp(op, expr) => match op {
                 UnaryOp::LogicalNot => {
                     // Should be boolean
-                    if expr.get_type() != Type::Bool {
+                    if expr.get_type()? != Type::Bool {
                         unimplemented!("logical not is not bool")
                     }
-                    Type::Bool
+                    Ok(Type::Bool)
                 }
                 UnaryOp::ArithmeticNegative | UnaryOp::ArithmeticPositive => {
                     // Should be float or integer
-                    let expr_type = expr.get_type();
+                    let expr_type = expr.get_type()?;
                     if expr_type != Type::Integer || expr_type != Type::Float {
                         unimplemented!("arithmetic +/- not int/float")
                     }
-                    expr_type
+                    Ok(expr_type)
                 }
                 UnaryOp::BitwiseNot => {
                     // Should be integer
-                    if expr.get_type() != Type::Integer {
+                    if expr.get_type()? != Type::Integer {
                         unimplemented!("bitwise not is not int")
                     }
-                    Type::Integer
+                    Ok(Type::Integer)
                 }
             },
             Expr::FunctionCall(_, _) => todo!("IMPLEMENT FUNCTION RETURN TYPES!"),
-            Expr::Member(_, _) => todo!(),
+            Expr::Member(_, _) => todo!("IMPLEMENT MEMBER RETURN TYPES!"),
             Expr::IfExpr {
-                condition,
-                then,
-                else_stmt,
-            } => todo!(),
-            Expr::ForExpr { item, then } => todo!(),
-            Expr::WhileExpr { condition, then } => todo!(),
-            Expr::BlockExpr(_) => todo!(),
-            Expr::ForeverLoopExpr(_) => todo!(),
-            Expr::SpecialNull => Type::Null,
+                then, else_stmt, ..
+            } => {
+                let then_type = then.last().map_or(Ok(Type::Null), |stmt| stmt.get_type())?;
+                if let Some(else_block) = else_stmt {
+                    let else_type = else_block
+                        .last()
+                        .map_or(Ok(Type::Null), |stmt| stmt.get_type())?;
+                    if then_type == else_type {
+                        Ok(then_type)
+                    } else {
+                        Ok(Type::Mismatch)
+                    }
+                } else {
+                    Ok(then_type)
+                }
+            }
+            Expr::ForExpr { item: _, then } => {
+                then.last().map_or(Ok(Type::Null), |stmt| stmt.get_type())
+            }
+            Expr::WhileExpr { condition: _, then } => {
+                then.last().map_or(Ok(Type::Null), |stmt| stmt.get_type())
+            }
+            Expr::BlockExpr(statements) => statements
+                .last()
+                .map_or(Ok(Type::Null), |stmt| stmt.get_type()),
+            Expr::ForeverLoopExpr(statements) => statements
+                .last()
+                .map_or(Ok(Type::Null), |stmt| stmt.get_type()),
+            Expr::SpecialNull => Ok(Type::Null),
         }
     }
 }
@@ -178,6 +202,24 @@ pub enum Stmt {
     }, // Parameters, Name, Body, Is async?
 }
 
+impl ParsetimeType for Stmt {
+    fn get_type(&self) -> Result<Type, ParserError> {
+        match self {
+            Stmt::ExprStmt(expr) => expr.get_type(),
+            Stmt::DeclareStmt { .. } => Ok(Type::Null),
+            Stmt::ReturnStmt(expr) => match expr {
+                Some(expr) => expr.get_type(),
+                None => Ok(Type::Null),
+            },
+            Stmt::BreakStmt(expr) => match expr {
+                Some(expr) => expr.get_type(),
+                None => Ok(Type::Null),
+            },
+            Stmt::FunctionDeclaration { .. } => Ok(Type::Null),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
     Integer(i64),
@@ -188,12 +230,12 @@ pub enum Literal {
 }
 
 impl ParsetimeType for Literal {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Result<Type, ParserError> {
         match self {
-            Literal::Integer(_) => Type::Integer,
-            Literal::Float(_) => Type::Float,
-            Literal::String(_) => Type::String,
-            Literal::Object(_) => Type::Object,
+            Literal::Integer(_) => Ok(Type::Integer),
+            Literal::Float(_) => Ok(Type::Float),
+            Literal::String(_) => Ok(Type::String),
+            Literal::Object(_) => Ok(Type::Object),
         }
     }
 }

@@ -535,19 +535,19 @@ impl Parser {
             }
             TokenType::Symbol(Symbol::LeftBracket) => {
                 let mut elements: Vec<Expr> = Vec::new();
-                let mut array_type: Option<Type> = None;
+                let mut array_type: Type = Type::Null;
                 if self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBracket) {
                     // Parse elements
                     let first = self.parse_expr()?;
-                    array_type = Some(first.get_type());
+                    array_type = first.get_type()?;
                     elements.push(first);
                     while self.at().token == TokenType::Symbol(Symbol::Comma) {
                         let comma_token = self.eat(); // Consume comma
                         let value = self.parse_expr()?;
-                        let value_type = value.get_type();
-                        if value_type != array_type.clone().unwrap() {
+                        let value_type = value.get_type()?;
+                        if value_type != array_type {
                             return Err(ParserError::TypeError {
-                                expected: array_type.unwrap(),
+                                expected: array_type,
                                 found: value_type,
                                 line: comma_token.line,
                                 col: comma_token.col,
@@ -561,39 +561,7 @@ impl Parser {
                     TokenType::Symbol(Symbol::RightBracket),
                     "Expected right bracket after array literal.",
                 )?;
-                if array_type.is_none() {
-                    self.expect(
-                        TokenType::Symbol(Symbol::Colon),
-                        "Expected type declaration after empty array literal.",
-                    )?;
-                    // TODO: Implement type declaration
-                    let type_declaration = self.eat();
-                    match type_declaration.token {
-                        TokenType::Identifier(ident) => {
-                            array_type = match ident.as_str() {
-                                "string" => Some(Type::String),
-                                "integer" => Some(Type::Integer),
-                                "float" => Some(Type::Float),
-                                "bool" => Some(Type::Bool),
-                                "null" => Some(Type::Null),
-                                "object" => Some(Type::Object),
-                                _ => {
-                                    return Err(ParserError::InvalidTypeDeclaration(
-                                        type_declaration.line,
-                                        type_declaration.col,
-                                    ))
-                                }
-                            }
-                        }
-                        _ => {
-                            return Err(ParserError::InvalidTypeDeclaration(
-                                type_declaration.line,
-                                type_declaration.col,
-                            ))
-                        }
-                    }
-                }
-                Ok(Expr::Array(elements, array_type.unwrap()))
+                Ok(Expr::Array(elements, array_type))
             }
             TokenType::Symbol(Symbol::Semicolon) => Ok(Expr::SpecialNull),
             _ => Err(ParserError::UnexpectedToken {
