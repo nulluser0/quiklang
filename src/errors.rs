@@ -115,6 +115,21 @@ pub enum ParserError {
         col: usize,
         message: String,
     },
+
+    #[error("at position {0}:{1}: Cannot declare already existing variable '{2}'")]
+    DeclaredExistingVariable(usize, usize, String),
+
+    #[error("at position {0}:{1}: Cannot declare already existing function '{2}'")]
+    DeclaredExistingFunction(usize, usize, String),
+
+    #[error("at position {0}:{1}: Cannot resolve non-existent variable '{2}'")]
+    UndefinedVariable(usize, usize, String),
+
+    #[error("at position {0}:{1}: Cannot resolve non-existent function '{2}'")]
+    UndefinedFunction(usize, usize, String),
+
+    #[error("at position {0}:{1}: Function call on non-identifier.")]
+    InvalidFunctionCall(usize, usize),
 }
 
 // Interpreter-specific Errors

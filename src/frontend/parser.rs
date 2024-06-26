@@ -1,5 +1,7 @@
 // Parser
 
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     errors::{Error, ParserError},
     frontend::ast::{BinaryOp, Program, Property},
@@ -8,6 +10,7 @@ use crate::{
 use super::{
     ast::{Expr, Literal, ParsetimeType, Stmt, Type, UnaryOp},
     lexer::{tokenize, Keyword, Operator, Symbol, Token, TokenType},
+    type_environment::TypeEnvironment,
 };
 
 #[derive(Debug)]
@@ -62,25 +65,45 @@ impl Parser {
         Ok(prev)
     }
 
-    fn parse_stmt(&mut self) -> Result<Stmt, ParserError> {
+    fn parse_stmt(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Stmt, ParserError> {
         match self.at().token {
-            TokenType::Keyword(Keyword::Let) => self.parse_var_declaration(false),
-            TokenType::Keyword(Keyword::Const) => self.parse_var_declaration(true),
-            TokenType::Keyword(Keyword::Fn) => self.parse_fn_declaration(false),
+            TokenType::Keyword(Keyword::Let) => {
+                self.parse_var_declaration(false, type_env, root_type_env)
+            }
+            TokenType::Keyword(Keyword::Const) => {
+                self.parse_var_declaration(true, type_env, root_type_env)
+            }
+            TokenType::Keyword(Keyword::Fn) => {
+                self.parse_fn_declaration(false, type_env, root_type_env)
+            }
             TokenType::Keyword(Keyword::Async) => {
                 self.eat();
                 match self.at().token {
-                    TokenType::Keyword(Keyword::Fn) => self.parse_fn_declaration(true),
+                    TokenType::Keyword(Keyword::Fn) => {
+                        self.parse_fn_declaration(true, type_env, root_type_env)
+                    }
                     _ => Err(ParserError::MissingAsyncFn),
                 }
             }
-            TokenType::Keyword(Keyword::Break) => self.parse_break_declaration(),
-            TokenType::Keyword(Keyword::Return) => self.parse_return_declaration(),
-            _ => Ok(Stmt::ExprStmt(self.parse_expr()?)),
+            TokenType::Keyword(Keyword::Break) => {
+                self.parse_break_declaration(type_env, root_type_env)
+            }
+            TokenType::Keyword(Keyword::Return) => {
+                self.parse_return_declaration(type_env, root_type_env)
+            }
+            _ => Ok(Stmt::ExprStmt(self.parse_expr(type_env, root_type_env)?)),
         }
     }
 
-    fn parse_break_declaration(&mut self) -> Result<Stmt, ParserError> {
+    fn parse_break_declaration(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Stmt, ParserError> {
         let break_declaration = self.eat();
         if !self.inside_loop {
             return Err(ParserError::BreakOutsideLoop(
@@ -92,7 +115,7 @@ impl Parser {
             self.eat();
             return Ok(Stmt::BreakStmt(None));
         }
-        let expr = self.parse_expr()?;
+        let expr = self.parse_expr(type_env, root_type_env)?;
         self.expect(
             TokenType::Symbol(Symbol::Semicolon),
             "break declaration is a statement. It must end with a semicolon.",
@@ -100,7 +123,11 @@ impl Parser {
         Ok(Stmt::BreakStmt(Some(expr)))
     }
 
-    fn parse_return_declaration(&mut self) -> Result<Stmt, ParserError> {
+    fn parse_return_declaration(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Stmt, ParserError> {
         let return_declaration = self.eat();
         if !self.inside_function {
             return Err(ParserError::ReturnOutsideFunction(
@@ -112,7 +139,7 @@ impl Parser {
             self.eat();
             return Ok(Stmt::ReturnStmt(None));
         }
-        let expr = self.parse_expr()?;
+        let expr = self.parse_expr(type_env, root_type_env)?;
         self.expect(
             TokenType::Symbol(Symbol::Semicolon),
             "return declaration is a statement. It must end with a semicolon.",
@@ -120,8 +147,13 @@ impl Parser {
         Ok(Stmt::ReturnStmt(Some(expr)))
     }
 
-    fn parse_fn_declaration(&mut self, is_async: bool) -> Result<Stmt, ParserError> {
-        self.eat();
+    fn parse_fn_declaration(
+        &mut self,
+        is_async: bool,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Stmt, ParserError> {
+        let declaration = self.eat();
         let ident = self.eat();
         let name = match ident.token {
             TokenType::Identifier(name) => name,
@@ -131,7 +163,7 @@ impl Parser {
                 ))
             }
         };
-        let args: Vec<(Expr, Type)> = self.parse_args_with_types()?;
+        let args: Vec<(Expr, Type)> = self.parse_args_with_types(type_env, root_type_env)?;
         let mut params: Vec<(String, Type)> = Vec::new();
         for arg in args {
             match arg {
@@ -145,6 +177,16 @@ impl Parser {
             self.eat();
             return_type = self.parse_type_declaration()?;
         }
+
+        // Declare the function into the declared scope
+        let fn_type = Type::Function(
+            params.iter().map(|(_, t)| t.clone()).collect(),
+            Box::new(return_type.clone()),
+        );
+        type_env
+            .borrow_mut()
+            .declare_fn(&name, fn_type.clone(), &declaration)?;
+
         self.expect(
             TokenType::Symbol(Symbol::LeftBrace),
             "Expected function body following declaration.",
@@ -152,8 +194,18 @@ impl Parser {
         let prev_inside_function = self.inside_function;
         self.inside_function = true;
         let mut body: Vec<Stmt> = Vec::new();
+        let fn_type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+            root_type_env.clone(),
+        )));
+        for (param_name, param_type) in params.iter() {
+            fn_type_env.borrow_mut().declare_var(
+                param_name.to_string(),
+                param_type.clone(),
+                &declaration,
+            )?;
+        }
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
-            let stmt = self.parse_stmt()?;
+            let stmt = self.parse_stmt(&fn_type_env, root_type_env)?;
             match stmt {
                 Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
                     body.push(stmt);
@@ -167,6 +219,19 @@ impl Parser {
                 }
                 _ => body.push(stmt),
             }
+        }
+        let actual_return_type =
+            body.last()
+                .unwrap()
+                .get_type(&fn_type_env, self.at().line, self.at().col)?;
+        if actual_return_type != return_type {
+            return Err(ParserError::TypeError {
+                expected: return_type,
+                found: actual_return_type,
+                line: self.at().line,
+                col: self.at().col,
+                message: "Mismatched return type for function".to_string(),
+            });
         }
         self.inside_function = prev_inside_function;
         self.expect(
@@ -183,7 +248,12 @@ impl Parser {
     }
 
     // `let (global) (mut) ident(: type) = expr`
-    fn parse_var_declaration(&mut self, is_const: bool) -> Result<Stmt, ParserError> {
+    fn parse_var_declaration(
+        &mut self,
+        is_const: bool,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Stmt, ParserError> {
         let declaration = self.eat(); // remove unneeded let/const token.
         let is_global = match self.at().token {
             TokenType::Keyword(Keyword::Global) => {
@@ -238,6 +308,11 @@ impl Parser {
                     declaration.col,
                 ));
             }
+            type_env.borrow_mut().declare_var(
+                identifier.to_string(),
+                expected_type.clone().unwrap(),
+                &declaration,
+            )?;
             return Ok(Stmt::DeclareStmt {
                 name: identifier.to_string(),
                 is_mutable,
@@ -251,25 +326,38 @@ impl Parser {
             TokenType::Operator(Operator::Assign),
             "Expected assign token `=` following identifier in var declaration.",
         )?;
-        let expr = self.parse_expr()?;
+        let expr = self.parse_expr(type_env, root_type_env)?;
         if expected_type.is_none() {
+            let expr_type = expr.get_type(type_env, declaration.line, declaration.col)?;
+            type_env.borrow_mut().declare_var(
+                identifier.to_string(),
+                expr_type.clone(),
+                &declaration,
+            )?;
             return Ok(Stmt::DeclareStmt {
                 name: identifier.to_string(),
                 is_mutable,
                 is_global,
-                var_type: expr.get_type()?,
+                var_type: expr_type,
                 expr: Some(expr),
             });
         }
-        if expr.get_type()? != expected_type.clone().unwrap() {
+        if expr.get_type(type_env, declaration.line, declaration.col)?
+            != expected_type.clone().unwrap()
+        {
             return Err(ParserError::TypeError {
                 expected: expected_type.unwrap(),
-                found: expr.get_type()?,
+                found: expr.get_type(type_env, declaration.line, declaration.col)?,
                 line: declaration.line,
                 col: declaration.col,
                 message: "Mismatched types between static declaration and value type".to_string(),
             });
         }
+        type_env.borrow_mut().declare_var(
+            identifier.to_string(),
+            expected_type.clone().unwrap(),
+            &declaration,
+        )?;
         let declaration = Stmt::DeclareStmt {
             name: identifier.to_string(),
             is_mutable,
@@ -318,15 +406,23 @@ impl Parser {
         }
     }
 
-    fn parse_expr(&mut self) -> Result<Expr, ParserError> {
-        self.parse_assignment_expr()
+    fn parse_expr(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        self.parse_assignment_expr(type_env, root_type_env)
     }
 
-    fn parse_assignment_expr(&mut self) -> Result<Expr, ParserError> {
-        let left = self.parse_object_expr()?;
+    fn parse_assignment_expr(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let left = self.parse_object_expr(type_env, root_type_env)?;
         if self.at().token == TokenType::Operator(Operator::Assign) {
             self.eat(); // Advance after.
-            let value = self.parse_assignment_expr()?;
+            let value = self.parse_assignment_expr(type_env, root_type_env)?;
             return Ok(Expr::AssignmentExpr {
                 assignee: Box::new(left),
                 expr: Box::new(value),
@@ -335,9 +431,13 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_object_expr(&mut self) -> Result<Expr, ParserError> {
+    fn parse_object_expr(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
         if self.at().token != TokenType::Symbol(Symbol::LeftBrace) {
-            return self.parse_relational_expr();
+            return self.parse_relational_expr(type_env, root_type_env);
         }
         self.eat(); // advance past leftbrace
         let mut properties: Vec<Property> = Vec::new();
@@ -366,7 +466,7 @@ impl Parser {
                 TokenType::Symbol(Symbol::Colon),
                 "Missing colon following identifier in Object Expression",
             )?;
-            let value = self.parse_expr()?;
+            let value = self.parse_expr(type_env, root_type_env)?;
             properties.push(Property {
                 key,
                 value: Some(value),
@@ -385,8 +485,12 @@ impl Parser {
         Ok(Expr::Literal(Literal::Object(properties)))
     }
 
-    fn parse_relational_expr(&mut self) -> Result<Expr, ParserError> {
-        let mut left = self.parse_concatenation_expr()?;
+    fn parse_relational_expr(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let mut left = self.parse_concatenation_expr(type_env, root_type_env)?;
         while matches!(
             self.at().token,
             TokenType::Operator(Operator::GreaterThan)
@@ -412,7 +516,7 @@ impl Parser {
                     ));
                 }
             };
-            let right = self.parse_concatenation_expr()?;
+            let right = self.parse_concatenation_expr(type_env, root_type_env)?;
             left = Expr::BinaryOp {
                 op: operator,
                 left: Box::new(left),
@@ -422,12 +526,16 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_concatenation_expr(&mut self) -> Result<Expr, ParserError> {
-        let mut left = self.parse_additive_expr()?;
+    fn parse_concatenation_expr(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let mut left = self.parse_additive_expr(type_env, root_type_env)?;
 
         while matches!(self.at().token, TokenType::Operator(Operator::Concat)) {
             self.eat();
-            let right = self.parse_additive_expr()?;
+            let right = self.parse_additive_expr(type_env, root_type_env)?;
             left = Expr::ConcatOp {
                 left: Box::new(left),
                 right: Box::new(right),
@@ -436,8 +544,12 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_additive_expr(&mut self) -> Result<Expr, ParserError> {
-        let mut left = self.parse_multiplicative_expr()?;
+    fn parse_additive_expr(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let mut left = self.parse_multiplicative_expr(type_env, root_type_env)?;
 
         while matches!(
             self.at().token,
@@ -454,7 +566,7 @@ impl Parser {
                     ));
                 }
             };
-            let right = self.parse_multiplicative_expr()?;
+            let right = self.parse_multiplicative_expr(type_env, root_type_env)?;
             left = Expr::BinaryOp {
                 op: operator,
                 left: Box::new(left),
@@ -464,8 +576,12 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_multiplicative_expr(&mut self) -> Result<Expr, ParserError> {
-        let mut left = self.parse_call_member_expr()?;
+    fn parse_multiplicative_expr(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let mut left = self.parse_call_member_expr(type_env, root_type_env)?;
 
         while matches!(
             self.at().token,
@@ -484,7 +600,7 @@ impl Parser {
                     ));
                 }
             };
-            let right = self.parse_call_member_expr()?;
+            let right = self.parse_call_member_expr(type_env, root_type_env)?;
             left = Expr::BinaryOp {
                 op: operator,
                 left: Box::new(left),
@@ -494,27 +610,83 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_call_member_expr(&mut self) -> Result<Expr, ParserError> {
-        let member = self.parse_member_expr()?;
+    fn parse_call_member_expr(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let member = self.parse_member_expr(type_env, root_type_env)?;
         if self.at().token == TokenType::Symbol(Symbol::LeftParen) {
-            return self.parse_call_expr(member);
+            return self.parse_call_expr(member, type_env, root_type_env);
         }
         Ok(member)
     }
 
-    fn parse_call_expr(&mut self, caller: Expr) -> Result<Expr, ParserError> {
-        let mut call_expr: Expr = Expr::FunctionCall(self.parse_args()?, Box::new(caller));
+    fn parse_call_expr(
+        &mut self,
+        caller: Expr,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let mut call_expr: Expr = Expr::FunctionCall(
+            self.parse_args(type_env, root_type_env)?,
+            Box::new(caller.clone()),
+        );
         if self.at().token == TokenType::Symbol(Symbol::LeftParen) {
-            call_expr = self.parse_call_expr(call_expr)?;
+            call_expr = self.parse_call_expr(call_expr, type_env, root_type_env)?;
         }
+
+        // Ensure correct parameters
+        if let Expr::Identifier(fn_name) = &caller {
+            if let Some(Type::Function(param_types, _)) = type_env.borrow().lookup_fn(fn_name) {
+                let args = match &call_expr {
+                    Expr::FunctionCall(args, _) => args,
+                    _ => unreachable!(),
+                };
+                if args.len() != param_types.len() {
+                    return Err(ParserError::TypeError {
+                        expected: Type::Function(param_types.clone(), Box::new(Type::Null)),
+                        found: Type::Function(
+                            args.iter()
+                                .map(|arg| {
+                                    arg.get_type(type_env, self.at().line, self.at().col)
+                                        .unwrap()
+                                })
+                                .collect(),
+                            Box::new(Type::Null),
+                        ),
+                        line: self.at().line,
+                        col: self.at().col,
+                        message: "Incorrect number of arguments.".to_string(),
+                    });
+                }
+                for (arg, expected_type) in args.iter().zip(param_types.iter()) {
+                    let arg_type = arg.get_type(type_env, self.at().line, self.at().col)?;
+                    if arg_type != *expected_type {
+                        return Err(ParserError::TypeError {
+                            expected: expected_type.clone(),
+                            found: arg_type,
+                            line: self.at().line,
+                            col: self.at().col,
+                            message: "Argument type mismatch.".to_string(),
+                        });
+                    }
+                }
+            }
+        }
+
         Ok(call_expr)
     }
 
-    fn parse_args(&mut self) -> Result<Vec<Expr>, ParserError> {
+    fn parse_args(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Vec<Expr>, ParserError> {
         self.expect(TokenType::Symbol(Symbol::LeftParen), "Expected left paren.")?;
         let args = match self.at().token == TokenType::Symbol(Symbol::RightParen) {
             true => vec![],
-            false => self.parse_arguments_list()?,
+            false => self.parse_arguments_list(type_env, root_type_env)?,
         };
         self.expect(
             TokenType::Symbol(Symbol::RightParen),
@@ -523,11 +695,15 @@ impl Parser {
         Ok(args)
     }
 
-    fn parse_args_with_types(&mut self) -> Result<Vec<(Expr, Type)>, ParserError> {
+    fn parse_args_with_types(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Vec<(Expr, Type)>, ParserError> {
         self.expect(TokenType::Symbol(Symbol::LeftParen), "Expected left paren.")?;
         let args = match self.at().token == TokenType::Symbol(Symbol::RightParen) {
             true => vec![],
-            false => self.parse_arguments_list_with_types()?,
+            false => self.parse_arguments_list_with_types(type_env, root_type_env)?,
         };
         self.expect(
             TokenType::Symbol(Symbol::RightParen),
@@ -536,17 +712,25 @@ impl Parser {
         Ok(args)
     }
 
-    fn parse_arguments_list(&mut self) -> Result<Vec<Expr>, ParserError> {
-        let mut args = vec![self.parse_expr()?];
+    fn parse_arguments_list(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Vec<Expr>, ParserError> {
+        let mut args = vec![self.parse_expr(type_env, root_type_env)?];
         while self.at().token == TokenType::Symbol(Symbol::Comma) && self.not_eof() {
             self.eat();
-            args.push(self.parse_expr()?);
+            args.push(self.parse_expr(type_env, root_type_env)?);
         }
         Ok(args)
     }
 
-    fn parse_arguments_list_with_types(&mut self) -> Result<Vec<(Expr, Type)>, ParserError> {
-        let first = self.parse_expr()?;
+    fn parse_arguments_list_with_types(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Vec<(Expr, Type)>, ParserError> {
+        let first = self.parse_expr(type_env, root_type_env)?;
         self.expect(
             TokenType::Symbol(Symbol::Colon),
             "Expected colon to define type for args",
@@ -555,7 +739,7 @@ impl Parser {
         let mut args: Vec<(Expr, Type)> = vec![(first, first_type)];
         while self.at().token == TokenType::Symbol(Symbol::Comma) && self.not_eof() {
             self.eat();
-            let ident = self.parse_expr()?;
+            let ident = self.parse_expr(type_env, root_type_env)?;
             self.expect(
                 TokenType::Symbol(Symbol::Colon),
                 "Expected colon to define type for args",
@@ -566,8 +750,12 @@ impl Parser {
         Ok(args)
     }
 
-    fn parse_member_expr(&mut self) -> Result<Expr, ParserError> {
-        let mut object = self.parse_primary_expr()?;
+    fn parse_member_expr(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let mut object = self.parse_primary_expr(type_env, root_type_env)?;
         while self.at().token == TokenType::Symbol(Symbol::Dot)
             || self.at().token == TokenType::Symbol(Symbol::LeftBracket)
         {
@@ -577,7 +765,7 @@ impl Parser {
             // obj.expr
             if operator.token == TokenType::Symbol(Symbol::Dot) {
                 // Get identifier
-                property = self.parse_primary_expr()?;
+                property = self.parse_primary_expr(type_env, root_type_env)?;
                 match property {
                     Expr::Identifier(_) => {}
                     _ => {
@@ -590,7 +778,7 @@ impl Parser {
                 }
             } else {
                 // This allows obj[computed value]
-                property = self.parse_expr()?;
+                property = self.parse_expr(type_env, root_type_env)?;
                 self.expect(
                     TokenType::Symbol(Symbol::RightBracket),
                     "Missing right bracket in computed value.",
@@ -601,19 +789,27 @@ impl Parser {
         Ok(object)
     }
 
-    fn parse_primary_expr(&mut self) -> Result<Expr, ParserError> {
+    fn parse_primary_expr(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
         let tk = self.eat();
         match tk.token {
             // Keyword
-            TokenType::Keyword(Keyword::If) => self.parse_if_expr() as Result<Expr, ParserError>,
+            TokenType::Keyword(Keyword::If) => {
+                self.parse_if_expr(tk.line, tk.col, type_env, root_type_env)
+                    as Result<Expr, ParserError>
+            }
             TokenType::Keyword(Keyword::While) => {
-                self.parse_while_expr() as Result<Expr, ParserError>
+                self.parse_while_expr(tk.line, tk.col, type_env, root_type_env)
+                    as Result<Expr, ParserError>
             }
             TokenType::Keyword(Keyword::Loop) => {
-                self.parse_loop_expr() as Result<Expr, ParserError>
+                self.parse_loop_expr(type_env, root_type_env) as Result<Expr, ParserError>
             }
             TokenType::Keyword(Keyword::Block) => {
-                self.parse_block_expr() as Result<Expr, ParserError>
+                self.parse_block_expr(type_env, root_type_env) as Result<Expr, ParserError>
             }
             // Identifier
             TokenType::Identifier(name) => {
@@ -631,24 +827,24 @@ impl Parser {
             }
             // Unary Operators
             TokenType::Operator(Operator::LogicalNot) => {
-                let expr = self.parse_call_member_expr()?;
+                let expr = self.parse_call_member_expr(type_env, root_type_env)?;
                 Ok(Expr::UnaryOp(UnaryOp::LogicalNot, Box::new(expr)))
             }
             TokenType::Operator(Operator::Subtract) => {
-                let expr = self.parse_call_member_expr()?;
+                let expr = self.parse_call_member_expr(type_env, root_type_env)?;
                 Ok(Expr::UnaryOp(UnaryOp::ArithmeticNegative, Box::new(expr)))
             }
             TokenType::Operator(Operator::Add) => {
-                let expr = self.parse_call_member_expr()?;
+                let expr = self.parse_call_member_expr(type_env, root_type_env)?;
                 Ok(Expr::UnaryOp(UnaryOp::ArithmeticPositive, Box::new(expr)))
             }
             TokenType::Operator(Operator::BitwiseNot) => {
-                let expr = self.parse_call_member_expr()?;
+                let expr = self.parse_call_member_expr(type_env, root_type_env)?;
                 Ok(Expr::UnaryOp(UnaryOp::BitwiseNot, Box::new(expr)))
             }
             // Symbols
             TokenType::Symbol(Symbol::LeftParen) => {
-                let value = self.parse_expr()?;
+                let value = self.parse_expr(type_env, root_type_env)?;
                 self.expect(
                     TokenType::Symbol(Symbol::RightParen),
                     "Unexpected token found inside parenthesised expression. Expected closing parenthesis."
@@ -660,16 +856,16 @@ impl Parser {
                 let mut array_type: Type = Type::Null;
                 if self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBracket) {
                     // Parse elements
-                    let first = self.parse_expr()?;
-                    array_type = first.get_type()?;
+                    let first = self.parse_expr(type_env, root_type_env)?;
+                    array_type = first.get_type(type_env, tk.line, tk.col)?;
                     if array_type == Type::Mismatch {
                         return Err(ParserError::MultipleReturnTypes(tk.line, tk.col));
                     }
                     elements.push(first);
                     while self.at().token == TokenType::Symbol(Symbol::Comma) {
                         let comma_token = self.eat(); // Consume comma
-                        let value = self.parse_expr()?;
-                        let value_type = value.get_type()?;
+                        let value = self.parse_expr(type_env, root_type_env)?;
+                        let value_type = value.get_type(type_env, tk.line, tk.col)?;
                         if value_type != array_type {
                             return Err(ParserError::TypeError {
                                 expected: array_type,
@@ -699,8 +895,24 @@ impl Parser {
         }
     }
 
-    fn parse_while_expr(&mut self) -> Result<Expr, ParserError> {
-        let condition = self.parse_expr()?;
+    fn parse_while_expr(
+        &mut self,
+        line: usize,
+        col: usize,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let condition = self.parse_expr(type_env, root_type_env)?;
+        let condition_type = condition.get_type(type_env, line, col)?;
+        if condition_type != Type::Bool {
+            return Err(ParserError::TypeError {
+                expected: Type::Bool,
+                found: condition_type,
+                line,
+                col,
+                message: "While expressions must have a boolean condition.".to_string(),
+            });
+        }
         self.expect(
             TokenType::Symbol(Symbol::LeftBrace),
             "Expected left brace before `while` expression.",
@@ -710,7 +922,7 @@ impl Parser {
         self.inside_loop = true; // We are now in a loop context. Modify parser.
         let mut statements: Vec<Stmt> = Vec::new();
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
-            let stmt = self.parse_stmt()?;
+            let stmt = self.parse_stmt(type_env, root_type_env)?;
             match stmt {
                 Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
                     statements.push(stmt);
@@ -736,14 +948,21 @@ impl Parser {
         })
     }
 
-    fn parse_block_expr(&mut self) -> Result<Expr, ParserError> {
+    fn parse_block_expr(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
         self.expect(
             TokenType::Symbol(Symbol::LeftBrace),
             "Expected left brace before `block` expression.",
         )?;
         let mut statements: Vec<Stmt> = Vec::new();
+        let while_type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+            type_env.clone(),
+        )));
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
-            let stmt = self.parse_stmt()?;
+            let stmt = self.parse_stmt(&while_type_env, root_type_env)?;
             match stmt {
                 Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
                     statements.push(stmt);
@@ -765,7 +984,11 @@ impl Parser {
         Ok(Expr::BlockExpr(statements))
     }
 
-    fn parse_loop_expr(&mut self) -> Result<Expr, ParserError> {
+    fn parse_loop_expr(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
         self.expect(
             TokenType::Symbol(Symbol::LeftBrace),
             "Expected left brace before `loop` expression.",
@@ -773,8 +996,11 @@ impl Parser {
         let prev_inside_loop = self.inside_loop; // Save previous context.
         self.inside_loop = true; // We are now in a loop context. Modify parser.
         let mut statements: Vec<Stmt> = Vec::new();
+        let loop_type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+            type_env.clone(),
+        )));
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
-            let stmt = self.parse_stmt()?;
+            let stmt = self.parse_stmt(&loop_type_env, root_type_env)?;
             match stmt {
                 Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
                     statements.push(stmt);
@@ -797,15 +1023,34 @@ impl Parser {
         Ok(Expr::ForeverLoopExpr(statements))
     }
 
-    fn parse_if_expr(&mut self) -> Result<Expr, ParserError> {
-        let condition = self.parse_expr()?;
+    fn parse_if_expr(
+        &mut self,
+        line: usize,
+        col: usize,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let condition = self.parse_expr(type_env, root_type_env)?;
+        let condition_type = condition.get_type(type_env, line, col)?;
+        if condition_type != Type::Bool {
+            return Err(ParserError::TypeError {
+                expected: Type::Bool,
+                found: condition_type,
+                line,
+                col,
+                message: "If expressions must have a boolean condition.".to_string(),
+            });
+        }
         self.expect(
             TokenType::Symbol(Symbol::LeftBrace),
             "Expected left brace before `if` expression.",
         )?;
         let mut consequent: Vec<Stmt> = Vec::new();
+        let if_type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+            type_env.clone(),
+        )));
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
-            let stmt = self.parse_stmt()?;
+            let stmt = self.parse_stmt(&if_type_env, root_type_env)?;
             match stmt {
                 Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
                     consequent.push(stmt);
@@ -829,15 +1074,23 @@ impl Parser {
             self.eat(); // Advance from else
             if self.at().token == TokenType::Keyword(Keyword::If) {
                 self.eat();
-                alternative = Some(vec![Stmt::ExprStmt(self.parse_if_expr()?)])
+                alternative = Some(vec![Stmt::ExprStmt(self.parse_if_expr(
+                    line,
+                    col,
+                    type_env,
+                    root_type_env,
+                )?)])
             } else {
                 self.expect(
                     TokenType::Symbol(Symbol::LeftBrace),
                     "Expected left brace before `else` expression.",
                 )?;
                 let mut else_block: Vec<Stmt> = Vec::new();
+                let else_type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+                    type_env.clone(),
+                )));
                 while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
-                    let stmt = self.parse_stmt()?;
+                    let stmt = self.parse_stmt(&else_type_env, root_type_env)?;
                     match stmt {
                         Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
                             else_block.push(stmt);
@@ -870,11 +1123,16 @@ impl Parser {
     pub fn produce_ast(&mut self, source_code: String) -> Result<Program, Error> {
         self.tokens = tokenize(&source_code).map_err(Error::LexerError)?;
         let mut program = Program::new(Vec::new());
+        let root_type_env = Rc::new(RefCell::new(TypeEnvironment::new()));
+        let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+            root_type_env.clone(),
+        )));
 
         while self.not_eof() {
-            program
-                .statements
-                .push(self.parse_stmt().map_err(Error::ParserError)?);
+            program.statements.push(
+                self.parse_stmt(&type_env, &root_type_env)
+                    .map_err(Error::ParserError)?,
+            );
         }
 
         Ok(program)

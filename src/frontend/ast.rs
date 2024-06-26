@@ -1,8 +1,10 @@
 // AST logic
 
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{backend::values::ValueType, errors::ParserError};
 
-use super::lexer::Operator;
+use super::{lexer::Operator, type_environment::TypeEnvironment};
 
 // Program struct
 #[derive(Debug)]
@@ -17,7 +19,12 @@ impl Program {
 }
 
 pub trait ParsetimeType: std::fmt::Debug {
-    fn get_type(&self) -> Result<Type, ParserError>;
+    fn get_type(
+        &self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        line: usize,
+        col: usize,
+    ) -> Result<Type, ParserError>;
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -28,6 +35,7 @@ pub enum Type {
     Object,
     Null,
     Bool,
+    Function(Vec<Type>, Box<Type>),
     Array(Box<Type>),
     Mismatch,
     // TODO: Custom(String)
@@ -44,6 +52,7 @@ impl Type {
             Type::Bool => Some(ValueType::Bool),
             Type::Array(inner) => Some(ValueType::Array(Box::new(inner.to_val()?))),
             Type::Mismatch => None,
+            Type::Function(_, _) => Some(ValueType::Function),
         }
     }
 }
@@ -59,6 +68,7 @@ impl std::fmt::Display for Type {
             Type::Bool => write!(f, "Bool"),
             Type::Array(inner) => write!(f, "Array<{}>", inner),
             Type::Mismatch => write!(f, "(Multiple, Mismatched Return Types)"),
+            Type::Function(_, _) => write!(f, "Function"),
         }
     }
 }
@@ -103,25 +113,45 @@ pub enum Expr {
 }
 
 impl ParsetimeType for Expr {
-    fn get_type(&self) -> Result<Type, ParserError> {
+    fn get_type(
+        &self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        line: usize,
+        col: usize,
+    ) -> Result<Type, ParserError> {
         match self {
-            Expr::Literal(literal) => literal.get_type(),
+            Expr::Literal(literal) => literal.get_type(type_env, line, col),
             Expr::Array(_, defined_type) => Ok(Type::Array(Box::new(defined_type.clone()))),
-            Expr::Identifier(_) => todo!("IMPLEMENT IDENTIFIER TYPES"),
-            Expr::AssignmentExpr { expr, .. } => expr.get_type(),
+            Expr::Identifier(ident) => Ok(type_env
+                .borrow()
+                .lookup_var(ident)
+                .ok_or(ParserError::UndefinedVariable(line, col, ident.to_owned()))?),
+            Expr::AssignmentExpr { expr, .. } => expr.get_type(type_env, line, col),
             Expr::ConcatOp { .. } => Ok(Type::String),
             Expr::BinaryOp { op, left, right } => match op {
                 BinaryOp::Add
                 | BinaryOp::Subtract
                 | BinaryOp::Multiply
                 | BinaryOp::Divide
-                | BinaryOp::Modulus => match (left.get_type()?, right.get_type()?) {
-                    (Type::Integer, Type::Integer) => Ok(Type::Integer),
-                    (Type::Float, Type::Integer)
-                    | (Type::Integer, Type::Float)
-                    | (Type::Float, Type::Float) => Ok(Type::Float),
-                    _ => Ok(Type::Mismatch),
-                },
+                | BinaryOp::Modulus => {
+                    match (
+                        left.get_type(type_env, line, col)?,
+                        right.get_type(type_env, line, col)?,
+                    ) {
+                        (Type::Integer, Type::Integer) => Ok(Type::Integer),
+                        (Type::Float, Type::Integer)
+                        | (Type::Integer, Type::Float)
+                        | (Type::Float, Type::Float) => Ok(Type::Float),
+                        _ => Err(ParserError::TypeError {
+                            expected: Type::Float,
+                            found: Type::Mismatch,
+                            line,
+                            col,
+                            message: "Binary operations can only take in either float or integer."
+                                .to_string(),
+                        }),
+                    }
+                }
                 BinaryOp::GreaterThan
                 | BinaryOp::LessThan
                 | BinaryOp::GreaterOrEqual
@@ -134,37 +164,76 @@ impl ParsetimeType for Expr {
             Expr::UnaryOp(op, expr) => match op {
                 UnaryOp::LogicalNot => {
                     // Should be boolean
-                    if expr.get_type()? != Type::Bool {
-                        unimplemented!("logical not is not bool")
+                    let expr_type = expr.get_type(type_env, line, col)?;
+                    if expr_type != Type::Bool {
+                        return Err(ParserError::TypeError {
+                            expected: Type::Bool,
+                            found: expr_type,
+                            line,
+                            col,
+                            message: "Logical Not can only take in bool.".to_string(),
+                        });
                     }
                     Ok(Type::Bool)
                 }
                 UnaryOp::ArithmeticNegative | UnaryOp::ArithmeticPositive => {
                     // Should be float or integer
-                    let expr_type = expr.get_type()?;
+                    let expr_type = expr.get_type(type_env, line, col)?;
                     if expr_type != Type::Integer || expr_type != Type::Float {
-                        unimplemented!("arithmetic +/- not int/float")
+                        return Err(ParserError::TypeError {
+                            expected: Type::Float,
+                            found: expr_type,
+                            line,
+                            col,
+                            message: "Arithmetic negative/positive can only take in either float or integer."
+                                .to_string(),
+                        });
                     }
                     Ok(expr_type)
                 }
                 UnaryOp::BitwiseNot => {
                     // Should be integer
-                    if expr.get_type()? != Type::Integer {
-                        unimplemented!("bitwise not is not int")
+                    let expr_type = expr.get_type(type_env, line, col)?;
+                    if expr_type != Type::Integer {
+                        return Err(ParserError::TypeError {
+                            expected: Type::Integer,
+                            found: expr_type,
+                            line,
+                            col,
+                            message: "Bitwise Not can only take in integer.".to_string(),
+                        });
                     }
                     Ok(Type::Integer)
                 }
             },
-            Expr::FunctionCall(_, _) => todo!("IMPLEMENT FUNCTION RETURN TYPES!"),
-            Expr::Member(_, _) => todo!("IMPLEMENT MEMBER RETURN TYPES!"),
+            Expr::FunctionCall(_, caller) => {
+                if let Expr::Identifier(fn_name) = &**caller {
+                    if let Some(Type::Function(_, return_type)) =
+                        type_env.borrow().lookup_fn(fn_name)
+                    {
+                        Ok(*return_type.clone())
+                    } else {
+                        Err(ParserError::UndefinedFunction(
+                            line,
+                            col,
+                            fn_name.to_string(),
+                        ))
+                    }
+                } else {
+                    Err(ParserError::InvalidFunctionCall(line, col))
+                }
+            }
+            Expr::Member(_, _) => todo!("IMPLEMENT MEMBER RETURN TYPES!"), // flagged for removal sometime after new impl of datatypes
             Expr::IfExpr {
                 then, else_stmt, ..
             } => {
-                let then_type = then.last().map_or(Ok(Type::Null), |stmt| stmt.get_type())?;
+                let then_type = then
+                    .last()
+                    .map_or(Ok(Type::Null), |stmt| stmt.get_type(type_env, line, col))?;
                 if let Some(else_block) = else_stmt {
                     let else_type = else_block
                         .last()
-                        .map_or(Ok(Type::Null), |stmt| stmt.get_type())?;
+                        .map_or(Ok(Type::Null), |stmt| stmt.get_type(type_env, line, col))?;
                     if then_type == else_type {
                         Ok(then_type)
                     } else {
@@ -174,18 +243,18 @@ impl ParsetimeType for Expr {
                     Ok(then_type)
                 }
             }
-            Expr::ForExpr { item: _, then } => {
-                then.last().map_or(Ok(Type::Null), |stmt| stmt.get_type())
-            }
-            Expr::WhileExpr { condition: _, then } => {
-                then.last().map_or(Ok(Type::Null), |stmt| stmt.get_type())
-            }
+            Expr::ForExpr { item: _, then } => then
+                .last()
+                .map_or(Ok(Type::Null), |stmt| stmt.get_type(type_env, line, col)),
+            Expr::WhileExpr { condition: _, then } => then
+                .last()
+                .map_or(Ok(Type::Null), |stmt| stmt.get_type(type_env, line, col)),
             Expr::BlockExpr(statements) => statements
                 .last()
-                .map_or(Ok(Type::Null), |stmt| stmt.get_type()),
+                .map_or(Ok(Type::Null), |stmt| stmt.get_type(type_env, line, col)),
             Expr::ForeverLoopExpr(statements) => statements
                 .last()
-                .map_or(Ok(Type::Null), |stmt| stmt.get_type()),
+                .map_or(Ok(Type::Null), |stmt| stmt.get_type(type_env, line, col)),
             Expr::SpecialNull => Ok(Type::Null),
         }
     }
@@ -222,16 +291,21 @@ pub enum Stmt {
 }
 
 impl ParsetimeType for Stmt {
-    fn get_type(&self) -> Result<Type, ParserError> {
+    fn get_type(
+        &self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        line: usize,
+        col: usize,
+    ) -> Result<Type, ParserError> {
         match self {
-            Stmt::ExprStmt(expr) => expr.get_type(),
+            Stmt::ExprStmt(expr) => expr.get_type(type_env, line, col),
             Stmt::DeclareStmt { .. } => Ok(Type::Null),
             Stmt::ReturnStmt(expr) => match expr {
-                Some(expr) => expr.get_type(),
+                Some(expr) => expr.get_type(type_env, line, col),
                 None => Ok(Type::Null),
             },
             Stmt::BreakStmt(expr) => match expr {
-                Some(expr) => expr.get_type(),
+                Some(expr) => expr.get_type(type_env, line, col),
                 None => Ok(Type::Null),
             },
             Stmt::FunctionDeclaration { .. } => Ok(Type::Null),
@@ -249,7 +323,12 @@ pub enum Literal {
 }
 
 impl ParsetimeType for Literal {
-    fn get_type(&self) -> Result<Type, ParserError> {
+    fn get_type(
+        &self,
+        _type_env: &Rc<RefCell<TypeEnvironment>>,
+        _line: usize,
+        _col: usize,
+    ) -> Result<Type, ParserError> {
         match self {
             Literal::Integer(_) => Ok(Type::Integer),
             Literal::Float(_) => Ok(Type::Float),
