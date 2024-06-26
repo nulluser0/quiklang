@@ -139,6 +139,12 @@ impl Parser {
                 _ => return Err(ParserError::InvalidFunctionParameter(ident.line, ident.col)),
             }
         }
+        let mut return_type = Type::Null;
+        if self.at().token == TokenType::Symbol(Symbol::Arrow) {
+            // Defined return type
+            self.eat();
+            return_type = self.parse_type_declaration()?;
+        }
         self.expect(
             TokenType::Symbol(Symbol::LeftBrace),
             "Expected function body following declaration.",
@@ -170,6 +176,7 @@ impl Parser {
         Ok(Stmt::FunctionDeclaration {
             parameters: params,
             name,
+            return_type,
             body,
             is_async,
         })

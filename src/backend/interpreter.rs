@@ -31,6 +31,7 @@ pub fn evaluate(
         Stmt::FunctionDeclaration {
             parameters,
             name,
+            return_type: _, // TODO: use this if needed
             body,
             is_async,
         } => evaluate_declare_fn(parameters, name, body, is_async, env),

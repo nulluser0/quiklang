@@ -215,6 +215,7 @@ pub enum Stmt {
     FunctionDeclaration {
         parameters: Vec<(String, Type)>,
         name: String,
+        return_type: Type,
         body: Vec<Stmt>,
         is_async: bool,
     }, // Parameters, Name, Body, Is async?
