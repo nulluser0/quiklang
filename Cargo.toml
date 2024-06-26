@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 criterion = "0.5.1"
+rustyline = "9.0.0"
 thiserror = "1.0.61"
 
 [lib]

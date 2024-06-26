@@ -4,3 +4,4 @@
 /gitignored
 perf.*
 flamegraph.svg
+.quiklang_history

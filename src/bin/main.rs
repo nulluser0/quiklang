@@ -1,12 +1,7 @@
-use std::{
-    cell::RefCell,
-    fs::File,
-    io::{self, Read, Write},
-    process,
-    rc::Rc,
-};
+use std::{cell::RefCell, fs::File, io::Read, process, rc::Rc};
 
 use quiklang::{backend::environment::Environment, utils::run::run};
+use rustyline::{error::ReadlineError, Config, Editor};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -61,20 +56,41 @@ fn repl() {
         RefCell::new(Environment::default()),
     ))));
 
-    loop {
-        print!("quiklang> ");
-        io::stdout().flush().expect("Failed to flush stdout");
+    let config = Config::builder().build();
+    let mut rl = Editor::<()>::with_config(config);
 
-        let mut input = String::new();
-        io::stdin()
-            .read_line(&mut input)
-            .expect("Failed to read line");
-
-        // Exit if user enters "exit" or "quit"
-        if input.trim() == "exit" || input.trim() == "quit" {
-            println!("Exiting QuikLang REPL.");
-            process::exit(0); // Exit normally
-        }
-        run(input.trim().to_string(), &env);
+    if rl.load_history(".quiklang_history").is_err() {
+        println!("No previous history.");
     }
+
+    loop {
+        let readline = rl.readline("quiklang> ");
+        match readline {
+            Ok(line) => {
+                let trimmed_line = line.trim();
+                // Exit if user enters "exit" or "quit"
+                if trimmed_line == "exit" || trimmed_line == "quit" {
+                    println!("Exiting QuikLang REPL.");
+                    break;
+                }
+
+                rl.add_history_entry(trimmed_line);
+
+                run(trimmed_line.to_string(), &env);
+            }
+            Err(ReadlineError::Interrupted) => {
+                println!("CTRL-C");
+                break;
+            }
+            Err(ReadlineError::Eof) => {
+                println!("CTRL-D");
+                break;
+            }
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
+        }
+    }
+    rl.save_history(".quiklang_history").unwrap();
 }
