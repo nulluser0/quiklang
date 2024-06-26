@@ -3,7 +3,7 @@ use quiklang::frontend::lexer::tokenize;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let source_code = r#"
-        fn factorial(n) {
+        fn factorial(n: integer) -> integer {
             if n <= 1 {
                 1
             } else {
