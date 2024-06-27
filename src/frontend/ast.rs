@@ -112,6 +112,20 @@ pub enum Expr {
     SpecialNull, // Literally just returns null. Should ONLY be returned as a result of a semicolon.
 }
 
+impl Expr {
+    pub fn verify_type(
+        self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        line: usize,
+        col: usize,
+    ) -> Result<Self, ParserError> {
+        match self.get_type(type_env, line, col) {
+            Ok(_) => Ok(self),
+            Err(e) => Err(e),
+        }
+    }
+}
+
 impl ParsetimeType for Expr {
     fn get_type(
         &self,

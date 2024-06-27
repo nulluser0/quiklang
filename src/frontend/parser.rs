@@ -526,7 +526,7 @@ impl Parser {
                 right: Box::new(right),
             };
         }
-        Ok(left)
+        left.verify_type(type_env, self.at().line, self.at().col)
     }
 
     fn parse_concatenation_expr(
@@ -831,19 +831,23 @@ impl Parser {
             // Unary Operators
             TokenType::Operator(Operator::LogicalNot) => {
                 let expr = self.parse_call_member_expr(type_env, root_type_env)?;
-                Ok(Expr::UnaryOp(UnaryOp::LogicalNot, Box::new(expr)))
+                Expr::UnaryOp(UnaryOp::LogicalNot, Box::new(expr))
+                    .verify_type(type_env, tk.line, tk.col)
             }
             TokenType::Operator(Operator::Subtract) => {
                 let expr = self.parse_call_member_expr(type_env, root_type_env)?;
-                Ok(Expr::UnaryOp(UnaryOp::ArithmeticNegative, Box::new(expr)))
+                Expr::UnaryOp(UnaryOp::ArithmeticNegative, Box::new(expr))
+                    .verify_type(type_env, tk.line, tk.col)
             }
             TokenType::Operator(Operator::Add) => {
                 let expr = self.parse_call_member_expr(type_env, root_type_env)?;
-                Ok(Expr::UnaryOp(UnaryOp::ArithmeticPositive, Box::new(expr)))
+                Expr::UnaryOp(UnaryOp::ArithmeticPositive, Box::new(expr))
+                    .verify_type(type_env, tk.line, tk.col)
             }
             TokenType::Operator(Operator::BitwiseNot) => {
                 let expr = self.parse_call_member_expr(type_env, root_type_env)?;
-                Ok(Expr::UnaryOp(UnaryOp::BitwiseNot, Box::new(expr)))
+                Expr::UnaryOp(UnaryOp::BitwiseNot, Box::new(expr))
+                    .verify_type(type_env, tk.line, tk.col)
             }
             // Symbols
             TokenType::Symbol(Symbol::LeftParen) => {
@@ -1126,7 +1130,7 @@ impl Parser {
     pub fn produce_ast(&mut self, source_code: String) -> Result<Program, Error> {
         self.tokens = tokenize(&source_code).map_err(Error::LexerError)?;
         let mut program = Program::new(Vec::new());
-        let root_type_env = Rc::new(RefCell::new(TypeEnvironment::new()));
+        let root_type_env = Rc::new(RefCell::new(TypeEnvironment::new()?));
         let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
             root_type_env.clone(),
         )));
