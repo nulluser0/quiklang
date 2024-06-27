@@ -3,7 +3,7 @@ use std::{cell::RefCell, process::exit, rc::Rc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use quiklang::{
     backend::{environment::Environment, interpreter::evaluate},
-    frontend::parser,
+    frontend::{parser, type_environment::TypeEnvironment},
 };
 
 fn criterion_benchmark(c: &mut Criterion) {
@@ -21,7 +21,17 @@ fn criterion_benchmark(c: &mut Criterion) {
     .to_string();
 
     let mut parser = parser::Parser::new();
-    let program = match parser.produce_ast(source_code) {
+    let root_type_env = Rc::new(RefCell::new(match TypeEnvironment::new() {
+        Ok(result) => result,
+        Err(e) => {
+            println!("Error with type_env: {:?}", e);
+            exit(1);
+        }
+    }));
+    let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+        root_type_env.clone(),
+    )));
+    let program = match parser.produce_ast(source_code, &type_env, &root_type_env) {
         Ok(program) => program,
         Err(e) => {
             println!("Error: {:?}", e);

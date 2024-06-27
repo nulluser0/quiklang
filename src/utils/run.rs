@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     backend::{environment::Environment, interpreter::evaluate},
     errors::Error,
-    frontend::parser,
+    frontend::{parser, type_environment::TypeEnvironment},
 };
 
 pub fn run(input: String, env: &Rc<RefCell<Environment>>) {
@@ -12,7 +12,17 @@ pub fn run(input: String, env: &Rc<RefCell<Environment>>) {
         .get_parent()
         .expect("Env should have a root env!");
     let mut parser = parser::Parser::new();
-    match parser.produce_ast(input) {
+    let root_type_env = Rc::new(RefCell::new(match TypeEnvironment::new() {
+        Ok(result) => result,
+        Err(e) => {
+            print_e(Error::ParserError(e));
+            return;
+        }
+    }));
+    let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+        root_type_env.clone(),
+    )));
+    match parser.produce_ast(input, &type_env, &root_type_env) {
         Ok(program) => {
             // println!("{:#?}", program);
 

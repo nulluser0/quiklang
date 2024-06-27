@@ -520,13 +520,15 @@ impl Parser {
                 }
             };
             let right = self.parse_concatenation_expr(type_env, root_type_env)?;
+            left.clone()
+                .verify_type(type_env, operator_astoken.line, operator_astoken.col)?;
             left = Expr::BinaryOp {
                 op: operator,
                 left: Box::new(left),
                 right: Box::new(right),
             };
         }
-        left.verify_type(type_env, self.at().line, self.at().col)
+        Ok(left)
     }
 
     fn parse_concatenation_expr(
@@ -537,14 +539,15 @@ impl Parser {
         let mut left = self.parse_additive_expr(type_env, root_type_env)?;
 
         while matches!(self.at().token, TokenType::Operator(Operator::Concat)) {
-            self.eat();
+            let op = self.eat();
             let right = self.parse_additive_expr(type_env, root_type_env)?;
             left = Expr::ConcatOp {
                 left: Box::new(left),
                 right: Box::new(right),
-            }
+            };
+            left.clone().verify_type(type_env, op.line, op.col)?;
         }
-        left.verify_type(type_env, self.at().line, self.at().col)
+        Ok(left)
     }
 
     fn parse_additive_expr(
@@ -570,6 +573,8 @@ impl Parser {
                 }
             };
             let right = self.parse_multiplicative_expr(type_env, root_type_env)?;
+            left.clone()
+                .verify_type(type_env, operator_astoken.line, operator_astoken.col)?;
             left = Expr::BinaryOp {
                 op: operator,
                 left: Box::new(left),
@@ -604,6 +609,8 @@ impl Parser {
                 }
             };
             let right = self.parse_call_member_expr(type_env, root_type_env)?;
+            left.clone()
+                .verify_type(type_env, operator_astoken.line, operator_astoken.col)?;
             left = Expr::BinaryOp {
                 op: operator,
                 left: Box::new(left),
@@ -733,7 +740,17 @@ impl Parser {
         type_env: &Rc<RefCell<TypeEnvironment>>,
         root_type_env: &Rc<RefCell<TypeEnvironment>>,
     ) -> Result<Vec<(Expr, Type)>, ParserError> {
-        let first = self.parse_expr(type_env, root_type_env)?;
+        let first = match self.parse_expr(type_env, root_type_env) {
+            Ok(result) => result,
+            Err(e) => {
+                let return_val = if let ParserError::UndefinedVariable(_, _, var_name) = e {
+                    Ok(Expr::Identifier(var_name))
+                } else {
+                    Err(e)
+                };
+                return_val?
+            }
+        };
         self.expect(
             TokenType::Symbol(Symbol::Colon),
             "Expected colon to define type for args",
@@ -742,7 +759,17 @@ impl Parser {
         let mut args: Vec<(Expr, Type)> = vec![(first, first_type)];
         while self.at().token == TokenType::Symbol(Symbol::Comma) && self.not_eof() {
             self.eat();
-            let ident = self.parse_expr(type_env, root_type_env)?;
+            let ident = match self.parse_expr(type_env, root_type_env) {
+                Ok(result) => result,
+                Err(e) => {
+                    let return_val = if let ParserError::UndefinedVariable(_, _, var_name) = e {
+                        Ok(Expr::Identifier(var_name))
+                    } else {
+                        Err(e)
+                    };
+                    return_val?
+                }
+            };
             self.expect(
                 TokenType::Symbol(Symbol::Colon),
                 "Expected colon to define type for args",
@@ -815,9 +842,9 @@ impl Parser {
                 self.parse_block_expr(type_env, root_type_env) as Result<Expr, ParserError>
             }
             // Identifier
-            TokenType::Identifier(name) => {
-                Ok(Expr::Identifier(name.to_string())) as Result<Expr, ParserError>
-            }
+            TokenType::Identifier(name) => Expr::Identifier(name.to_string())
+                .verify_type(type_env, tk.line, tk.col)
+                as Result<Expr, ParserError>,
             // Literals
             TokenType::StringLiteral(string) => {
                 Ok(Expr::Literal(Literal::String(string))) as Result<Expr, ParserError>
@@ -1127,17 +1154,18 @@ impl Parser {
         })
     }
 
-    pub fn produce_ast(&mut self, source_code: String) -> Result<Program, Error> {
+    pub fn produce_ast(
+        &mut self,
+        source_code: String,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Program, Error> {
         self.tokens = tokenize(&source_code).map_err(Error::LexerError)?;
         let mut program = Program::new(Vec::new());
-        let root_type_env = Rc::new(RefCell::new(TypeEnvironment::new()?));
-        let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
-            root_type_env.clone(),
-        )));
 
         while self.not_eof() {
             program.statements.push(
-                self.parse_stmt(&type_env, &root_type_env)
+                self.parse_stmt(type_env, root_type_env)
                     .map_err(Error::ParserError)?,
             );
         }
