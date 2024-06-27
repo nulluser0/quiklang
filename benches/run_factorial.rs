@@ -1,7 +1,9 @@
 use std::{cell::RefCell, rc::Rc};
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use quiklang::{backend::environment::Environment, utils::run::run};
+use quiklang::{
+    backend::environment::Environment, frontend::type_environment::TypeEnvironment, utils::run::run,
+};
 
 fn criterion_benchmark(c: &mut Criterion) {
     let source_code = r#"
@@ -22,7 +24,16 @@ fn criterion_benchmark(c: &mut Criterion) {
             let env = Rc::new(RefCell::new(Environment::new_with_parent(Rc::new(
                 RefCell::new(Environment::default()),
             ))));
-            run(black_box(source_code.clone()), &env);
+            let root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
+            let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+                root_type_env.clone(),
+            )));
+            run(
+                black_box(source_code.clone()),
+                &env,
+                &type_env,
+                &root_type_env,
+            );
         })
     });
 }

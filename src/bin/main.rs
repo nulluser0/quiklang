@@ -1,6 +1,8 @@
 use std::{cell::RefCell, fs::File, io::Read, process, rc::Rc};
 
-use quiklang::{backend::environment::Environment, utils::run::run};
+use quiklang::{
+    backend::environment::Environment, frontend::type_environment::TypeEnvironment, utils::run::run,
+};
 use rustyline::{error::ReadlineError, Config, Editor};
 
 fn main() {
@@ -46,7 +48,11 @@ fn run_file(file_path: &str) {
     let env = Rc::new(RefCell::new(Environment::new_with_parent(Rc::new(
         RefCell::new(Environment::default()),
     ))));
-    run(content, &env)
+    let root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
+    let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+        root_type_env.clone(),
+    )));
+    run(content, &env, &type_env, &root_type_env)
 }
 
 fn repl() {
@@ -55,6 +61,11 @@ fn repl() {
     let env = Rc::new(RefCell::new(Environment::new_with_parent(Rc::new(
         RefCell::new(Environment::default()),
     ))));
+
+    let root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
+    let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+        root_type_env.clone(),
+    )));
 
     let config = Config::builder().build();
     let mut rl = Editor::<()>::with_config(config);
@@ -76,7 +87,7 @@ fn repl() {
 
                 rl.add_history_entry(trimmed_line);
 
-                run(trimmed_line.to_string(), &env);
+                run(trimmed_line.to_string(), &env, &type_env, &root_type_env);
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
