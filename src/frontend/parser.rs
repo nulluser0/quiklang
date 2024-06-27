@@ -544,7 +544,7 @@ impl Parser {
                 right: Box::new(right),
             }
         }
-        Ok(left)
+        left.verify_type(type_env, self.at().line, self.at().col)
     }
 
     fn parse_additive_expr(
