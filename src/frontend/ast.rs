@@ -100,9 +100,10 @@ pub enum Expr {
         else_stmt: Option<Vec<Stmt>>,
     }, // Condition, Then, Optional Else
     ForExpr {
-        item: Box<Expr>,
+        identifier: String,
+        iterable: Box<Expr>,
         then: Vec<Stmt>,
-    }, // For item in iterable, Do Stmts
+    }, // For identifier in iterable, Do Stmts
     WhileExpr {
         condition: Box<Expr>,
         then: Vec<Stmt>,
@@ -257,7 +258,11 @@ impl ParsetimeType for Expr {
                     Ok(then_type)
                 }
             }
-            Expr::ForExpr { item: _, then } => then
+            Expr::ForExpr {
+                identifier: _,
+                iterable: _,
+                then,
+            } => then
                 .last()
                 .map_or(Ok(Type::Null), |stmt| stmt.get_type(type_env, line, col)),
             Expr::WhileExpr { condition: _, then } => then

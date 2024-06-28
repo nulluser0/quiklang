@@ -84,6 +84,10 @@ impl Environment {
         value: Val,
         is_mutable: bool,
     ) -> Result<Val, RuntimeError> {
+        if let "_" = name {
+            // _ means intentionally ignored
+            return Ok(value);
+        }
         if let std::collections::hash_map::Entry::Vacant(e) = self.values.entry(name.to_string()) {
             e.insert(value.clone());
         } else {

@@ -118,6 +118,10 @@ impl TypeEnvironment {
         var_type: Type,
         token: &Token,
     ) -> Result<(), ParserError> {
+        if let "_" = name.as_str() {
+            // _ means intentionally ignored
+            return Ok(());
+        }
         if self.types.contains_key(name.as_str()) {
             return Err(ParserError::DeclaredExistingVariable(
                 token.line,

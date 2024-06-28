@@ -36,7 +36,11 @@ pub fn evaluate_expr(
             then,
             else_stmt,
         } => evaluate_if_expr(*condition, then, else_stmt, env, root_env),
-        Expr::ForExpr { .. } => todo!("ForExpr"),
+        Expr::ForExpr {
+            identifier,
+            iterable,
+            then,
+        } => evaluate_for_expr(identifier, *iterable, then, env, root_env),
         Expr::WhileExpr { condition, then } => evaluate_while_expr(*condition, then, env, root_env),
         Expr::ForeverLoopExpr(then) => evaluate_loop_expr(then, env, root_env),
         Expr::Array(elements, elements_type) => {
@@ -64,6 +68,35 @@ pub fn evaluate_array_expr(
             .to_val()
             .expect("Unable to convert Type to ValueType. This should not happen."),
     }))
+}
+
+pub fn evaluate_for_expr(
+    identifier: String,
+    iterable: Expr,
+    then: Vec<Stmt>,
+    env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
+) -> Result<Val, RuntimeError> {
+    let iterable_value = evaluate_expr(iterable, env, root_env)?;
+    let iterator = match iterable_value.to_iterator() {
+        Ok(iter) => iter,
+        Err(err) => return Err(err),
+    };
+
+    while let Some(item) = iterator.borrow_mut().next() {
+        let scope = Rc::new(RefCell::new(Environment::new_with_parent(env.clone())));
+        scope.borrow_mut().declare_var(&identifier, item, false)?;
+        for stmt in &then {
+            if let Val::Special(SpecialVal {
+                keyword: SpecialValKeyword::Break,
+                return_value,
+            }) = evaluate(stmt.clone(), &scope, root_env)?
+            {
+                return return_value.map_or(Ok(mk_null!()), |val| Ok(*val));
+            }
+        }
+    }
+    Ok(mk_null!())
 }
 
 pub fn evaluate_while_expr(

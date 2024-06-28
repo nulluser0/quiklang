@@ -835,6 +835,10 @@ impl Parser {
                 self.parse_while_expr(tk.line, tk.col, type_env, root_type_env)
                     as Result<Expr, ParserError>
             }
+            TokenType::Keyword(Keyword::For) => {
+                self.parse_for_expr(tk.line, tk.col, type_env, root_type_env)
+                    as Result<Expr, ParserError>
+            }
             TokenType::Keyword(Keyword::Loop) => {
                 self.parse_loop_expr(type_env, root_type_env) as Result<Expr, ParserError>
             }
@@ -929,6 +933,72 @@ impl Parser {
         }
     }
 
+    fn parse_for_expr(
+        &mut self,
+        line: usize,
+        col: usize,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let identifier_token = self.eat();
+        let identifier = match identifier_token.token {
+            TokenType::Identifier(ref ident) => ident,
+            _ => {
+                return Err(ParserError::MissingIdentifier(
+                    identifier_token.line,
+                    identifier_token.col,
+                ))
+            }
+        };
+
+        self.expect(TokenType::Keyword(Keyword::In), "Expected 'in' keyword.")?;
+
+        let iterable = self.parse_expr(type_env, root_type_env)?;
+        self.expect(
+            TokenType::Symbol(Symbol::LeftBrace),
+            "Expected left brace before `for` expression.",
+        )?;
+
+        let prev_inside_loop = self.inside_loop; // Save previous context.
+        self.inside_loop = true; // We are now in a loop context. Modify parser.
+        let mut then: Vec<Stmt> = Vec::new();
+        let for_type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+            type_env.clone(),
+        )));
+        for_type_env.borrow_mut().declare_var(
+            identifier.to_string(),
+            iterable.get_type(type_env, line, col)?,
+            &identifier_token,
+        )?;
+        while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
+            let stmt = self.parse_stmt(&for_type_env, root_type_env)?;
+            match stmt {
+                Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
+                    then.push(stmt);
+                    while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace)
+                    {
+                        // Reached break or return stmt in its absolute scope (not outside, not inside scope).
+                        // Ignore other stmts after the break/return.
+                        self.eat();
+                    }
+                    break;
+                }
+                _ => then.push(stmt),
+            }
+        }
+        self.inside_loop = prev_inside_loop; // Restore previous context
+        self.expect(
+            TokenType::Symbol(Symbol::RightBrace),
+            "Expected right brace after `for` expression.",
+        )?;
+
+        Ok(Expr::ForExpr {
+            identifier: identifier.to_string(),
+            iterable: Box::new(iterable),
+            then,
+        })
+    }
+
     fn parse_while_expr(
         &mut self,
         line: usize,
@@ -955,8 +1025,11 @@ impl Parser {
         let prev_inside_loop = self.inside_loop; // Save previous context.
         self.inside_loop = true; // We are now in a loop context. Modify parser.
         let mut statements: Vec<Stmt> = Vec::new();
+        let while_type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+            type_env.clone(),
+        )));
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
-            let stmt = self.parse_stmt(type_env, root_type_env)?;
+            let stmt = self.parse_stmt(&while_type_env, root_type_env)?;
             match stmt {
                 Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
                     statements.push(stmt);
@@ -992,11 +1065,11 @@ impl Parser {
             "Expected left brace before `block` expression.",
         )?;
         let mut statements: Vec<Stmt> = Vec::new();
-        let while_type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+        let block_type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
             type_env.clone(),
         )));
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
-            let stmt = self.parse_stmt(&while_type_env, root_type_env)?;
+            let stmt = self.parse_stmt(&block_type_env, root_type_env)?;
             match stmt {
                 Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
                     statements.push(stmt);

@@ -18,7 +18,11 @@ pub enum ValueType {
     NativeFunction,
     Function,
     Array(Box<ValueType>),
+    Iterator(Box<ValueType>),
     Special, // Stuff like breaks, returns, etc.
+
+    // SHOULD NOT BE USED!
+    Any,
 }
 
 impl std::fmt::Display for ValueType {
@@ -33,7 +37,9 @@ impl std::fmt::Display for ValueType {
             ValueType::NativeFunction => write!(f, "NativeFunction"),
             ValueType::Function => write!(f, "Function"),
             ValueType::Array(inner) => write!(f, "Array<{}>", inner),
+            ValueType::Iterator(inner) => write!(f, "Iterator<{}>", inner),
             ValueType::Special => write!(f, "Special"),
+            ValueType::Any => write!(f, "_"),
         }
     }
 }
@@ -184,6 +190,52 @@ impl RuntimeVal for SpecialVal {
     }
 }
 
+pub trait Iterator: std::fmt::Debug {
+    fn next(&mut self) -> Option<Val>;
+}
+
+#[derive(Debug, Clone)]
+pub struct IteratorVal {
+    pub iterator: Rc<RefCell<dyn Iterator>>,
+    pub return_type: ValueType,
+}
+
+impl PartialEq for IteratorVal {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.iterator, &other.iterator)
+    }
+}
+
+impl RuntimeVal for IteratorVal {
+    fn get_type(&self) -> ValueType {
+        ValueType::Iterator(Box::new(self.return_type.clone()))
+    }
+}
+
+#[derive(Debug)]
+pub struct ArrayIterator {
+    array: Vec<Val>,
+    index: usize,
+}
+
+impl ArrayIterator {
+    pub fn new(array: Vec<Val>) -> Self {
+        Self { array, index: 0 }
+    }
+}
+
+impl Iterator for ArrayIterator {
+    fn next(&mut self) -> Option<Val> {
+        if self.index < self.array.len() {
+            let value = self.array[self.index].clone();
+            self.index += 1;
+            Some(value)
+        } else {
+            None
+        }
+    }
+}
+
 // This enum encapsulates any RuntimeVal type to handle them generically.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Val {
@@ -197,6 +249,7 @@ pub enum Val {
     Function(Rc<FunctionVal>),
     Array(ArrayVal),
     Special(SpecialVal),
+    Iterator(IteratorVal),
 }
 
 impl Val {
@@ -211,6 +264,21 @@ impl Val {
             ));
         }
         Ok(())
+    }
+}
+
+impl Val {
+    pub fn to_iterator(self) -> Result<Rc<RefCell<dyn Iterator>>, RuntimeError> {
+        match self {
+            Val::Array(array_val) => {
+                Ok(Rc::new(RefCell::new(ArrayIterator::new(array_val.values))))
+            }
+            _ => Err(RuntimeError::TypeError {
+                message: "Value is not iterable.".to_string(),
+                expected: ValueType::Iterator(Box::new(ValueType::Any)),
+                found: self.get_type(),
+            }),
+        }
     }
 }
 
@@ -229,6 +297,10 @@ impl RuntimeVal for Val {
                 values: _,
                 inner_type,
             }) => ValueType::Array(Box::new(inner_type.clone())),
+            Val::Iterator(IteratorVal {
+                iterator: _,
+                return_type,
+            }) => ValueType::Iterator(Box::new(return_type.clone())),
             Val::Special(_) => ValueType::Special,
         }
     }
@@ -249,6 +321,10 @@ impl std::fmt::Display for Val {
                 write!(f, "fn:{}", function_val.name)
             }
             Val::Array(values) => write!(f, "{}", values),
+            Val::Iterator(IteratorVal {
+                iterator,
+                return_type: _,
+            }) => write!(f, "iterator:{:?}", iterator),
             Val::Special(SpecialVal { keyword, .. }) => write!(f, "{:?}", keyword),
         }
     }
