@@ -74,6 +74,10 @@ pub enum Keyword {
     Global, // global
     Block,  // block
     In,     // in
+    Struct, // struct
+    Enum,   // enum
+    Type,   // type
+    Impl,   // impl
 }
 
 impl FromStr for Keyword {
@@ -100,6 +104,10 @@ impl FromStr for Keyword {
             "global" => Ok(Keyword::Global),
             "block" => Ok(Keyword::Block),
             "in" => Ok(Keyword::In),
+            "struct" => Ok(Keyword::Struct),
+            "enum" => Ok(Keyword::Enum),
+            "type" => Ok(Keyword::Type),
+            "impl" => Ok(Keyword::Impl),
             _ => Err(format!("{} is not a keyword.", s)),
         }
     }
