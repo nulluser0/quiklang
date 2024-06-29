@@ -13,7 +13,6 @@ use super::{
 #[derive(Debug, Clone)]
 pub struct TypeEnvironment {
     vars: HashMap<String, Type>,
-    types: HashMap<String>,
     parent: Option<Rc<RefCell<TypeEnvironment>>>,
 }
 
