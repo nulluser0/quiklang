@@ -1,0 +1,14 @@
+struct name {
+    key: string,
+    foo: integer
+}
+
+enum name {
+    key(a<string>),         // Enum(tuple)
+    foo { bar: string },    // Enum(struct)
+    huh,                    // Enum
+}
+
+type name {
+    fn bruh(0) -> wjefoij;
+}

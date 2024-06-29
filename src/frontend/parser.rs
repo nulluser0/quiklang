@@ -1,6 +1,6 @@
 // Parser
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     errors::{Error, ParserError},
@@ -95,8 +95,72 @@ impl Parser {
             TokenType::Keyword(Keyword::Return) => {
                 self.parse_return_declaration(type_env, root_type_env)
             }
+            TokenType::Keyword(Keyword::Struct) => {
+                self.parse_struct_definition(type_env, root_type_env)
+            }
             _ => Ok(Stmt::ExprStmt(self.parse_expr(type_env, root_type_env)?)),
         }
+    }
+
+    fn parse_struct_definition(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Stmt, ParserError> {
+        self.eat();
+        let ident = self.eat();
+        let name = match ident.token {
+            TokenType::Identifier(ident) => ident,
+            _ => return Err(ParserError::MissingIdentifier(ident.line, ident.col)),
+        };
+        self.expect(
+            TokenType::Symbol(Symbol::LeftBrace),
+            "Expected struct body following definition.",
+        )?;
+
+        let mut struct_definition: HashMap<String, Type> = HashMap::new();
+
+        while self.not_eof() && self.at().token == TokenType::Symbol(Symbol::RightBrace) {
+            // ident
+            let key_token = self.eat();
+            let key = match key_token.token {
+                TokenType::Identifier(ident) => ident,
+                _ => return Err(ParserError::MissingIdentifier(ident.line, ident.col)),
+            };
+
+            // :
+            self.expect(
+                TokenType::Symbol(Symbol::Colon),
+                "Keys in structs must be followed with a colon ':', then its type.",
+            )?;
+
+            // type
+            let key_type = self.parse_type_declaration()?;
+
+            // Add to definition
+            struct_definition.insert(key, key_type);
+
+            // ',', ',)', or ')'
+            match self.eat().token {
+                TokenType::Symbol(Symbol::Comma) => {
+                    if self.at().token == TokenType::Symbol(Symbol::RightBrace) {
+                        break;
+                    } else {
+                        continue;
+                    }
+                }
+                _ => break,
+            }
+        }
+        self.expect(
+            TokenType::Symbol(Symbol::RightBrace),
+            "Struct body must end with a right brace '}'",
+        )?;
+
+        Ok(Stmt::StructDefStmt {
+            ident: name,
+            key_type_values: struct_definition,
+        })
     }
 
     fn parse_break_declaration(

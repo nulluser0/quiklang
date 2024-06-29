@@ -12,7 +12,8 @@ use super::{
 
 #[derive(Debug, Clone)]
 pub struct TypeEnvironment {
-    types: HashMap<String, Type>,
+    vars: HashMap<String, Type>,
+    types: HashMap<String>,
     parent: Option<Rc<RefCell<TypeEnvironment>>>,
 }
 
@@ -98,7 +99,7 @@ fn setup_type_env(type_env: &mut TypeEnvironment) -> Result<(), ParserError> {
 impl TypeEnvironment {
     pub fn new() -> Result<Self, ParserError> {
         let mut type_env = TypeEnvironment {
-            types: HashMap::new(),
+            vars: HashMap::new(),
             parent: None,
         };
         setup_type_env(&mut type_env)?;
@@ -107,7 +108,7 @@ impl TypeEnvironment {
 
     pub fn new_with_parent(parent: Rc<RefCell<TypeEnvironment>>) -> Self {
         TypeEnvironment {
-            types: HashMap::new(),
+            vars: HashMap::new(),
             parent: Some(parent),
         }
     }
@@ -122,19 +123,19 @@ impl TypeEnvironment {
             // _ means intentionally ignored
             return Ok(());
         }
-        if self.types.contains_key(name.as_str()) {
+        if self.vars.contains_key(name.as_str()) {
             return Err(ParserError::DeclaredExistingVariable(
                 token.line,
                 token.col,
                 name.to_string(),
             ));
         }
-        self.types.insert(name.to_string(), var_type);
+        self.vars.insert(name.to_string(), var_type);
         Ok(())
     }
 
     pub fn lookup_var(&self, name: &str) -> Option<Type> {
-        if let Some(var_type) = self.types.get(name) {
+        if let Some(var_type) = self.vars.get(name) {
             return Some(var_type.clone());
         }
         if let Some(ref parent) = self.parent {
@@ -149,14 +150,14 @@ impl TypeEnvironment {
         fn_type: Type,
         declaration: &Token,
     ) -> Result<(), ParserError> {
-        if self.types.contains_key(name) {
+        if self.vars.contains_key(name) {
             return Err(ParserError::DeclaredExistingFunction(
                 declaration.line,
                 declaration.col,
                 name.to_string(),
             ));
         }
-        self.types.insert(name.to_string(), fn_type);
+        self.vars.insert(name.to_string(), fn_type);
         Ok(())
     }
 

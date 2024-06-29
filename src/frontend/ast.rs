@@ -1,6 +1,6 @@
 // AST logic
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{backend::values::ValueType, errors::ParserError};
 
@@ -307,6 +307,10 @@ pub enum Stmt {
         body: Vec<Stmt>,
         is_async: bool,
     }, // Parameters, Name, Body, Is async?
+    StructDefStmt {
+        ident: String,
+        key_type_values: HashMap<String, Type>,
+    },
 }
 
 impl ParsetimeType for Stmt {
@@ -328,6 +332,7 @@ impl ParsetimeType for Stmt {
                 None => Ok(Type::Null),
             },
             Stmt::FunctionDeclaration { .. } => Ok(Type::Null),
+            Stmt::StructDefStmt { .. } => Ok(Type::Null),
         }
     }
 }
