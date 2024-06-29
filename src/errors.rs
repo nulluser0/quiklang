@@ -54,7 +54,7 @@ pub enum LexerError {
 // Parser-specific Errors
 #[derive(Error, Debug)]
 pub enum ParserError {
-    #[error("at position {line}:{col}: {message}. Expected {expected:?}, but found {found:?}")]
+    #[error("at position {line}:{col}: {message}. Expected {expected}, but found {found}")]
     UnexpectedToken {
         expected: TokenType,
         found: TokenType,
@@ -93,10 +93,10 @@ pub enum ParserError {
     #[error("at position {0}:{1}: Object literal key expected")]
     ObjectLiteralKeyExpected(usize, usize),
 
-    #[error("at position {0}:{1}: Invalid operator {1:?}")]
+    #[error("at position {0}:{1}: Invalid operator {1}")]
     InvalidOperator(usize, usize, TokenType),
 
-    #[error("at position {0}:{1}: Invalid property access using dot operator {1:?}")]
+    #[error("at position {0}:{1}: Invalid property access using dot operator {1}")]
     InvalidDotProperty(usize, usize, Expr),
 
     #[error("at position {0}:{1}: Invalid type declaration")]
