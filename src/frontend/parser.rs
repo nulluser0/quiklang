@@ -512,8 +512,19 @@ impl Parser {
     ) -> Result<Expr, ParserError> {
         let left = self.parse_object_expr(type_env, root_type_env)?;
         if self.at().token == TokenType::Operator(Operator::Assign) {
-            self.eat(); // Advance after.
+            let assign_token = self.eat(); // Advance after.
             let value = self.parse_assignment_expr(type_env, root_type_env)?;
+            let left_type = left.get_type(type_env, assign_token.line, assign_token.col)?;
+            let value_type = value.get_type(type_env, assign_token.line, assign_token.col)?;
+            if left_type != value_type {
+                return Err(ParserError::TypeError {
+                    expected: left_type,
+                    found: value_type,
+                    line: assign_token.line,
+                    col: assign_token.col,
+                    message: "Expression assigning to the assignee must be the same.".to_string(),
+                });
+            }
             return Ok(Expr::AssignmentExpr {
                 assignee: Box::new(left),
                 expr: Box::new(value),

@@ -52,7 +52,13 @@ impl Type {
             Type::Null => Some(ValueType::Null),
             Type::Bool => Some(ValueType::Bool),
             Type::Array(inner) => Some(ValueType::Array(Box::new(inner.to_val()?))),
-            Type::Tuple(_inner_types) => todo!(),
+            Type::Tuple(inner_types) => {
+                let values: Vec<ValueType> = inner_types
+                    .iter()
+                    .map(|inner_type| inner_type.to_val().unwrap())
+                    .collect();
+                Some(ValueType::Tuple(values))
+            }
             Type::Mismatch => None,
             Type::Function(_, _) => Some(ValueType::Function),
         }
