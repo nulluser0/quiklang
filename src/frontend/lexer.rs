@@ -40,13 +40,13 @@ pub enum TokenType {
 impl std::fmt::Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TokenType::Keyword(keyword) => write!(f, "{:?}", keyword),
+            TokenType::Keyword(keyword) => write!(f, "{}", keyword),
             TokenType::Identifier(name) => write!(f, "{}", name),
             TokenType::IntegerLiteral(value) => write!(f, "{}", value),
             TokenType::FloatLiteral(value) => write!(f, "{}", value),
             TokenType::StringLiteral(value) => write!(f, "{}", value),
-            TokenType::Operator(operator) => write!(f, "{:?}", operator),
-            TokenType::Symbol(symbol) => write!(f, "{:?}", symbol),
+            TokenType::Operator(operator) => write!(f, "{}", operator),
+            TokenType::Symbol(symbol) => write!(f, "{}", symbol),
             TokenType::EOF => write!(f, "EOF"),
         }
     }
@@ -113,6 +113,36 @@ impl FromStr for Keyword {
     }
 }
 
+impl std::fmt::Display for Keyword {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Keyword::Import => write!(f, "Keyword 'import'"),
+            Keyword::Fn => write!(f, "Keyword 'fn'"),
+            Keyword::Let => write!(f, "Keyword 'let'"),
+            Keyword::Mut => write!(f, "Keyword 'mut'"),
+            Keyword::Const => write!(f, "Keyword 'const'"),
+            Keyword::Return => write!(f, "Keyword 'return'"),
+            Keyword::If => write!(f, "Keyword 'if'"),
+            Keyword::Else => write!(f, "Keyword 'else'"),
+            Keyword::Err => write!(f, "Keyword 'Err'"),
+            Keyword::Ok => write!(f, "Keyword 'Ok'"),
+            Keyword::Exit => write!(f, "Keyword 'exit'"),
+            Keyword::Break => write!(f, "Keyword 'break'"),
+            Keyword::Async => write!(f, "Keyword 'async'"),
+            Keyword::While => write!(f, "Keyword 'while'"),
+            Keyword::For => write!(f, "Keyword 'for'"),
+            Keyword::Loop => write!(f, "Keyword 'loop'"),
+            Keyword::Global => write!(f, "Keyword 'global'"),
+            Keyword::Block => write!(f, "Keyword 'block'"),
+            Keyword::In => write!(f, "Keyword 'in'"),
+            Keyword::Struct => write!(f, "Keyword 'struct'"),
+            Keyword::Enum => write!(f, "Keyword 'enum'"),
+            Keyword::Type => write!(f, "Keyword 'type'"),
+            Keyword::Impl => write!(f, "Keyword 'impl'"),
+        }
+    }
+}
+
 // Operators
 #[derive(Debug, PartialEq, Clone)]
 pub enum Operator {
@@ -136,6 +166,31 @@ pub enum Operator {
     BitwiseNot,     // ~
 }
 
+impl std::fmt::Display for Operator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Operator::Assign => write!(f, "Operator Assign '='"),
+            Operator::Add => write!(f, "Operator Add '+'"),
+            Operator::Subtract => write!(f, "Operator Subtract '-'"),
+            Operator::Multiply => write!(f, "Operator Multiply '*'"),
+            Operator::Divide => write!(f, "Operator Divide '/'"),
+            Operator::GreaterThan => write!(f, "Operator Greater Than '>'"),
+            Operator::LessThan => write!(f, "Operator Less Than '<'"),
+            Operator::GreaterOrEqual => write!(f, "Operator Greater or Equal '>='"),
+            Operator::LessOrEqual => write!(f, "Operator Less or Equal '<='"),
+            Operator::Equal => write!(f, "Operator Equal '=='"),
+            Operator::NotEqual => write!(f, "Operator Not Equal '!='"),
+            Operator::LogicalNot => write!(f, "Operator Logical Not '!'"),
+            Operator::Concat => write!(f, "Operator Concat '&'"),
+            Operator::And => write!(f, "Operator And '&&'"),
+            Operator::Or => write!(f, "Operator Or '||'"),
+            Operator::Pipe => write!(f, "Operator Pipe '|'"),
+            Operator::Modulus => write!(f, "Operator Modulus '%'"),
+            Operator::BitwiseNot => write!(f, "Operator Bitwise Not '~'"),
+        }
+    }
+}
+
 // Symbols/Delimiters
 #[derive(Debug, PartialEq, Clone)]
 pub enum Symbol {
@@ -151,6 +206,25 @@ pub enum Symbol {
     Colon,        // :
     Dot,          // .
     Arrow,        // ->
+}
+
+impl std::fmt::Display for Symbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Symbol::LeftParen => write!(f, "Symbol Left Parenthesis '('"),
+            Symbol::RightParen => write!(f, "Symbol Right Parenthesis ')'"),
+            Symbol::LeftBrace => write!(f, "Symbol Left Brace '{{'"),
+            Symbol::RightBrace => write!(f, "Symbol Right Brace '}}'"),
+            Symbol::LeftBracket => write!(f, "Symbol Left Bracket '['"),
+            Symbol::RightBracket => write!(f, "Symbol Right Bracket ']'"),
+            Symbol::DataBracket => write!(f, "Symbol Data Bracket '|'"),
+            Symbol::Comma => write!(f, "Symbol Comma ','"),
+            Symbol::Semicolon => write!(f, "Symbol Semicolon ';'"),
+            Symbol::Colon => write!(f, "Symbol Colon ':'"),
+            Symbol::Dot => write!(f, "Symbol Dot '.'"),
+            Symbol::Arrow => write!(f, "Symbol Arrow '->'"),
+        }
+    }
 }
 
 #[inline]
