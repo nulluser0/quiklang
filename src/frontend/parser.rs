@@ -466,6 +466,30 @@ impl Parser {
                     current.col,
                 )),
             },
+            TokenType::Symbol(Symbol::LeftParen) => {
+                let mut inner_types: Vec<Type> = Vec::new();
+                while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightParen) {
+                    inner_types.push(self.parse_type_declaration()?);
+                    let next = self.at();
+                    match next.token {
+                        TokenType::Symbol(Symbol::Comma) => {
+                            if self.at().token == TokenType::Symbol(Symbol::RightParen) {
+                                break;
+                            }
+                            self.eat();
+                        }
+                        TokenType::Symbol(Symbol::RightParen) => break,
+                        _ => return Err(ParserError::InvalidTypeDeclaration(next.line, next.col)),
+                    }
+                }
+
+                self.expect(
+                    TokenType::Symbol(Symbol::RightParen),
+                    "Expected Right parenthesis ')' to close tuple type expression.",
+                )?;
+
+                Ok(Type::Tuple(inner_types))
+            }
             _ => Err(ParserError::InvalidTypeDeclaration(
                 current.line,
                 current.col,
