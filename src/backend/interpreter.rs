@@ -35,6 +35,10 @@ pub fn evaluate(
             body,
             is_async,
         } => evaluate_declare_fn(parameters, name, body, is_async, env),
-        Stmt::BreakStmt(expr) => evaluate_break_stmt(expr, env, root_env), // Handle other statement types...
+        Stmt::BreakStmt(expr) => evaluate_break_stmt(expr, env, root_env),
+        Stmt::StructDefStmt {
+            ident: _,
+            key_type_values: _,
+        } => todo!(), // Handle other statement types...
     }
 }

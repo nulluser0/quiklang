@@ -37,6 +37,7 @@ pub enum Type {
     Bool,
     Function(Vec<Type>, Box<Type>),
     Array(Box<Type>),
+    Tuple(Vec<Type>),
     Mismatch,
     // TODO: Custom(String)
 }
@@ -51,6 +52,7 @@ impl Type {
             Type::Null => Some(ValueType::Null),
             Type::Bool => Some(ValueType::Bool),
             Type::Array(inner) => Some(ValueType::Array(Box::new(inner.to_val()?))),
+            Type::Tuple(_inner_types) => todo!(),
             Type::Mismatch => None,
             Type::Function(_, _) => Some(ValueType::Function),
         }
@@ -67,6 +69,10 @@ impl std::fmt::Display for Type {
             Type::Null => write!(f, "Null"),
             Type::Bool => write!(f, "Bool"),
             Type::Array(inner) => write!(f, "Array<{}>", inner),
+            Type::Tuple(inner) => {
+                let elements: Vec<String> = inner.iter().map(|val| format!("{}", val)).collect();
+                write!(f, "({})", elements.join(", "))
+            }
             Type::Mismatch => write!(f, "(Multiple, Mismatched Return Types)"),
             Type::Function(_, _) => write!(f, "Function"),
         }
@@ -78,6 +84,7 @@ pub enum Expr {
     Literal(Literal),
     Array(Vec<Expr>, Type),
     Identifier(String),
+    Tuple(Vec<(Expr, Type)>),
     AssignmentExpr {
         assignee: Box<Expr>,
         expr: Box<Expr>,
@@ -141,6 +148,12 @@ impl ParsetimeType for Expr {
                 .borrow()
                 .lookup_var(ident)
                 .ok_or(ParserError::UndefinedVariable(line, col, ident.to_owned()))?),
+            Expr::Tuple(values) => Ok(Type::Tuple(
+                values
+                    .iter()
+                    .map(|(_, type_val)| type_val.clone())
+                    .collect(),
+            )),
             Expr::AssignmentExpr { expr, .. } => expr.get_type(type_env, line, col),
             Expr::ConcatOp { .. } => Ok(Type::String),
             Expr::BinaryOp { op, left, right } => match op {

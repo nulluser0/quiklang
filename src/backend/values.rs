@@ -18,6 +18,7 @@ pub enum ValueType {
     NativeFunction,
     Function,
     Array(Box<ValueType>),
+    Tuple(Vec<ValueType>),
     Iterator(Box<ValueType>),
     Special, // Stuff like breaks, returns, etc.
 
@@ -37,6 +38,10 @@ impl std::fmt::Display for ValueType {
             ValueType::NativeFunction => write!(f, "NativeFunction"),
             ValueType::Function => write!(f, "Function"),
             ValueType::Array(inner) => write!(f, "Array<{}>", inner),
+            ValueType::Tuple(inner) => {
+                let elements: Vec<String> = inner.iter().map(|val| format!("{}", val)).collect();
+                write!(f, "({})", elements.join(", "))
+            }
             ValueType::Iterator(inner) => write!(f, "Iterator<{}>", inner),
             ValueType::Special => write!(f, "Special"),
             ValueType::Any => write!(f, "_"),
@@ -173,6 +178,24 @@ impl std::fmt::Display for ArrayVal {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct TupleVal {
+    pub values: Vec<Val>,
+}
+
+impl RuntimeVal for TupleVal {
+    fn get_type(&self) -> ValueType {
+        ValueType::Tuple(self.values.iter().map(|val| val.get_type()).collect())
+    }
+}
+
+impl std::fmt::Display for TupleVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let elements: Vec<String> = self.values.iter().map(|val| format!("{}", val)).collect();
+        write!(f, "({})", elements.join(", "))
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum SpecialValKeyword {
     Break,
     Return,
@@ -248,6 +271,7 @@ pub enum Val {
     NativeFunction(NativeFunctionVal),
     Function(Rc<FunctionVal>),
     Array(ArrayVal),
+    Tuple(TupleVal),
     Special(SpecialVal),
     Iterator(IteratorVal),
 }
@@ -297,6 +321,7 @@ impl RuntimeVal for Val {
                 values: _,
                 inner_type,
             }) => ValueType::Array(Box::new(inner_type.clone())),
+            Val::Tuple(inner) => inner.get_type(),
             Val::Iterator(IteratorVal {
                 iterator: _,
                 return_type,
@@ -321,6 +346,7 @@ impl std::fmt::Display for Val {
                 write!(f, "fn:{}", function_val.name)
             }
             Val::Array(values) => write!(f, "{}", values),
+            Val::Tuple(values) => write!(f, "{}", values),
             Val::Iterator(IteratorVal {
                 iterator,
                 return_type: _,

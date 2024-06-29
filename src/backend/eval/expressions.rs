@@ -1,6 +1,6 @@
 // Expressions
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, env, rc::Rc};
 
 use crate::{
     backend::{
@@ -8,7 +8,7 @@ use crate::{
         interpreter::evaluate,
         values::{
             ArrayVal, BoolVal, FloatVal, IntegerVal, NullVal, ObjectVal, RuntimeVal, SpecialVal,
-            SpecialValKeyword, StringVal, ToFloat, Val, ValueType,
+            SpecialValKeyword, StringVal, ToFloat, TupleVal, Val, ValueType,
         },
     },
     errors::RuntimeError,
@@ -24,6 +24,7 @@ pub fn evaluate_expr(
     match expr {
         Expr::Literal(literal) => evaluate_literal(literal, env, root_env),
         Expr::Identifier(identifier) => evaluate_identifier(identifier, env),
+        Expr::Tuple(values) => evaluate_tuple(values, env, root_env),
         Expr::BinaryOp { op, left, right } => evaluate_binary_op(op, *left, *right, env, root_env),
         Expr::UnaryOp(op, expr) => evaluate_unary_op(op, *expr, env, root_env),
         Expr::FunctionCall(args, caller) => evaluate_call_expr(args, *caller, env, root_env),
@@ -50,6 +51,20 @@ pub fn evaluate_expr(
         Expr::ConcatOp { left, right } => evaluate_concatenation_expr(*left, *right, env, root_env),
         Expr::BlockExpr(then) => evaluate_block_expr(then, env, root_env),
     }
+}
+
+pub fn evaluate_tuple(
+    tuple: Vec<(Expr, Type)>,
+    env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
+) -> Result<Val, RuntimeError> {
+    let mut evaluated_elements: Vec<Val> = Vec::new();
+    for element in tuple.iter().map(|(values, _)| values) {
+        evaluated_elements.push(evaluate_expr(element.clone(), env, root_env)?)
+    }
+    Ok(Val::Tuple(TupleVal {
+        values: evaluated_elements,
+    }))
 }
 
 pub fn evaluate_array_expr(

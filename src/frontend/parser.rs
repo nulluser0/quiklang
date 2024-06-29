@@ -947,11 +947,27 @@ impl Parser {
             // Symbols
             TokenType::Symbol(Symbol::LeftParen) => {
                 let value = self.parse_expr(type_env, root_type_env)?;
-                self.expect(
-                    TokenType::Symbol(Symbol::RightParen),
-                    "Unexpected token found inside parenthesised expression. Expected closing parenthesis."
-                )?; // rightParen
-                Ok(value)
+                let possibility = self.eat();
+                match possibility.token {
+                    TokenType::Symbol(Symbol::Comma) => {
+                        // It's a tuple expr.
+                        self.parse_tuple_expr(tk.line, tk.col, value, type_env, root_type_env)
+                    }
+                    TokenType::Symbol(Symbol::RightParen) => {
+                        // It's a standard bracketed expr.
+                        Ok(value)
+                    }
+                    _ => {
+                        Err(ParserError::UnexpectedToken {
+                            expected: TokenType::Symbol(Symbol::RightParen),
+                            found: possibility.token,
+                            line: possibility.line,
+                            col: possibility.col,
+                            message: "Expected closing parenthesis ')' (or ',' for tuples) for bracketed expr"
+                                .to_string(),
+                        })
+                    }
+                }
             }
             TokenType::Symbol(Symbol::LeftBracket) => {
                 let mut elements: Vec<Expr> = Vec::new();
@@ -995,6 +1011,53 @@ impl Parser {
                 message: "Unexpected token found during parsing!".to_string(),
             }),
         }
+    }
+
+    fn parse_tuple_expr(
+        &mut self,
+        line: usize,
+        col: usize,
+        first_value: Expr,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let mut tuple: Vec<(Expr, Type)> = Vec::new();
+        tuple.push((
+            first_value.clone(),
+            first_value.get_type(type_env, line, col)?,
+        ));
+        // (value1, value2)
+        // ---------^------ here now
+        while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightParen) {
+            let value = self.parse_expr(type_env, root_type_env)?;
+            tuple.push((value.clone(), value.get_type(type_env, line, col)?));
+            let next = self.eat();
+            match next.token {
+                TokenType::Symbol(Symbol::Comma) => {
+                    if self.eat().token == TokenType::Symbol(Symbol::RightParen) {
+                        return Ok(Expr::Tuple(tuple));
+                    }
+                    continue;
+                }
+                TokenType::Symbol(Symbol::RightParen) => return Ok(Expr::Tuple(tuple)),
+                e => {
+                    return Err(ParserError::UnexpectedToken {
+                        expected: TokenType::Symbol(Symbol::RightParen),
+                        found: e,
+                        line: next.line,
+                        col: next.col,
+                        message:
+                            "Expected comma ',' or right parenthesis ')' to delimit or end tuple."
+                                .to_string(),
+                    })
+                }
+            };
+        }
+        self.expect(
+            TokenType::Symbol(Symbol::RightParen),
+            "Expected right parenthesis ')' to end tuple expression.",
+        )?;
+        Ok(Expr::Tuple(tuple))
     }
 
     fn parse_for_expr(
