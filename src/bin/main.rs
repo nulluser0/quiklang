@@ -1,7 +1,7 @@
 use std::{cell::RefCell, fs::File, io::Read, process, rc::Rc};
 
 use quiklang::{
-    backend::environment::Environment, frontend::type_environment::TypeEnvironment, utils::run::run,
+    backend_interpreter::environment::Environment, frontend::type_environment::TypeEnvironment, utils::run::run,
 };
 use rustyline::{error::ReadlineError, Config, Editor};
 

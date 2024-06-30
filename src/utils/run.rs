@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    backend::{environment::Environment, interpreter::evaluate},
+    backend_interpreter::{environment::Environment, interpreter::evaluate},
     errors::Error,
     frontend::{parser, type_environment::TypeEnvironment},
 };

@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use crate::{
-    backend::values::ValueType,
+    backend_interpreter::values::ValueType,
     frontend::{
         ast::{BinaryOp, Expr, Type},
         lexer::TokenType,

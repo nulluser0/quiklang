@@ -2,7 +2,7 @@ use std::{cell::RefCell, process::exit, rc::Rc};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use quiklang::{
-    backend::{environment::Environment, interpreter::evaluate},
+    backend_interpreter::{environment::Environment, interpreter::evaluate},
     frontend::{parser, type_environment::TypeEnvironment},
 };
 

@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use quiklang::{
-    backend::environment::Environment, frontend::type_environment::TypeEnvironment, utils::run::run,
+    backend_interpreter::environment::Environment, frontend::type_environment::TypeEnvironment, utils::run::run,
 };
 
 fn criterion_benchmark(c: &mut Criterion) {
