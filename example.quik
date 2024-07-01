@@ -1,3 +1,19 @@
+/* 
+    Quiklang (QLang) (QL) files
+
+    *.quik - QLang source code file
+    *.qbce - QLang bytecode represented as 'asm'-like syntax, easily editable
+    *.qbin - 
+*/
+
+/* 
+    let x = 100;    // loadint r0 100
+    y = x + 200;    // loadint r1 200
+                    // add r2 r0 r1
+    y               // halt
+                    // r2 has results of var 'y' (300)
+*/
+
 struct name {
     key: string,
     foo: integer
