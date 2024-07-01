@@ -8,7 +8,7 @@ use crate::{
         values::{FunctionVal, NullVal, SpecialVal, SpecialValKeyword, Val, ValueType},
     },
     errors::RuntimeError,
-    frontend::ast::{Expr, Stmt, Type},
+    frontend::ast::{Expr, FromType, Stmt, Type},
     mk_null,
 };
 
@@ -47,8 +47,7 @@ pub fn evaluate_declare_fn(
         .map(|(ident, val_type)| {
             (
                 ident.to_owned(),
-                val_type
-                    .to_val()
+                Val::from_type(val_type)
                     .expect("Type conversion to ValueType failed. This should not happen."),
             )
         })

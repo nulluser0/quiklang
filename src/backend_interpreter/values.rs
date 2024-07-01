@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     errors::RuntimeError,
-    frontend::ast::{Expr, Stmt},
+    frontend::ast::{Expr, FromType, Stmt, Type},
 };
 
 use super::environment::Environment;
@@ -274,6 +274,30 @@ pub enum Val {
     Tuple(TupleVal),
     Special(SpecialVal),
     Iterator(IteratorVal),
+}
+
+impl FromType for Val {
+    type Output = ValueType;
+    fn from_type(type_val: &crate::frontend::ast::Type) -> Option<Self::Output> {
+        match type_val {
+            Type::String => Some(ValueType::String),
+            Type::Integer => Some(ValueType::Integer),
+            Type::Float => Some(ValueType::Float),
+            Type::Object => Some(ValueType::Object),
+            Type::Null => Some(ValueType::Null),
+            Type::Bool => Some(ValueType::Bool),
+            Type::Array(inner) => Some(ValueType::Array(Box::new(Val::from_type(inner)?))),
+            Type::Tuple(inner_types) => {
+                let values: Vec<ValueType> = inner_types
+                    .iter()
+                    .map(|inner_type| Val::from_type(inner_type).unwrap())
+                    .collect();
+                Some(ValueType::Tuple(values))
+            }
+            Type::Mismatch => None,
+            Type::Function(_, _) => Some(ValueType::Function),
+        }
+    }
 }
 
 impl Val {

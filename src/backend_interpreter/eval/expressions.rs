@@ -12,7 +12,7 @@ use crate::{
         },
     },
     errors::RuntimeError,
-    frontend::ast::{BinaryOp, Expr, Literal, Property, Stmt, Type, UnaryOp},
+    frontend::ast::{BinaryOp, Expr, FromType, Literal, Property, Stmt, Type, UnaryOp},
     mk_float, mk_integer, mk_null, mk_string,
 };
 
@@ -79,8 +79,7 @@ pub fn evaluate_array_expr(
     }
     Ok(Val::Array(ArrayVal {
         values: evaluated_elements,
-        inner_type: elements_type
-            .to_val()
+        inner_type: Val::from_type(&elements_type)
             .expect("Unable to convert Type to ValueType. This should not happen."),
     }))
 }

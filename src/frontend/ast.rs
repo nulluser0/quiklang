@@ -42,27 +42,9 @@ pub enum Type {
     // TODO: Custom(String)
 }
 
-impl Type {
-    pub fn to_val(&self) -> Option<ValueType> {
-        match self {
-            Type::String => Some(ValueType::String),
-            Type::Integer => Some(ValueType::Integer),
-            Type::Float => Some(ValueType::Float),
-            Type::Object => Some(ValueType::Object),
-            Type::Null => Some(ValueType::Null),
-            Type::Bool => Some(ValueType::Bool),
-            Type::Array(inner) => Some(ValueType::Array(Box::new(inner.to_val()?))),
-            Type::Tuple(inner_types) => {
-                let values: Vec<ValueType> = inner_types
-                    .iter()
-                    .map(|inner_type| inner_type.to_val().unwrap())
-                    .collect();
-                Some(ValueType::Tuple(values))
-            }
-            Type::Mismatch => None,
-            Type::Function(_, _) => Some(ValueType::Function),
-        }
-    }
+pub trait FromType: std::fmt::Debug {
+    type Output;
+    fn from_type(type_val: &Type) -> Option<Self::Output>;
 }
 
 impl std::fmt::Display for Type {
