@@ -34,10 +34,9 @@
 //
 // 4. String-pointing constant pool indexes:
 //      Offset      Size (bytes)        Description
-//          36          16 (4+4+8)          An entry which points to a const entry in the pool, providing information of the string.
+//          36          12 (4+8)          An entry which points to a const entry in the pool, providing information of the string.
 //      1.                  4                   Index of constant in constant pool.
-//      2.                  4                   Index of string in string pool.
-//      3.                  8                   Lens (size) of string in const pool, which is 64-bits (u64).
+//      2.                  8                   Lens (size) of string in const pool, which is 64-bits (u64).
 //                                              Note that the actual length of the string is 8*lens, since the strings are UTF-8 (8-bits) encoded
 //
 // 5. Constant pool:
