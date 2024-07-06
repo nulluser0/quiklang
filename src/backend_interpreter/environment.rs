@@ -6,7 +6,7 @@ use std::process;
 use std::rc::Rc;
 
 use crate::backend_interpreter::values::{BoolVal, NativeFunctionVal, NullVal, Val};
-use crate::errors::RuntimeError;
+use crate::errors::InterpreterError;
 use crate::{mk_bool, mk_native_fn, mk_null};
 
 use super::native_fn::{native_drop, native_forget, native_println, native_time};
@@ -24,7 +24,7 @@ impl Default for Environment {
     }
 }
 
-fn setup_env(env: &mut Environment) -> Result<(), RuntimeError> {
+fn setup_env(env: &mut Environment) -> Result<(), InterpreterError> {
     // Create Default Global Environment
     env.declare_var("null", mk_null!(), false)?;
     env.declare_var("true", mk_bool!(true), false)?;
@@ -38,7 +38,7 @@ fn setup_env(env: &mut Environment) -> Result<(), RuntimeError> {
 }
 
 impl Environment {
-    pub fn new() -> Result<Self, RuntimeError> {
+    pub fn new() -> Result<Self, InterpreterError> {
         let mut env = Environment {
             values: HashMap::new(),
             is_mutable: HashSet::new(),
@@ -66,7 +66,7 @@ impl Environment {
     pub fn resolve(
         env: &Rc<RefCell<Environment>>,
         varname: &str,
-    ) -> Result<Rc<RefCell<Environment>>, RuntimeError> {
+    ) -> Result<Rc<RefCell<Environment>>, InterpreterError> {
         if env.borrow().values.contains_key(varname) {
             return Ok(env.clone());
         }
@@ -75,7 +75,7 @@ impl Environment {
             return Self::resolve(parent, varname);
         }
 
-        Err(RuntimeError::UndefinedVariable(varname.to_string()))
+        Err(InterpreterError::UndefinedVariable(varname.to_string()))
     }
 
     pub fn declare_var(
@@ -83,7 +83,7 @@ impl Environment {
         name: &str,
         value: Val,
         is_mutable: bool,
-    ) -> Result<Val, RuntimeError> {
+    ) -> Result<Val, InterpreterError> {
         if let "_" = name {
             // _ means intentionally ignored
             return Ok(value);
@@ -91,7 +91,7 @@ impl Environment {
         if let std::collections::hash_map::Entry::Vacant(e) = self.values.entry(name.to_string()) {
             e.insert(value.clone());
         } else {
-            return Err(RuntimeError::DeclaredExistingVariable(name.to_string()));
+            return Err(InterpreterError::DeclaredExistingVariable(name.to_string()));
         }
         if is_mutable {
             self.is_mutable.insert(name.to_owned());
@@ -103,12 +103,12 @@ impl Environment {
         env: &Rc<RefCell<Environment>>,
         name: &str,
         value: Val,
-    ) -> Result<Val, RuntimeError> {
+    ) -> Result<Val, InterpreterError> {
         let containing_env = Self::resolve(env, name)?;
 
         // immutables (const and let) cannot have its value changed.
         if !containing_env.borrow().is_mutable.contains(name) {
-            return Err(RuntimeError::ImmutableVariableEdit(name.to_string()));
+            return Err(InterpreterError::ImmutableVariableEdit(name.to_string()));
         }
 
         match Val::is_same_type(containing_env.borrow().values.get(name).unwrap(), &value) {
@@ -135,7 +135,7 @@ impl Environment {
         containing_env.borrow_mut().values.remove(name).unwrap();
     }
 
-    pub fn lookup_var(env: &Rc<RefCell<Environment>>, name: &str) -> Result<Val, RuntimeError> {
+    pub fn lookup_var(env: &Rc<RefCell<Environment>>, name: &str) -> Result<Val, InterpreterError> {
         let env = Self::resolve(env, name)?;
         let x = env.borrow().values.get(name).unwrap().clone();
         Ok(x)

@@ -11,7 +11,7 @@ use crate::{
             SpecialValKeyword, StringVal, ToFloat, TupleVal, Val, ValueType,
         },
     },
-    errors::RuntimeError,
+    errors::InterpreterError,
     frontend::ast::{BinaryOp, Expr, FromType, Literal, Property, Stmt, Type, UnaryOp},
     mk_float, mk_integer, mk_null, mk_string,
 };
@@ -20,7 +20,7 @@ pub fn evaluate_expr(
     expr: Expr,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     match expr {
         Expr::Literal(literal) => evaluate_literal(literal, env, root_env),
         Expr::Identifier(identifier) => evaluate_identifier(identifier, env),
@@ -57,7 +57,7 @@ pub fn evaluate_tuple(
     tuple: Vec<(Expr, Type)>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let mut evaluated_elements: Vec<Val> = Vec::new();
     for element in tuple.iter().map(|(values, _)| values) {
         evaluated_elements.push(evaluate_expr(element.clone(), env, root_env)?)
@@ -72,7 +72,7 @@ pub fn evaluate_array_expr(
     elements_type: Type,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let mut evaluated_elements: Vec<Val> = Vec::new();
     for element in elements {
         evaluated_elements.push(evaluate_expr(element, env, root_env)?)
@@ -90,7 +90,7 @@ pub fn evaluate_for_expr(
     then: Vec<Stmt>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let iterable_value = evaluate_expr(iterable, env, root_env)?;
     let iterator = match iterable_value.to_iterator() {
         Ok(iter) => iter,
@@ -118,7 +118,7 @@ pub fn evaluate_while_expr(
     then: Vec<Stmt>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let value_type = evaluate_expr(condition.clone(), env, root_env)?.get_type();
     if value_type == ValueType::Bool {
         while let Val::Bool(BoolVal { value: true }) =
@@ -137,7 +137,7 @@ pub fn evaluate_while_expr(
             }
         }
     } else {
-        return Err(RuntimeError::TypeError {
+        return Err(InterpreterError::TypeError {
             message: "While expression conditions must evaluate to a bool.".to_string(),
             expected: ValueType::Bool,
             found: value_type,
@@ -150,7 +150,7 @@ pub fn evaluate_loop_expr(
     then: Vec<Stmt>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     loop {
         let scope = Rc::new(RefCell::new(Environment::new_with_parent(env.clone())));
         for stmt in &then {
@@ -169,7 +169,7 @@ pub fn evaluate_block_expr(
     then: Vec<Stmt>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let scope = Rc::new(RefCell::new(Environment::new_with_parent(env.clone())));
     let mut result = mk_null!();
     for stmt in then {
@@ -183,7 +183,7 @@ pub fn evaluate_unary_op(
     expr: Expr,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let evaluated_expr = evaluate_expr(expr, env, root_env)?;
     match op {
         UnaryOp::LogicalNot => {
@@ -222,7 +222,7 @@ pub fn evaluate_if_expr(
     else_stmt: Option<Vec<Stmt>>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     // Evaluate the condition. If it is true, then complete then, else do the else_stmt (or ignore if statement.)
     let condition_value = evaluate_expr(condition, env, root_env)?;
 
@@ -243,7 +243,7 @@ pub fn evaluate_if_expr(
         }
     } else {
         // Error: If condition doesn't evaluate to a boolean value
-        return Err(RuntimeError::TypeError {
+        return Err(InterpreterError::TypeError {
             message: "If expression must evaluate to a bool.".to_string(),
             expected: ValueType::Bool,
             found: condition_value.get_type(),
@@ -258,10 +258,10 @@ pub fn evaluate_assignment(
     expr: Expr,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let varname = match assignee {
         Expr::Identifier(name) => name,
-        _ => return Err(RuntimeError::InvalidAssignExpr(assignee.to_string())),
+        _ => return Err(InterpreterError::InvalidAssignExpr(assignee.to_string())),
     };
     let value = evaluate_expr(expr, env, root_env)?;
     Environment::assign_var(env, &varname, value)
@@ -272,12 +272,12 @@ pub fn evaluate_member_expr(
     property: Expr,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let object = evaluate_expr(object, env, root_env)?;
     let property = match property {
         Expr::Identifier(result) => result,
         _ => {
-            return Err(RuntimeError::RuntimeError(
+            return Err(InterpreterError::RuntimeError(
                 "Cannot find member of non-identifier.".to_string(),
             )); // TODO: When proper data strctures are impl, the entire member/object classes are flagged for removal.
         }
@@ -287,7 +287,7 @@ pub fn evaluate_member_expr(
             Some(result) => Ok(result.clone().unwrap_or(mk_null!())),
             None => Ok(mk_null!()),
         },
-        _ => Err(RuntimeError::RuntimeError(
+        _ => Err(InterpreterError::RuntimeError(
             "Cannot get a member of a non-object type.".to_string(),
         )),
     }
@@ -296,7 +296,7 @@ pub fn evaluate_member_expr(
 pub fn evaluate_identifier(
     identifier: String,
     env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     Environment::lookup_var(env, &identifier)
 }
 
@@ -304,7 +304,7 @@ pub fn evaluate_literal(
     literal: Literal,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     match literal {
         Literal::Integer(value) => Ok(mk_integer!(value) as Val),
         Literal::Float(value) => Ok(mk_float!(value) as Val),
@@ -317,7 +317,7 @@ pub fn evaluate_object_expr(
     obj: Vec<Property>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let mut object = ObjectVal {
         properties: HashMap::new(),
     };
@@ -337,12 +337,12 @@ pub fn evaluate_call_expr(
     caller: Expr,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let function = evaluate_expr(caller, env, root_env)?;
     match &function {
         Val::NativeFunction(callable) => (callable.call)(args, env, root_env),
         Val::Function(fn_value) => {
-            let evaluated_args: Result<Vec<Val>, RuntimeError> = args
+            let evaluated_args: Result<Vec<Val>, InterpreterError> = args
                 .into_iter()
                 .map(|expr| evaluate_expr(expr, env, root_env))
                 .collect();
@@ -380,7 +380,7 @@ pub fn evaluate_concatenation_expr(
     right: Expr,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let left_val = evaluate_expr(left, env, root_env)?;
     let right_val = evaluate_expr(right, env, root_env)?;
 
@@ -388,7 +388,7 @@ pub fn evaluate_concatenation_expr(
         (Val::String(StringVal { value: l }), Val::String(StringVal { value: r })) => {
             Ok(Val::String(StringVal { value: l + &r }))
         }
-        e => Err(RuntimeError::TypeError {
+        e => Err(InterpreterError::TypeError {
             message: "Concatenation expressions only work on Strings.".to_string(),
             expected: ValueType::String,
             found: e.0.get_type(),
@@ -402,7 +402,7 @@ pub fn evaluate_binary_op(
     right: Expr,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let left_val = evaluate_expr(left, env, root_env)?;
     let right_val = evaluate_expr(right, env, root_env)?;
 
@@ -441,7 +441,7 @@ pub fn evaluate_binary_op(
             BinaryOp::NotEqual => Ok(Val::Bool(BoolVal {
                 value: l.value != r.value,
             })),
-            e => Err(RuntimeError::UnsupportedBinaryOp(e)),
+            e => Err(InterpreterError::UnsupportedBinaryOp(e)),
         },
         (Val::Float(l), Val::Float(r)) => {
             match op {
@@ -478,7 +478,7 @@ pub fn evaluate_binary_op(
                 BinaryOp::NotEqual => Ok(Val::Bool(BoolVal {
                     value: l.value != r.value,
                 })),
-                e => Err(RuntimeError::UnsupportedBinaryOp(e)),
+                e => Err(InterpreterError::UnsupportedBinaryOp(e)),
             }
         }
         (Val::Integer(l), Val::Float(r)) => {
@@ -516,7 +516,7 @@ pub fn evaluate_binary_op(
                 BinaryOp::NotEqual => Ok(Val::Bool(BoolVal {
                     value: l.to_float() != r.value,
                 })),
-                e => Err(RuntimeError::UnsupportedBinaryOp(e)),
+                e => Err(InterpreterError::UnsupportedBinaryOp(e)),
             }
         }
         (Val::Float(l), Val::Integer(r)) => {
@@ -554,10 +554,10 @@ pub fn evaluate_binary_op(
                 BinaryOp::NotEqual => Ok(Val::Bool(BoolVal {
                     value: l.value != r.to_float(),
                 })),
-                e => Err(RuntimeError::UnsupportedBinaryOp(e)),
+                e => Err(InterpreterError::UnsupportedBinaryOp(e)),
             }
         }
-        e => Err(RuntimeError::TypeError {
+        e => Err(InterpreterError::TypeError {
             message: "Binary operations are only for integers and floats.".to_string(),
             expected: ValueType::Integer,
             found: e.0.get_type(),

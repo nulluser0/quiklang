@@ -25,7 +25,7 @@ pub fn run(
                 match evaluate(stmt, env, &root_env) {
                     Ok(_) => continue,
                     Err(e) => {
-                        print_e(Error::RuntimeError(e));
+                        print_e(Error::InterpreterError(e));
                         break;
                     }
                 };

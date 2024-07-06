@@ -16,12 +16,20 @@ pub enum Error {
 
     #[error("Parser Error: {0}")]
     ParserError(#[from] ParserError),
-    //
-    // #[error("Type Error: {0}")]
-    // TODO: TypeError(#[from] TypeError),
-    //
-    #[error("Runtime Error: {0}")]
-    RuntimeError(#[from] RuntimeError),
+
+    // Interpreter Errors:
+    #[error("Interpreter Error: {0}")]
+    InterpreterError(#[from] InterpreterError),
+
+    // VM Errors:
+    #[error("VM Compile Error: {0}")]
+    VMCompileError(#[from] VMCompileError),
+
+    #[error("VM Bytecode Error: {0}")]
+    VMBytecodeError(#[from] VMBytecodeError),
+
+    #[error("VM Runtime Error: {0}")]
+    VMRuntimeError(#[from] VMRuntimeError),
 }
 
 // Lexer-specific Errors
@@ -134,7 +142,7 @@ pub enum ParserError {
 
 // Interpreter-specific Errors
 #[derive(Error, Debug)]
-pub enum RuntimeError {
+pub enum InterpreterError {
     // Variables
     #[error("Cannot resolve non-existent variable '{0}'")]
     UndefinedVariable(String),
@@ -167,3 +175,24 @@ pub enum RuntimeError {
     #[error("Other runtime error: {0}")]
     RuntimeError(String),
 }
+
+// VM Compile specific errors
+#[derive(Error, Debug)]
+pub enum VMCompileError {}
+
+// VM Bytecode specific errors
+#[derive(Error, Debug)]
+pub enum VMBytecodeError {
+    #[error("IO Error occurred: {0}")]
+    IOError(#[from] std::io::Error),
+
+    #[error("String parse error: {0}")]
+    StringParseError(#[from] std::string::FromUtf8Error),
+
+    #[error("Bytecode being read contains invalid Magic Number.")]
+    InvalidOrNoMagicNumber,
+}
+
+// VM Runtime specific errors
+#[derive(Error, Debug)]
+pub enum VMRuntimeError {}

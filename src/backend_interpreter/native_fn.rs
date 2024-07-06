@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc, time::SystemTime};
 
 use crate::{
-    backend_interpreter::eval::expressions::evaluate_expr, errors::RuntimeError,
+    backend_interpreter::eval::expressions::evaluate_expr, errors::InterpreterError,
     frontend::ast::Expr, mk_integer, mk_null,
 };
 
@@ -12,8 +12,8 @@ pub fn native_println(
     args: Vec<Expr>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
-    let evaluated_args: Result<Vec<Val>, RuntimeError> = args
+) -> Result<Val, InterpreterError> {
+    let evaluated_args: Result<Vec<Val>, InterpreterError> = args
         .into_iter()
         .map(|expr| evaluate_expr(expr, env, root_env))
         .collect();
@@ -30,7 +30,7 @@ pub fn native_time(
     _args: Vec<Expr>,
     _env: &Rc<RefCell<Environment>>,
     _root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let time = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_secs() as i64,
         Err(e) => panic!("SystemTime before UNIX EPOCH! {}", e),
@@ -42,7 +42,7 @@ pub fn native_forget(
     args: Vec<Expr>,
     _env: &Rc<RefCell<Environment>>,
     _root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     for arg in args {
         std::mem::forget(arg)
     }
@@ -53,7 +53,7 @@ pub fn native_drop(
     args: Vec<Expr>,
     env: &Rc<RefCell<Environment>>,
     _root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     for raw_expr in args {
         if let Expr::Identifier(ident) = raw_expr {
             Environment::drop_var(env, &ident);

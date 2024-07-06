@@ -13,7 +13,7 @@ use super::instructions::{
 //     base: usize,
 // }
 
-pub type RegisterVal = i64;
+pub type RegisterVal = u64;
 
 // A note about converting from bytecode to vm for strings specifically:
 // A constant entry with a string has information we know: its lens and string content.

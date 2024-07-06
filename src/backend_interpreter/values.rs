@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    errors::RuntimeError,
+    errors::InterpreterError,
     frontend::ast::{Expr, FromType, Stmt, Type},
 };
 
@@ -131,7 +131,7 @@ type NativeFunctionCallback = fn(
     Vec<Expr>,
     &Rc<RefCell<Environment>>,
     &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError>;
+) -> Result<Val, InterpreterError>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct NativeFunctionVal {
@@ -316,12 +316,12 @@ impl Val {
 }
 
 impl Val {
-    pub fn to_iterator(self) -> Result<Rc<RefCell<dyn Iterator>>, RuntimeError> {
+    pub fn to_iterator(self) -> Result<Rc<RefCell<dyn Iterator>>, InterpreterError> {
         match self {
             Val::Array(array_val) => {
                 Ok(Rc::new(RefCell::new(ArrayIterator::new(array_val.values))))
             }
-            _ => Err(RuntimeError::TypeError {
+            _ => Err(InterpreterError::TypeError {
                 message: "Value is not iterable.".to_string(),
                 expected: ValueType::Iterator(Box::new(ValueType::Any)),
                 found: self.get_type(),

@@ -7,7 +7,7 @@ use crate::{
         environment::Environment,
         values::{FunctionVal, NullVal, SpecialVal, SpecialValKeyword, Val, ValueType},
     },
-    errors::RuntimeError,
+    errors::InterpreterError,
     frontend::ast::{Expr, FromType, Stmt, Type},
     mk_null,
 };
@@ -21,7 +21,7 @@ pub fn evaluate_declare_var(
     expr: Option<Expr>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let value: Val = if let Some(val) = expr {
         evaluate_expr(val, env, root_env)?
     } else {
@@ -41,7 +41,7 @@ pub fn evaluate_declare_fn(
     body: Vec<Stmt>,
     is_async: bool,
     env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     let parameters_with_valuetype: Vec<(String, ValueType)> = parameters
         .iter()
         .map(|(ident, val_type)| {
@@ -66,7 +66,7 @@ pub fn evaluate_break_stmt(
     expr: Option<Expr>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     match expr {
         Some(expr) => Ok(Val::Special(SpecialVal {
             keyword: SpecialValKeyword::Break,
@@ -83,7 +83,7 @@ pub fn evaluate_return_stmt(
     expr: Option<Expr>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
-) -> Result<Val, RuntimeError> {
+) -> Result<Val, InterpreterError> {
     match expr {
         Some(expr) => Ok(Val::Special(SpecialVal {
             keyword: SpecialValKeyword::Return,
