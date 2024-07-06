@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{backend_interpreter::values::ValueType, errors::ParserError};
+use crate::errors::ParserError;
 
 use super::{lexer::Operator, type_environment::TypeEnvironment};
 

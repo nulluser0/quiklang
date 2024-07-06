@@ -3,6 +3,9 @@ name = "quiklang"
 version = "0.1.0"
 edition = "2021"
 
+[package.metadata]
+quiklang-vm-version = 1
+
 [dependencies]
 criterion = "0.5.1"
 rustyline = "9.0.0"

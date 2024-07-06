@@ -28,3 +28,21 @@ enum name {
 type name {
     fn bruh(0) -> wjefoij;
 }
+
+/*   
+    pub fn add_string(&mut self, index: u32, value: &str) {
+        // Calculate the offset and length
+        let offset = self.string_pool.len() as u32;
+        let length = value.len() as u32;
+
+        // Add the string to the pool
+        self.string_pool.extend_from_slice(value.as_bytes());
+
+        // Calculate padding to ensure 4-byte alignment
+        let padding = (4 - (length % 4)) % 4;
+        self.string_pool.extend(vec![0; padding as usize]);
+
+        // Store the mapping (index, offset, length)
+        self.string_mappings.push((index, offset, length));
+    }
+*/
