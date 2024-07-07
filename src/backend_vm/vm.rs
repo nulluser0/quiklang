@@ -62,14 +62,16 @@ impl VM {
     }
 
     pub fn set_register(&mut self, index: usize, value: RegisterVal) -> Result<(), VMRuntimeError> {
-        if index < self.registers.len() {
-            return Err(VMRuntimeError::AccessToNonExistentRegister(
+        match self.registers.get_mut(index) {
+            Some(elem) => {
+                *elem = value;
+                Ok(())
+            }
+            None => Err(VMRuntimeError::AccessToNonExistentRegister(
                 index,
                 self.registers.len(),
-            ));
+            )),
         }
-        self.registers[index] = value;
-        Ok(())
     }
 
     pub fn get_register(&self, index: usize) -> Result<&RegisterVal, VMRuntimeError> {
@@ -82,14 +84,16 @@ impl VM {
     }
 
     pub fn set_constant(&mut self, index: usize, value: RegisterVal) -> Result<(), VMRuntimeError> {
-        if index < self.constant_pool.len() {
-            return Err(VMRuntimeError::AccessToNonExistentConstant(
+        match self.constant_pool.get_mut(index) {
+            Some(elem) => {
+                *elem = value;
+                Ok(())
+            }
+            None => Err(VMRuntimeError::AccessToNonExistentConstant(
                 index,
                 self.constant_pool.len(),
-            ));
+            )),
         }
-        self.constant_pool[index] = value;
-        Ok(())
     }
 
     pub fn get_constant(&self, index: usize) -> Result<&RegisterVal, VMRuntimeError> {
