@@ -1,10 +1,13 @@
 // VM (Register-based)
 
-use super::instructions::{
-    get_arga, get_argb, get_argbx, get_argc, get_argsbx, get_opcode, Instruction, OP_ADD, OP_AND,
-    OP_BITAND, OP_BITOR, OP_BITXOR, OP_CALL, OP_DEC, OP_DIV, OP_EQ, OP_GT, OP_INC, OP_JUMP,
-    OP_JUMP_IF_FALSE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LT, OP_MOD, OP_MOVE, OP_MUL,
-    OP_NOP, OP_NOT, OP_OR, OP_POW, OP_RETURN, OP_SHL, OP_SHR, OP_SUB, OP_TAILCALL,
+use super::{
+    bytecode::ByteCode,
+    instructions::{
+        get_arga, get_argb, get_argbx, get_argc, get_argsbx, get_opcode, Instruction, OP_ADD,
+        OP_AND, OP_BITAND, OP_BITOR, OP_BITXOR, OP_CALL, OP_DEC, OP_DIV, OP_EQ, OP_GT, OP_INC,
+        OP_JUMP, OP_JUMP_IF_FALSE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LT, OP_MOD, OP_MOVE,
+        OP_MUL, OP_NOP, OP_NOT, OP_OR, OP_POW, OP_RETURN, OP_SHL, OP_SHR, OP_SUB, OP_TAILCALL,
+    },
 };
 
 // struct CallFrame {
@@ -24,20 +27,36 @@ pub type RegisterVal = u64;
 pub struct VM {
     registers: Vec<RegisterVal>,
     constant_pool: Vec<RegisterVal>,
+    string_pool: Vec<String>,
     program_counter: usize,
     instructions: Vec<Instruction>,
     // call_stack: Vec<CallFrame>,
 }
 
 impl VM {
-    pub fn new(instructions: Vec<Instruction>, num_constants: usize, num_registers: usize) -> Self {
+    pub fn new(
+        instructions: Vec<Instruction>,
+        string_pool: Vec<String>,
+        constant_pool: Vec<RegisterVal>,
+        num_registers: usize,
+    ) -> Self {
         VM {
             registers: vec![0; num_registers],
-            constant_pool: vec![0; num_constants],
+            constant_pool,
+            string_pool,
             program_counter: 0,
             instructions,
             // call_stack: Vec::new(),
         }
+    }
+
+    pub fn from_bytecode(bytecode: ByteCode) -> Self {
+        VM::new(
+            bytecode.instructions().clone(),
+            bytecode.string_pool().clone(),
+            bytecode.constant_pool().clone(),
+            *bytecode.register_count() as usize,
+        )
     }
 
     pub fn set_register(&mut self, index: usize, value: RegisterVal) {
@@ -54,6 +73,10 @@ impl VM {
 
     pub fn get_constant(&self, index: usize) -> &RegisterVal {
         &self.constant_pool[index]
+    }
+
+    pub fn get_string(&self, index: RegisterVal) -> &String {
+        &self.string_pool[index as usize]
     }
 
     pub fn fetch_instruction(&self) -> Instruction {

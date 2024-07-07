@@ -235,6 +235,22 @@ impl ByteCode {
 
         Ok(encoded_bytecode)
     }
+
+    pub fn instructions(&self) -> &Vec<Instruction> {
+        &self.instructions
+    }
+
+    pub fn register_count(&self) -> &i32 {
+        &self.integrity_info.num_register
+    }
+
+    pub fn constant_pool(&self) -> &Vec<RegisterVal> {
+        &self.constants
+    }
+
+    pub fn string_pool(&self) -> &Vec<String> {
+        &self.string_pool
+    }
 }
 
 #[cfg(test)]
