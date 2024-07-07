@@ -6,9 +6,10 @@ use super::{
     bytecode::ByteCode,
     instructions::{
         get_arga, get_argb, get_argbx, get_argc, get_argsbx, get_opcode, Instruction, OP_ADD,
-        OP_AND, OP_BITAND, OP_BITOR, OP_BITXOR, OP_CALL, OP_DEC, OP_DIV, OP_EQ, OP_GT, OP_INC,
-        OP_JUMP, OP_JUMP_IF_FALSE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LT, OP_MOD, OP_MOVE,
-        OP_MUL, OP_NOP, OP_NOT, OP_OR, OP_POW, OP_RETURN, OP_SHL, OP_SHR, OP_SUB, OP_TAILCALL,
+        OP_AND, OP_BITAND, OP_BITOR, OP_BITXOR, OP_CALL, OP_DEC, OP_DIV, OP_EQ, OP_GE, OP_GT,
+        OP_INC, OP_JUMP, OP_JUMP_IF_FALSE, OP_JUMP_IF_TRUE, OP_LE, OP_LOADBOOL, OP_LOADCONST,
+        OP_LOADNULL, OP_LT, OP_MOD, OP_MOVE, OP_MUL, OP_NOP, OP_NOT, OP_OR, OP_POW, OP_RETURN,
+        OP_SHL, OP_SHR, OP_SUB, OP_TAILCALL,
     },
 };
 
@@ -210,17 +211,35 @@ impl VM {
                 let right = self.registers[argc as usize];
                 self.registers[arga as usize] = if left < right { 1 } else { 0 };
             }
+            OP_LE => {
+                let left = self.registers[argb as usize];
+                let right = self.registers[argc as usize];
+                self.registers[arga as usize] = if left <= right { 1 } else { 0 };
+            }
             OP_GT => {
                 let left = self.registers[argb as usize];
                 let right = self.registers[argc as usize];
                 self.registers[arga as usize] = if left > right { 1 } else { 0 };
             }
+            OP_GE => {
+                let left = self.registers[argb as usize];
+                let right = self.registers[argc as usize];
+                self.registers[arga as usize] = if left >= right { 1 } else { 0 };
+            }
             OP_JUMP => {
                 self.program_counter = (self.program_counter as i32 + argsbx) as usize;
+                return;
+            }
+            OP_JUMP_IF_TRUE => {
+                if self.registers[arga as usize] > 0 {
+                    self.program_counter = (self.program_counter as i32 + argsbx) as usize;
+                    return;
+                }
             }
             OP_JUMP_IF_FALSE => {
                 if self.registers[arga as usize] == 0 {
                     self.program_counter = (self.program_counter as i32 + argsbx) as usize;
+                    return;
                 }
             }
             OP_CALL => {
@@ -263,7 +282,9 @@ impl VM {
                 let right = self.registers[argc as usize];
                 self.registers[arga as usize] = left >> right;
             }
-            OP_NOP => {}
+            OP_NOP => {
+                // Here for moral support B)))
+            }
             _ => unreachable!(),
         }
         self.program_counter += 1;

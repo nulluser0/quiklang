@@ -56,21 +56,24 @@ pub const OP_AND: OpCode = 11;
 pub const OP_OR: OpCode = 12;
 pub const OP_EQ: OpCode = 13;
 pub const OP_LT: OpCode = 14;
-pub const OP_GT: OpCode = 15;
-pub const OP_JUMP: OpCode = 16; // A  PC += A
-pub const OP_JUMP_IF_FALSE: OpCode = 17; // A B  if (!R(A)) PC += B
-pub const OP_CALL: OpCode = 18; // A B  Call function at R(A) with B arguments
-pub const OP_TAILCALL: OpCode = 19;
-pub const OP_RETURN: OpCode = 20; // A  Return with R(A)
-pub const OP_INC: OpCode = 21; // A  R(A)++
-pub const OP_DEC: OpCode = 22; // A  R(A)--
-pub const OP_BITAND: OpCode = 23; // A B C  R(A) := R(B) & R(C)
-pub const OP_BITOR: OpCode = 24; // A B C  R(A) := R(B) | R(C)
-pub const OP_BITXOR: OpCode = 25; // A B C  R(A) := R(B) ^ R(C)
-pub const OP_SHL: OpCode = 26; // A B C  R(A) := R(B) << R(C)
-pub const OP_SHR: OpCode = 27; // A B C  R(A) := R(B) >> R(C)
+pub const OP_LE: OpCode = 15;
+pub const OP_GT: OpCode = 16;
+pub const OP_GE: OpCode = 17;
+pub const OP_JUMP: OpCode = 18; // A  PC += A
+pub const OP_JUMP_IF_TRUE: OpCode = 19;
+pub const OP_JUMP_IF_FALSE: OpCode = 20; // A B  if (!R(A)) PC += B
+pub const OP_CALL: OpCode = 21; // A B  Call function at R(A) with B arguments
+pub const OP_TAILCALL: OpCode = 22;
+pub const OP_RETURN: OpCode = 23; // A  Return with R(A)
+pub const OP_INC: OpCode = 24; // A  R(A)++
+pub const OP_DEC: OpCode = 25; // A  R(A)--
+pub const OP_BITAND: OpCode = 26; // A B C  R(A) := R(B) & R(C)
+pub const OP_BITOR: OpCode = 27; // A B C  R(A) := R(B) | R(C)
+pub const OP_BITXOR: OpCode = 28; // A B C  R(A) := R(B) ^ R(C)
+pub const OP_SHL: OpCode = 29; // A B C  R(A) := R(B) << R(C)
+pub const OP_SHR: OpCode = 30; // A B C  R(A) := R(B) >> R(C)
                                // NOP
-pub const OP_NOP: OpCode = 28;
+pub const OP_NOP: OpCode = 31;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum OpArgMode {
@@ -215,7 +218,7 @@ pub static OP_NAMES: &[OpProp; OP_NOP as usize + 1] = &[
     OpProp {
         name: "EQ",
         is_test: true,
-        set_reg_a: false,
+        set_reg_a: true,
         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
         typ: OpType::Abc,
@@ -223,7 +226,15 @@ pub static OP_NAMES: &[OpProp; OP_NOP as usize + 1] = &[
     OpProp {
         name: "LT",
         is_test: true,
-        set_reg_a: false,
+        set_reg_a: true,
+        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+        typ: OpType::Abc,
+    },
+    OpProp {
+        name: "LE",
+        is_test: true,
+        set_reg_a: true,
         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
         typ: OpType::Abc,
@@ -231,7 +242,15 @@ pub static OP_NAMES: &[OpProp; OP_NOP as usize + 1] = &[
     OpProp {
         name: "GT",
         is_test: true,
-        set_reg_a: false,
+        set_reg_a: true,
+        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+        typ: OpType::Abc,
+    },
+    OpProp {
+        name: "GE",
+        is_test: true,
+        set_reg_a: true,
         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
         typ: OpType::Abc,
@@ -240,6 +259,14 @@ pub static OP_NAMES: &[OpProp; OP_NOP as usize + 1] = &[
         name: "JUMP",
         is_test: false,
         set_reg_a: false,
+        mode_arg_b: OpArgMode::Used,
+        mode_arg_c: OpArgMode::NotUsed,
+        typ: OpType::AsBx,
+    },
+    OpProp {
+        name: "JUMP_IF_TRUE",
+        is_test: true,
+        set_reg_a: true,
         mode_arg_b: OpArgMode::Used,
         mode_arg_c: OpArgMode::NotUsed,
         typ: OpType::AsBx,
@@ -506,20 +533,14 @@ pub fn to_string(inst: Instruction) -> String {
         OP_NOT => format!("{} | R({}) := not R({})", ops, arga, argb),
         OP_AND => format!("{} | R({}) := R({}) and R({})", ops, arga, argb, argc),
         OP_OR => format!("{} | R({}) := R({}) or R({})", ops, arga, argb, argc),
-        OP_EQ => format!(
-            "{} | if ((RK({}) == RK({})) ~= {}) then pc++",
-            ops, argb, argc, arga
-        ),
-        OP_LT => format!(
-            "{} | if ((RK({}) <  RK({})) ~= {}) then pc++",
-            ops, argb, argc, arga
-        ),
-        OP_GT => format!(
-            "{} | if ((RK({}) >  RK({})) ~= {}) then pc++",
-            ops, argb, argc, arga
-        ),
+        OP_EQ => format!("{} | R({}) = (RK({}) == RK({})", ops, arga, argb, argc),
+        OP_LT => format!("{} | R({}) = (RK({}) < RK({})", ops, arga, argb, argc),
+        OP_LE => format!("{} | R({}) = (RK({}) <= RK({})", ops, arga, argb, argc),
+        OP_GT => format!("{} | R({}) = (RK({}) > RK({})", ops, arga, argb, argc),
+        OP_GE => format!("{} | R({}) = (RK({}) >= RK({})", ops, arga, argb, argc),
         OP_JUMP => format!("{} | pc += {}", ops, argsbx),
-        OP_JUMP_IF_FALSE => format!("{} | if R({}) is true then pc += {}", ops, arga, argsbx),
+        OP_JUMP_IF_TRUE => format!("{} | if R({}) is true then pc += {}", ops, arga, argsbx),
+        OP_JUMP_IF_FALSE => format!("{} | if R({}) is false then pc += {}", ops, arga, argsbx),
         OP_CALL => format!(
             "{} | R({}) ... R({}+{}-2) := R({})(R({}+1) ... R({}+{}-1))",
             ops, arga, arga, argc, arga, arga, arga, argb
