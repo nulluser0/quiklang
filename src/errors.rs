@@ -195,4 +195,10 @@ pub enum VMBytecodeError {
 
 // VM Runtime specific errors
 #[derive(Error, Debug)]
-pub enum VMRuntimeError {}
+pub enum VMRuntimeError {
+    #[error("Attempted access to a register that does not exist. Tried to call {0}, but register lens is {1}. This is indicative of errornous bytecode, or a critical bug in the VM.")]
+    AccessToNonExistentRegister(usize, usize),
+
+    #[error("Attempted access to a string that does not exist. Tried to get string index {0}, but string pool lens is {1}. This is indicative of errornous bytecode, or a critical bug in the VM.")]
+    AccessToNonExistentString(usize, usize),
+}
