@@ -45,20 +45,16 @@
 //          36          8 each              64-bits (u64) representing a constant. Note, alignment is very important here.
 //          -           len * 8             For strings specifically: If identified as a string from (4), it will be treated as a string.
 //                                              String would be from: `(current offset) -> (current offset + len * 8).
-//                                              String would be padded with null (0) to the right until aligned with 4 bytes to next one.
+//                                              String would be padded with null (0) to the right until aligned with 8 bytes to next one.
 //
 // 6. Instructions:
 //      Offset      Size (bytes)        Description
 // After 5. offset      4 each              32-bit (u32) representing an instruction, with each segments of the u32 representing opcodes and args.
 //                                          Check instructions.rs for more info.
 
-use std::{
-    collections::HashMap,
-    fs::Metadata,
-    io::{Cursor, Read},
-};
+use std::io::{Cursor, Read, Write};
 
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::errors::VMBytecodeError;
 
@@ -70,6 +66,7 @@ pub struct ByteCode {
     integrity_info: BCIntegrityInfo,
     constants: Vec<RegisterVal>,
     string_pool: Vec<String>,
+    string_indexes: Vec<Option<usize>>,
     instructions: Vec<Instruction>,
 }
 
@@ -126,24 +123,26 @@ impl ByteCode {
         };
 
         // Read String-Pointing Constant Pool Indexes
-        let mut string_indexes: HashMap<i32, usize> =
-            HashMap::with_capacity(num_string_points as usize);
+        let mut string_indexes: Vec<Option<usize>> = vec![None; num_constants as usize];
         for _ in 0..num_string_points {
-            let index = cursor.read_i32::<LittleEndian>()?;
+            let index = cursor.read_i32::<LittleEndian>()? as usize;
             let length = cursor.read_u64::<LittleEndian>()? as usize;
-            string_indexes.insert(index, length);
+            string_indexes[index] = Some(length)
         }
 
         // Read Constant Pool and add to String Pool
         let mut constants: Vec<u64> = Vec::with_capacity(num_constants as usize);
         let mut string_pool: Vec<String> = Vec::with_capacity(num_string_points as usize);
         for i in 0..num_constants {
-            if let Some(lens) = string_indexes.get(&i) {
+            if let Some(lens) = string_indexes[i as usize] {
                 // It is a string.
-                let mut string: Vec<u8> = vec![0; *lens];
+                let mut string: Vec<u8> = vec![0; lens];
                 cursor.read_exact(&mut string)?;
+                let index = string_pool.len();
                 string_pool.push(String::from_utf8(string)?);
-                constants.push(i as u64);
+                constants.push(index as u64);
+                // Calculate padding to align to the next 8-byte boundary
+                cursor.set_position(cursor.position() + ((8 - (lens % 8)) % 8) as u64);
             } else {
                 // Not a string.
                 constants.push(cursor.read_u64::<LittleEndian>()?);
@@ -161,8 +160,80 @@ impl ByteCode {
             integrity_info,
             constants,
             string_pool,
+            string_indexes,
             instructions,
         })
+    }
+
+    pub fn encode(bytecode: &ByteCode) -> Result<Vec<u8>, VMBytecodeError> {
+        // Calculating the encoded bytecode's size:
+        //      4                                       - Magic number              - fixed size
+        //      20                                      - Metadata info             - fixed size
+        //      16                                      - Integrity info            - fixed size
+        // each 12 * num_string_points                  - String info               - variable size
+        // each 8 * (num_constants - num_string_points) - Constants (excl strings)  - variable size
+        // each string_len + (8 - (string_len % 8)) % 8 - String constants          - variable size - 1 string len = 1 byte. String len aligned to 8 bytes.
+        // each 4 * numm_inst                           - Instructions              - variable size
+        let fixed_sizes: usize = 4 + 20 + 16;
+        let string_info_size: usize = 12 * bytecode.integrity_info.num_string_points as usize;
+        let non_string_constant_size: usize = 8
+            * (bytecode.integrity_info.num_constants - bytecode.integrity_info.num_string_points)
+                as usize;
+        let mut string_constants_size: usize = 0;
+        for string in &bytecode.string_pool {
+            let string_len = string.len();
+            string_constants_size += string_len + ((8 - (string_len % 8)) % 8)
+        }
+        let instructions_size: usize = 4 * bytecode.integrity_info.num_inst as usize;
+        let total_size = fixed_sizes
+            + string_info_size
+            + non_string_constant_size
+            + string_constants_size
+            + instructions_size;
+
+        let mut encoded_bytecode: Vec<u8> = Vec::with_capacity(total_size);
+
+        // Write Magic Number
+        encoded_bytecode.write_all(b"QLBC")?;
+
+        // Write Metadata
+        encoded_bytecode.write_all(&bytecode.metadata.ql_version)?;
+        encoded_bytecode.write_i32::<LittleEndian>(bytecode.metadata.ql_vm_ver)?;
+        encoded_bytecode.write_u64::<LittleEndian>(bytecode.metadata.flags)?;
+
+        // Write Integrity Info
+        encoded_bytecode.write_i32::<LittleEndian>(bytecode.integrity_info.num_register)?;
+        encoded_bytecode.write_i32::<LittleEndian>(bytecode.integrity_info.num_constants)?;
+        encoded_bytecode.write_i32::<LittleEndian>(bytecode.integrity_info.num_inst)?;
+        encoded_bytecode.write_i32::<LittleEndian>(bytecode.integrity_info.num_string_points)?;
+
+        // Write String Info
+        for (index, length) in bytecode.string_indexes.iter().enumerate() {
+            if let Some(len) = length {
+                encoded_bytecode.write_i32::<LittleEndian>(index as i32)?;
+                encoded_bytecode.write_u64::<LittleEndian>(*len as u64)?;
+            }
+        }
+
+        // Write Constant Pool
+        for (index, constant) in bytecode.constants.iter().enumerate() {
+            if let Some(len) = bytecode.string_indexes[index] {
+                let string = &bytecode.string_pool[*constant as usize];
+                encoded_bytecode.write_all(string.as_bytes())?;
+                let padding_size: usize = (8 - (len % 8)) % 8;
+                let padding: Vec<u8> = vec![0; padding_size];
+                encoded_bytecode.write_all(&padding)?;
+            } else {
+                encoded_bytecode.write_u64::<LittleEndian>(*constant)?;
+            }
+        }
+
+        // Write Instructions
+        for inst in &bytecode.instructions {
+            encoded_bytecode.write_u32::<LittleEndian>(*inst)?;
+        }
+
+        Ok(encoded_bytecode)
     }
 }
 
@@ -174,9 +245,46 @@ mod tests {
     use byteorder::{LittleEndian, WriteBytesExt};
 
     fn create_valid_bytecode() -> Vec<u8> {
-        let mut bytecode = Vec::new();
+        let mut bytecode: Vec<u8> = Vec::new();
         // Magic Number
         bytecode.extend_from_slice(b"QLBC");
+        // Metadata
+        bytecode.extend_from_slice(b"v1.0.0  "); // QL Version
+        bytecode.write_i32::<LittleEndian>(1).unwrap(); // QLang VM Runtime Version
+        bytecode.write_u64::<LittleEndian>(0).unwrap(); // Flags
+
+        // Setup and Integrity Information
+        bytecode.write_i32::<LittleEndian>(4).unwrap(); // Register count
+        bytecode.write_i32::<LittleEndian>(2).unwrap(); // Constant count
+        bytecode.write_i32::<LittleEndian>(3).unwrap(); // Instruction count
+        bytecode.write_i32::<LittleEndian>(1).unwrap(); // String-pointing constant count
+
+        // String-Pointing Constant Pool Indexes
+        bytecode.write_i32::<LittleEndian>(1).unwrap(); // Index of constant in constant pool
+        bytecode.write_u64::<LittleEndian>(3).unwrap(); // Length of the string in bytes
+
+        // Constant Pool
+        bytecode.write_u64::<LittleEndian>(42).unwrap(); // Non-string constant
+        bytecode.extend_from_slice(b"foo\0\0\0\0\0"); // String constant "foo"
+
+        // Instructions
+        bytecode
+            .write_u32::<LittleEndian>(Abc(OP_MOVE, 0, 1, 0))
+            .unwrap(); // OP_MOVE
+        bytecode
+            .write_u32::<LittleEndian>(ABx(OP_LOADCONST, 1, 0))
+            .unwrap(); // OP_LOADCONST
+        bytecode
+            .write_u32::<LittleEndian>(Abc(OP_LOADBOOL, 2, 1, 0))
+            .unwrap(); // OP_LOADBOOL
+
+        bytecode
+    }
+
+    fn create_invalid_bytecode() -> Vec<u8> {
+        let mut bytecode: Vec<u8> = Vec::new();
+        // Invalid Magic Number
+        bytecode.extend_from_slice(b"XXXX");
         // Metadata
         bytecode.extend_from_slice(b"v1.0.0  "); // QL Version
         bytecode.write_i32::<LittleEndian>(1).unwrap(); // QLang VM Runtime Version
@@ -206,37 +314,6 @@ mod tests {
         bytecode
             .write_u32::<LittleEndian>(Abc(OP_LOADBOOL, 2, 1, 0))
             .unwrap(); // OP_LOADBOOL
-
-        bytecode
-    }
-
-    fn create_invalid_bytecode() -> Vec<u8> {
-        let mut bytecode = Vec::new();
-        // Invalid Magic Number
-        bytecode.extend_from_slice(b"XXXX");
-        // Metadata
-        bytecode.extend_from_slice(b"v1.0.0  "); // QL Version
-        bytecode.write_i32::<LittleEndian>(1).unwrap(); // QLang VM Runtime Version
-        bytecode.write_u64::<LittleEndian>(0).unwrap(); // Flags
-
-        // Setup and Integrity Information
-        bytecode.write_i32::<LittleEndian>(4).unwrap(); // Register count
-        bytecode.write_i32::<LittleEndian>(2).unwrap(); // Constant count
-        bytecode.write_i32::<LittleEndian>(3).unwrap(); // Instruction count
-        bytecode.write_i32::<LittleEndian>(1).unwrap(); // String-pointing constant count
-
-        // String-Pointing Constant Pool Indexes
-        bytecode.write_i32::<LittleEndian>(1).unwrap(); // Index of constant in constant pool
-        bytecode.write_u64::<LittleEndian>(3).unwrap(); // Length of the string in bytes
-
-        // Constant Pool
-        bytecode.write_u64::<LittleEndian>(42).unwrap(); // Non-string constant
-        bytecode.extend_from_slice(b"foo\0\0\0\0\0\0\0\0\0"); // String constant "foo"
-
-        // Instructions
-        bytecode.write_u32::<LittleEndian>(0).unwrap(); // OP_MOVE
-        bytecode.write_u32::<LittleEndian>(1).unwrap(); // OP_LOADCONST
-        bytecode.write_u32::<LittleEndian>(2).unwrap(); // OP_LOADBOOL
 
         bytecode
     }

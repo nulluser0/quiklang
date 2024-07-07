@@ -45,3 +45,11 @@ harness = false
 [[bench]]
 name = "interpret_factorial"
 harness = false
+
+[[bench]]
+name = "bytecode_decode"
+harness = false
+
+[[bench]]
+name = "bytecode_encode"
+harness = false
