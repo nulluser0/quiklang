@@ -1,5 +1,7 @@
 // VM (Register-based)
 
+use crate::errors::VMRuntimeError;
+
 use super::{
     bytecode::ByteCode,
     instructions::{
@@ -59,24 +61,53 @@ impl VM {
         )
     }
 
-    pub fn set_register(&mut self, index: usize, value: RegisterVal) {
+    pub fn set_register(&mut self, index: usize, value: RegisterVal) -> Result<(), VMRuntimeError> {
+        if index < self.registers.len() {
+            return Err(VMRuntimeError::AccessToNonExistentRegister(
+                index,
+                self.registers.len(),
+            ));
+        }
         self.registers[index] = value;
+        Ok(())
     }
 
-    pub fn get_register(&self, index: usize) -> &RegisterVal {
-        &self.registers[index]
+    pub fn get_register(&self, index: usize) -> Result<&RegisterVal, VMRuntimeError> {
+        self.registers
+            .get(index)
+            .ok_or(VMRuntimeError::AccessToNonExistentRegister(
+                index,
+                self.registers.len(),
+            ))
     }
 
-    pub fn set_constant(&mut self, index: usize, value: RegisterVal) {
+    pub fn set_constant(&mut self, index: usize, value: RegisterVal) -> Result<(), VMRuntimeError> {
+        if index < self.constant_pool.len() {
+            return Err(VMRuntimeError::AccessToNonExistentConstant(
+                index,
+                self.constant_pool.len(),
+            ));
+        }
         self.constant_pool[index] = value;
+        Ok(())
     }
 
-    pub fn get_constant(&self, index: usize) -> &RegisterVal {
-        &self.constant_pool[index]
+    pub fn get_constant(&self, index: usize) -> Result<&RegisterVal, VMRuntimeError> {
+        self.constant_pool
+            .get(index)
+            .ok_or(VMRuntimeError::AccessToNonExistentConstant(
+                index,
+                self.constant_pool.len(),
+            ))
     }
 
-    pub fn get_string(&self, index: RegisterVal) -> &String {
-        &self.string_pool[index as usize]
+    pub fn get_string(&self, index: RegisterVal) -> Result<&String, VMRuntimeError> {
+        self.string_pool
+            .get(index as usize)
+            .ok_or(VMRuntimeError::AccessToNonExistentString(
+                index as usize,
+                self.string_pool.len(),
+            ))
     }
 
     pub fn fetch_instruction(&self) -> Instruction {
