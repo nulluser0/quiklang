@@ -9,13 +9,13 @@ use super::{environment::Environment, values::Val};
 use crate::backend_interpreter::values::{IntegerVal, NullVal};
 
 pub fn native_println(
-    args: Vec<Expr>,
+    args: Vec<(Expr, bool)>,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
 ) -> Result<Val, InterpreterError> {
     let evaluated_args: Result<Vec<Val>, InterpreterError> = args
         .into_iter()
-        .map(|expr| evaluate_expr(expr, env, root_env))
+        .map(|expr| evaluate_expr(expr.0, env, root_env))
         .collect();
     let evaluated_args: Vec<Val> = evaluated_args?;
 
@@ -27,7 +27,7 @@ pub fn native_println(
 }
 
 pub fn native_time(
-    _args: Vec<Expr>,
+    _args: Vec<(Expr, bool)>,
     _env: &Rc<RefCell<Environment>>,
     _root_env: &Rc<RefCell<Environment>>,
 ) -> Result<Val, InterpreterError> {
@@ -39,7 +39,7 @@ pub fn native_time(
 }
 
 pub fn native_forget(
-    args: Vec<Expr>,
+    args: Vec<(Expr, bool)>,
     _env: &Rc<RefCell<Environment>>,
     _root_env: &Rc<RefCell<Environment>>,
 ) -> Result<Val, InterpreterError> {
@@ -50,12 +50,12 @@ pub fn native_forget(
 }
 
 pub fn native_drop(
-    args: Vec<Expr>,
+    args: Vec<(Expr, bool)>,
     env: &Rc<RefCell<Environment>>,
     _root_env: &Rc<RefCell<Environment>>,
 ) -> Result<Val, InterpreterError> {
     for raw_expr in args {
-        if let Expr::Identifier(ident) = raw_expr {
+        if let Expr::Identifier(ident) = raw_expr.0 {
             Environment::drop_var(env, &ident);
         }
     }

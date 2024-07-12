@@ -1,7 +1,8 @@
 use std::{cell::RefCell, fs::File, io::Read, process, rc::Rc};
 
 use quiklang::{
-    backend_interpreter::environment::Environment, frontend::type_environment::TypeEnvironment, utils::run::run,
+    backend_interpreter::environment::Environment, frontend::type_environment::TypeEnvironment,
+    utils::run::run,
 };
 use rustyline::{error::ReadlineError, Config, Editor};
 
@@ -62,8 +63,8 @@ fn repl() {
         RefCell::new(Environment::default()),
     ))));
 
-    let root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
-    let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+    let mut root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
+    let mut type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
         root_type_env.clone(),
     )));
 
@@ -86,6 +87,15 @@ fn repl() {
                 }
 
                 rl.add_history_entry(trimmed_line);
+
+                if trimmed_line == "drain" {
+                    println!("Draining variables and functions in both type_env and runtime_env.");
+                    root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
+                    type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+                        root_type_env.clone(),
+                    )));
+                    continue;
+                }
 
                 run(trimmed_line.to_string(), &env, &type_env, &root_type_env);
             }

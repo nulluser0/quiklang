@@ -35,7 +35,7 @@ pub enum Type {
     Object,
     Null,
     Bool,
-    Function(Vec<Type>, Box<Type>),
+    Function(Vec<(Type, bool)>, Box<Type>),
     Array(Box<Type>),
     Tuple(Vec<Type>),
     Mismatch,
@@ -87,8 +87,8 @@ pub enum Expr {
         right: Box<Expr>,
     },
     UnaryOp(UnaryOp, Box<Expr>),
-    FunctionCall(Vec<Expr>, Box<Expr>), // Args, Caller
-    Member(Box<Expr>, Box<Expr>),       // Object, Property
+    FunctionCall(Vec<(Expr, bool)>, Box<Expr>), // Args, Caller
+    Member(Box<Expr>, Box<Expr>),               // Object, Property
     IfExpr {
         condition: Box<Expr>,
         then: Vec<Stmt>,
@@ -302,7 +302,7 @@ pub enum Stmt {
     ReturnStmt(Option<Expr>),
     BreakStmt(Option<Expr>),
     FunctionDeclaration {
-        parameters: Vec<(String, Type)>,
+        parameters: Vec<(String, Type, bool)>,
         name: String,
         return_type: Type,
         body: Vec<Stmt>,

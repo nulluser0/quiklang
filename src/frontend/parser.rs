@@ -104,8 +104,8 @@ impl Parser {
 
     fn parse_struct_definition(
         &mut self,
-        type_env: &Rc<RefCell<TypeEnvironment>>,
-        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+        _type_env: &Rc<RefCell<TypeEnvironment>>,
+        _root_type_env: &Rc<RefCell<TypeEnvironment>>,
     ) -> Result<Stmt, ParserError> {
         self.eat();
         let ident = self.eat();
@@ -227,11 +227,13 @@ impl Parser {
                 ))
             }
         };
-        let args: Vec<(Expr, Type)> = self.parse_args_with_types(type_env, root_type_env)?;
-        let mut params: Vec<(String, Type)> = Vec::new();
+        let args: Vec<(Expr, Type, bool)> = self.parse_args_with_types(type_env, root_type_env)?;
+        let mut params: Vec<(String, Type, bool)> = Vec::new();
         for arg in args {
             match arg {
-                (Expr::Identifier(name), param_type) => params.push((name, param_type)),
+                (Expr::Identifier(name), param_type, is_mut) => {
+                    params.push((name, param_type, is_mut))
+                }
                 _ => return Err(ParserError::InvalidFunctionParameter(ident.line, ident.col)),
             }
         }
@@ -244,7 +246,10 @@ impl Parser {
 
         // Declare the function into the declared scope
         let fn_type = Type::Function(
-            params.iter().map(|(_, t)| t.clone()).collect(),
+            params
+                .iter()
+                .map(|(_, t, is_mut)| (t.clone(), *is_mut))
+                .collect(),
             Box::new(return_type.clone()),
         );
         type_env
@@ -264,10 +269,11 @@ impl Parser {
         fn_type_env
             .borrow_mut()
             .declare_fn(&name, fn_type.clone(), &declaration)?;
-        for (param_name, param_type) in params.iter() {
+        for (param_name, param_type, is_mut) in params.iter() {
             fn_type_env.borrow_mut().declare_var(
                 param_name.to_string(),
                 param_type.clone(),
+                *is_mut,
                 &declaration,
             )?;
         }
@@ -378,6 +384,7 @@ impl Parser {
             type_env.borrow_mut().declare_var(
                 identifier.to_string(),
                 expected_type.clone().unwrap(),
+                is_mutable,
                 &declaration,
             )?;
             return Ok(Stmt::DeclareStmt {
@@ -399,6 +406,7 @@ impl Parser {
             type_env.borrow_mut().declare_var(
                 identifier.to_string(),
                 expr_type.clone(),
+                is_mutable,
                 &declaration,
             )?;
             return Ok(Stmt::DeclareStmt {
@@ -423,6 +431,7 @@ impl Parser {
         type_env.borrow_mut().declare_var(
             identifier.to_string(),
             expected_type.clone().unwrap(),
+            is_mutable,
             &declaration,
         )?;
         let declaration = Stmt::DeclareStmt {
@@ -757,9 +766,12 @@ impl Parser {
                         expected: Type::Function(param_types.clone(), Box::new(Type::Null)),
                         found: Type::Function(
                             args.iter()
-                                .map(|arg| {
-                                    arg.get_type(type_env, self.at().line, self.at().col)
-                                        .unwrap()
+                                .map(|(arg, is_mut)| {
+                                    (
+                                        arg.get_type(type_env, self.at().line, self.at().col)
+                                            .unwrap(),
+                                        *is_mut,
+                                    )
                                 })
                                 .collect(),
                             Box::new(Type::Null),
@@ -770,14 +782,23 @@ impl Parser {
                     });
                 }
                 for (arg, expected_type) in args.iter().zip(param_types.iter()) {
-                    let arg_type = arg.get_type(type_env, self.at().line, self.at().col)?;
-                    if arg_type != *expected_type {
+                    let arg_type = arg.0.get_type(type_env, self.at().line, self.at().col)?;
+                    if arg_type != expected_type.0 {
                         return Err(ParserError::TypeError {
-                            expected: expected_type.clone(),
+                            expected: expected_type.0.clone(),
                             found: arg_type,
                             line: self.at().line,
                             col: self.at().col,
                             message: "Argument type mismatch.".to_string(),
+                        });
+                    }
+                    if arg.1 != expected_type.1 {
+                        return Err(ParserError::TypeError {
+                            expected: expected_type.0.clone(),
+                            found: arg_type,
+                            line: self.at().line,
+                            col: self.at().col,
+                            message: "Argument mutability mismatch.".to_string(),
                         });
                     }
                 }
@@ -791,7 +812,7 @@ impl Parser {
         &mut self,
         type_env: &Rc<RefCell<TypeEnvironment>>,
         root_type_env: &Rc<RefCell<TypeEnvironment>>,
-    ) -> Result<Vec<Expr>, ParserError> {
+    ) -> Result<Vec<(Expr, bool)>, ParserError> {
         self.expect(TokenType::Symbol(Symbol::LeftParen), "Expected left paren.")?;
         let args = match self.at().token == TokenType::Symbol(Symbol::RightParen) {
             true => vec![],
@@ -808,7 +829,7 @@ impl Parser {
         &mut self,
         type_env: &Rc<RefCell<TypeEnvironment>>,
         root_type_env: &Rc<RefCell<TypeEnvironment>>,
-    ) -> Result<Vec<(Expr, Type)>, ParserError> {
+    ) -> Result<Vec<(Expr, Type, bool)>, ParserError> {
         self.expect(TokenType::Symbol(Symbol::LeftParen), "Expected left paren.")?;
         let args = match self.at().token == TokenType::Symbol(Symbol::RightParen) {
             true => vec![],
@@ -825,11 +846,22 @@ impl Parser {
         &mut self,
         type_env: &Rc<RefCell<TypeEnvironment>>,
         root_type_env: &Rc<RefCell<TypeEnvironment>>,
-    ) -> Result<Vec<Expr>, ParserError> {
-        let mut args = vec![self.parse_expr(type_env, root_type_env)?];
+    ) -> Result<Vec<(Expr, bool)>, ParserError> {
+        let mut first_mut = false;
+        if self.at().token == TokenType::Keyword(Keyword::Mut) {
+            self.eat();
+            first_mut = true;
+        }
+        let mut args: Vec<(Expr, bool)> =
+            vec![(self.parse_expr(type_env, root_type_env)?, first_mut)];
         while self.at().token == TokenType::Symbol(Symbol::Comma) && self.not_eof() {
             self.eat();
-            args.push(self.parse_expr(type_env, root_type_env)?);
+            let mut is_mut = false;
+            if self.at().token == TokenType::Keyword(Keyword::Mut) {
+                self.eat();
+                is_mut = true;
+            }
+            args.push((self.parse_expr(type_env, root_type_env)?, is_mut));
         }
         Ok(args)
     }
@@ -838,7 +870,12 @@ impl Parser {
         &mut self,
         type_env: &Rc<RefCell<TypeEnvironment>>,
         root_type_env: &Rc<RefCell<TypeEnvironment>>,
-    ) -> Result<Vec<(Expr, Type)>, ParserError> {
+    ) -> Result<Vec<(Expr, Type, bool)>, ParserError> {
+        let mut first_mut = false;
+        if self.at().token == TokenType::Keyword(Keyword::Mut) {
+            self.eat();
+            first_mut = true;
+        }
         let first = match self.parse_expr(type_env, root_type_env) {
             Ok(result) => result,
             Err(e) => {
@@ -855,9 +892,14 @@ impl Parser {
             "Expected colon to define type for args",
         )?;
         let first_type = self.parse_type_declaration()?;
-        let mut args: Vec<(Expr, Type)> = vec![(first, first_type)];
+        let mut args: Vec<(Expr, Type, bool)> = vec![(first, first_type, first_mut)];
         while self.at().token == TokenType::Symbol(Symbol::Comma) && self.not_eof() {
             self.eat();
+            let mut ident_mut = false;
+            if self.at().token == TokenType::Keyword(Keyword::Mut) {
+                self.eat();
+                ident_mut = true;
+            }
             let ident = match self.parse_expr(type_env, root_type_env) {
                 Ok(result) => result,
                 Err(e) => {
@@ -874,7 +916,7 @@ impl Parser {
                 "Expected colon to define type for args",
             )?;
             let ident_type = self.parse_type_declaration()?;
-            args.push((ident, ident_type));
+            args.push((ident, ident_type, ident_mut));
         }
         Ok(args)
     }
@@ -1102,6 +1144,11 @@ impl Parser {
         type_env: &Rc<RefCell<TypeEnvironment>>,
         root_type_env: &Rc<RefCell<TypeEnvironment>>,
     ) -> Result<Expr, ParserError> {
+        let mut is_mut = false;
+        if self.at().token == TokenType::Keyword(Keyword::Mut) {
+            self.eat();
+            is_mut = true;
+        }
         let identifier_token = self.eat();
         let identifier = match identifier_token.token {
             TokenType::Identifier(ref ident) => ident,
@@ -1130,6 +1177,7 @@ impl Parser {
         for_type_env.borrow_mut().declare_var(
             identifier.to_string(),
             iterable.get_type(type_env, line, col)?,
+            is_mut,
             &identifier_token,
         )?;
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {

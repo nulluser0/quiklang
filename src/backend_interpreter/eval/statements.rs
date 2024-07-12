@@ -36,19 +36,20 @@ pub fn evaluate_declare_var(
 }
 
 pub fn evaluate_declare_fn(
-    parameters: Vec<(String, Type)>,
+    parameters: Vec<(String, Type, bool)>,
     name: String,
     body: Vec<Stmt>,
     is_async: bool,
     env: &Rc<RefCell<Environment>>,
 ) -> Result<Val, InterpreterError> {
-    let parameters_with_valuetype: Vec<(String, ValueType)> = parameters
+    let parameters_with_valuetype: Vec<(String, ValueType, bool)> = parameters
         .iter()
-        .map(|(ident, val_type)| {
+        .map(|(ident, val_type, is_mut)| {
             (
                 ident.to_owned(),
                 Val::from_type(val_type)
                     .expect("Type conversion to ValueType failed. This should not happen."),
+                *is_mut,
             )
         })
         .collect();

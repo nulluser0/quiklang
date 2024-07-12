@@ -333,7 +333,7 @@ pub fn evaluate_object_expr(
 }
 
 pub fn evaluate_call_expr(
-    args: Vec<Expr>,
+    args: Vec<(Expr, bool)>,
     caller: Expr,
     env: &Rc<RefCell<Environment>>,
     root_env: &Rc<RefCell<Environment>>,
@@ -342,9 +342,16 @@ pub fn evaluate_call_expr(
     match &function {
         Val::NativeFunction(callable) => (callable.call)(args, env, root_env),
         Val::Function(fn_value) => {
-            let evaluated_args: Result<Vec<Val>, InterpreterError> = args
+            let evaluated_args: Result<Vec<(Val, bool)>, InterpreterError> = args
                 .into_iter()
-                .map(|expr| evaluate_expr(expr, env, root_env))
+                .map(|(expr, is_mut)| {
+                    let eval_expr = match evaluate_expr(expr, env, root_env) {
+                        Ok(result) => result,
+                        Err(e) => return Err(e),
+                    };
+
+                    Ok((eval_expr, is_mut))
+                })
                 .collect();
             let evaluated_args = evaluated_args?;
             let scope = Rc::new(RefCell::new(Environment::new_with_parent(root_env.clone())));
@@ -356,7 +363,7 @@ pub fn evaluate_call_expr(
             for (varname, arg) in fn_value.parameters.iter().zip(evaluated_args.iter()) {
                 scope
                     .borrow_mut()
-                    .declare_var(&varname.0, arg.clone(), false)?;
+                    .declare_var(&varname.0, arg.0.clone(), arg.1)?;
             }
             let mut result: Val = mk_null!();
             for stmt in &fn_value.body {

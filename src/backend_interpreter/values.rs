@@ -128,7 +128,7 @@ impl RuntimeVal for ObjectVal {
 }
 
 type NativeFunctionCallback = fn(
-    Vec<Expr>,
+    Vec<(Expr, bool)>,
     &Rc<RefCell<Environment>>,
     &Rc<RefCell<Environment>>,
 ) -> Result<Val, InterpreterError>;
@@ -147,7 +147,7 @@ impl RuntimeVal for NativeFunctionVal {
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionVal {
     pub name: String,
-    pub parameters: Vec<(String, ValueType)>,
+    pub parameters: Vec<(String, ValueType, bool)>,
     pub body: Vec<Stmt>,
     pub is_async: bool,
 }

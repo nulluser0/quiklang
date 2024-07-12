@@ -12,7 +12,7 @@ use super::{
 
 #[derive(Debug, Clone)]
 pub struct TypeEnvironment {
-    vars: HashMap<String, Type>,
+    vars: HashMap<String, (Type, bool)>, // Type, is mutable?
     parent: Option<Rc<RefCell<TypeEnvironment>>>,
 }
 
@@ -27,6 +27,7 @@ fn setup_type_env(type_env: &mut TypeEnvironment) -> Result<(), ParserError> {
     type_env.declare_var(
         "null".to_string(),
         Type::Null,
+        false,
         &Token {
             token: TokenType::EOF,
             line: 0,
@@ -36,6 +37,7 @@ fn setup_type_env(type_env: &mut TypeEnvironment) -> Result<(), ParserError> {
     type_env.declare_var(
         "true".to_string(),
         Type::Bool,
+        false,
         &Token {
             token: TokenType::EOF,
             line: 0,
@@ -45,6 +47,7 @@ fn setup_type_env(type_env: &mut TypeEnvironment) -> Result<(), ParserError> {
     type_env.declare_var(
         "false".to_string(),
         Type::Bool,
+        false,
         &Token {
             token: TokenType::EOF,
             line: 0,
@@ -116,6 +119,7 @@ impl TypeEnvironment {
         &mut self,
         name: String,
         var_type: Type,
+        is_mutable: bool,
         token: &Token,
     ) -> Result<(), ParserError> {
         if let "_" = name.as_str() {
@@ -129,13 +133,13 @@ impl TypeEnvironment {
                 name.to_string(),
             ));
         }
-        self.vars.insert(name.to_string(), var_type);
+        self.vars.insert(name.to_string(), (var_type, is_mutable));
         Ok(())
     }
 
     pub fn lookup_var(&self, name: &str) -> Option<Type> {
         if let Some(var_type) = self.vars.get(name) {
-            return Some(var_type.clone());
+            return Some(var_type.0.clone());
         }
         if let Some(ref parent) = self.parent {
             return parent.borrow().lookup_var(name);
@@ -156,7 +160,7 @@ impl TypeEnvironment {
                 name.to_string(),
             ));
         }
-        self.vars.insert(name.to_string(), fn_type);
+        self.vars.insert(name.to_string(), (fn_type, false));
         Ok(())
     }
 
