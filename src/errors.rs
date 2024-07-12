@@ -124,6 +124,16 @@ pub enum ParserError {
         message: String,
     },
 
+    #[error(
+        "at position {line}:{col}: Mutability mismatch. Expected is_mutable = {expected}, but found is_mutable = {found}"
+    )]
+    MutabilityMismatch {
+        expected: bool,
+        found: bool,
+        line: usize,
+        col: usize,
+    },
+
     #[error("at position {0}:{1}: Cannot declare already existing variable '{2}'")]
     DeclaredExistingVariable(usize, usize, String),
 

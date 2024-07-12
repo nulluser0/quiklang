@@ -793,12 +793,11 @@ impl Parser {
                         });
                     }
                     if arg.1 != expected_type.1 {
-                        return Err(ParserError::TypeError {
-                            expected: expected_type.0.clone(),
-                            found: arg_type,
+                        return Err(ParserError::MutabilityMismatch {
+                            expected: expected_type.1,
+                            found: arg.1,
                             line: self.at().line,
                             col: self.at().col,
-                            message: "Argument mutability mismatch.".to_string(),
                         });
                     }
                 }
