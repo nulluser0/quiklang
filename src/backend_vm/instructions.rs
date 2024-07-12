@@ -72,8 +72,9 @@ pub const OP_BITOR: OpCode = 27; // A B C  R(A) := R(B) | R(C)
 pub const OP_BITXOR: OpCode = 28; // A B C  R(A) := R(B) ^ R(C)
 pub const OP_SHL: OpCode = 29; // A B C  R(A) := R(B) << R(C)
 pub const OP_SHR: OpCode = 30; // A B C  R(A) := R(B) >> R(C)
-                               // NOP
-pub const OP_NOP: OpCode = 31;
+pub const OP_CONCAT: OpCode = 31;
+// NOP
+pub const OP_NOP: OpCode = 32;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum OpArgMode {
@@ -360,6 +361,14 @@ pub static OP_NAMES: &[OpProp; OP_NOP as usize + 1] = &[
         typ: OpType::Abc,
     },
     OpProp {
+        name: "CONCAT",
+        is_test: false,
+        set_reg_a: true,
+        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+        typ: OpType::Abc,
+    },
+    OpProp {
         name: "NOP",
         is_test: false,
         set_reg_a: true,
@@ -432,7 +441,7 @@ pub fn get_argsbx(inst: Instruction) -> i32 {
 
 #[inline]
 pub fn set_argsbx(inst: &mut Instruction, sbx: i32) {
-    set_argbx(inst, sbx + OPCODE_SIZE_SBX);
+    set_argbx(inst, sbx + OPCODE_MAX_SBX);
 }
 
 #[allow(non_snake_case)]
@@ -563,6 +572,7 @@ pub fn to_string(inst: Instruction) -> String {
         ),
         OP_SHL => format!("{} | R({}) := R({}) << R({})", op, arga, argb, argc),
         OP_SHR => format!("{} | R({}) := R({}) >> R({})", op, arga, argb, argc),
+        OP_CONCAT => format!("{} | R({}) := R({}) & R({})", op, arga, argb, argc),
         OP_NOP => ops.to_string(),
         _ => unreachable!(),
     }
