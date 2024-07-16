@@ -21,7 +21,14 @@ use super::{
 //     base: usize,
 // }
 
-pub type RegisterVal = u64;
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub enum RegisterVal {
+    Int(i64),
+    Float(f64),
+    Bool(bool),
+    Str(Rc<String>),
+    Null,
+}
 
 // A note about converting from bytecode to vm for strings specifically:
 // A constant entry with a string has information we know: its lens and string content.
@@ -31,8 +38,8 @@ pub type RegisterVal = u64;
 
 #[derive(Debug)]
 pub struct VM {
-    registers: Vec<Rc<RegisterVal>>,
-    constant_pool: Vec<Rc<RegisterVal>>,
+    registers: Vec<RegisterVal>,
+    constant_pool: Vec<RegisterVal>,
     string_pool: Vec<String>,
     program_counter: usize,
     instructions: Vec<Instruction>,
@@ -46,14 +53,12 @@ impl VM {
         constant_pool: Vec<RegisterVal>,
         num_registers: usize,
     ) -> Self {
-        let empty: Rc<RegisterVal> = Rc::new(0);
         VM {
-            registers: vec![empty; num_registers],
-            constant_pool: constant_pool.into_iter().map(Rc::new).collect(),
+            registers: vec![RegisterVal::Null; num_registers],
+            constant_pool,
             string_pool,
             program_counter: 0,
             instructions,
-            // call_stack: Vec::new(),
         }
     }
 
@@ -67,22 +72,20 @@ impl VM {
     }
 
     pub fn set_register(&mut self, index: usize, value: RegisterVal) -> Result<(), VMRuntimeError> {
-        match self.registers.get_mut(index) {
-            Some(elem) => {
-                *elem = Rc::new(value);
-                Ok(())
-            }
-            None => Err(VMRuntimeError::AccessToNonExistentRegister(
+        if index < self.registers.len() {
+            self.registers[index] = value;
+            Ok(())
+        } else {
+            Err(VMRuntimeError::AccessToNonExistentRegister(
                 index,
                 self.registers.len(),
-            )),
+            ))
         }
     }
 
-    pub fn get_register(&self, index: usize) -> Result<Rc<RegisterVal>, VMRuntimeError> {
+    pub fn get_register(&self, index: usize) -> Result<&RegisterVal, VMRuntimeError> {
         self.registers
             .get(index)
-            .cloned()
             .ok_or(VMRuntimeError::AccessToNonExistentRegister(
                 index,
                 self.registers.len(),
@@ -90,33 +93,31 @@ impl VM {
     }
 
     pub fn set_constant(&mut self, index: usize, value: RegisterVal) -> Result<(), VMRuntimeError> {
-        match self.constant_pool.get_mut(index) {
-            Some(elem) => {
-                *elem = Rc::new(value);
-                Ok(())
-            }
-            None => Err(VMRuntimeError::AccessToNonExistentConstant(
+        if index < self.constant_pool.len() {
+            self.constant_pool[index] = value;
+            Ok(())
+        } else {
+            Err(VMRuntimeError::AccessToNonExistentConstant(
                 index,
                 self.constant_pool.len(),
-            )),
+            ))
         }
     }
 
-    pub fn get_constant(&self, index: usize) -> Result<Rc<RegisterVal>, VMRuntimeError> {
+    pub fn get_constant(&self, index: usize) -> Result<&RegisterVal, VMRuntimeError> {
         self.constant_pool
             .get(index)
-            .cloned()
             .ok_or(VMRuntimeError::AccessToNonExistentConstant(
                 index,
                 self.constant_pool.len(),
             ))
     }
 
-    pub fn get_string(&self, index: RegisterVal) -> Result<&String, VMRuntimeError> {
+    pub fn get_string(&self, index: usize) -> Result<&String, VMRuntimeError> {
         self.string_pool
-            .get(index as usize)
+            .get(index)
             .ok_or(VMRuntimeError::AccessToNonExistentString(
-                index as usize,
+                index,
                 self.string_pool.len(),
             ))
     }
@@ -127,16 +128,12 @@ impl VM {
 
     pub fn execute(&mut self) {
         while self.program_counter < self.instructions.len() {
-            self.execute_instruction(self.fetch_instruction())
+            self.execute_instruction(self.fetch_instruction());
         }
     }
 
     pub fn execute_instruction(&mut self, inst: Instruction) {
         let op = get_opcode(inst);
-        if op > OP_NOP {
-            panic!("Invalid OpCode.");
-        }
-        // let prop = OP_NAMES[op as usize];
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -144,106 +141,151 @@ impl VM {
         let argsbx = get_argsbx(inst);
         match op {
             OP_MOVE => {
-                let value = Rc::clone(&self.registers[argb as usize]);
+                let value = self.registers[argb as usize].clone();
                 self.registers[arga as usize] = value;
             }
             OP_LOADCONST => {
-                let value = Rc::clone(&self.constant_pool[argbx as usize]);
+                let value = self.constant_pool[argbx as usize].clone();
                 self.registers[arga as usize] = value;
             }
             OP_LOADBOOL => {
-                let value = if argb != 0 { 1 } else { 0 };
-                self.registers[arga as usize] = Rc::new(value);
+                let value = if argb != 0 {
+                    RegisterVal::Bool(true)
+                } else {
+                    RegisterVal::Bool(false)
+                };
+                self.registers[arga as usize] = value;
                 if argc != 0 {
                     self.program_counter += 1;
                 }
             }
             OP_LOADNULL => {
                 for i in arga as usize..=argb as usize {
-                    self.registers[i] = Rc::new(0);
+                    self.registers[i] = RegisterVal::Null;
                 }
             }
             OP_ADD => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(left.wrapping_add(*right));
+                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                    &self.registers[argb as usize],
+                    &self.registers[argc as usize],
+                ) {
+                    self.registers[arga as usize] = RegisterVal::Int(left.wrapping_add(*right));
+                }
             }
             OP_SUB => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(left.wrapping_sub(*right));
+                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                    &self.registers[argb as usize],
+                    &self.registers[argc as usize],
+                ) {
+                    self.registers[arga as usize] = RegisterVal::Int(left.wrapping_sub(*right));
+                }
             }
             OP_MUL => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(left.wrapping_mul(*right));
+                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                    &self.registers[argb as usize],
+                    &self.registers[argc as usize],
+                ) {
+                    self.registers[arga as usize] = RegisterVal::Int(left.wrapping_mul(*right));
+                }
             }
             OP_DIV => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(left.wrapping_div(*right));
+                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                    &self.registers[argb as usize],
+                    &self.registers[argc as usize],
+                ) {
+                    self.registers[arga as usize] = RegisterVal::Int(left.wrapping_div(*right));
+                }
             }
             OP_MOD => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(left.wrapping_rem(*right));
+                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                    &self.registers[argb as usize],
+                    &self.registers[argc as usize],
+                ) {
+                    self.registers[arga as usize] = RegisterVal::Int(left.wrapping_rem(*right));
+                }
             }
             OP_POW => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(left.wrapping_pow(*right as u32));
+                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                    &self.registers[argb as usize],
+                    &self.registers[argc as usize],
+                ) {
+                    self.registers[arga as usize] =
+                        RegisterVal::Int(left.wrapping_pow(*right as u32));
+                }
             }
             OP_NOT => {
-                let value = self.registers[argb as usize].clone();
-                self.registers[arga as usize] = Rc::new(!(*value));
+                if let RegisterVal::Int(value) = self.registers[argb as usize] {
+                    self.registers[arga as usize] = RegisterVal::Int(!value);
+                }
             }
             OP_AND => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(*left & *right);
+                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                    &self.registers[argb as usize],
+                    &self.registers[argc as usize],
+                ) {
+                    self.registers[arga as usize] = RegisterVal::Int(left & right);
+                }
             }
             OP_OR => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(*left | *right);
+                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                    &self.registers[argb as usize],
+                    &self.registers[argc as usize],
+                ) {
+                    self.registers[arga as usize] = RegisterVal::Int(left | right);
+                }
             }
             OP_EQ => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(if left == right { 1 } else { 0 });
+                let value = if self.registers[argb as usize] == self.registers[argc as usize] {
+                    RegisterVal::Bool(true)
+                } else {
+                    RegisterVal::Bool(false)
+                };
+                self.registers[arga as usize] = value;
             }
             OP_LT => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(if left < right { 1 } else { 0 });
+                let value = if self.registers[argb as usize] < self.registers[argc as usize] {
+                    RegisterVal::Bool(true)
+                } else {
+                    RegisterVal::Bool(false)
+                };
+                self.registers[arga as usize] = value;
             }
             OP_LE => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(if left <= right { 1 } else { 0 });
+                let value = if self.registers[argb as usize] <= self.registers[argc as usize] {
+                    RegisterVal::Bool(true)
+                } else {
+                    RegisterVal::Bool(false)
+                };
+                self.registers[arga as usize] = value;
             }
             OP_GT => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(if left > right { 1 } else { 0 });
+                let value = if self.registers[argb as usize] > self.registers[argc as usize] {
+                    RegisterVal::Bool(true)
+                } else {
+                    RegisterVal::Bool(false)
+                };
+                self.registers[arga as usize] = value;
             }
             OP_GE => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(if left >= right { 1 } else { 0 });
+                let value = if self.registers[argb as usize] >= self.registers[argc as usize] {
+                    RegisterVal::Bool(true)
+                } else {
+                    RegisterVal::Bool(false)
+                };
+                self.registers[arga as usize] = value;
             }
             OP_JUMP => {
                 self.program_counter = (self.program_counter as i32 + argsbx) as usize;
                 return;
             }
             OP_JUMP_IF_TRUE => {
-                if *self.registers[arga as usize] > 0 {
+                if let RegisterVal::Bool(true) = self.registers[arga as usize] {
                     self.program_counter = (self.program_counter as i32 + argsbx) as usize;
                     return;
                 }
             }
             OP_JUMP_IF_FALSE => {
-                if *self.registers[arga as usize] == 0 {
+                if let RegisterVal::Bool(false) = self.registers[arga as usize] {
                     self.program_counter = (self.program_counter as i32 + argsbx) as usize;
                     return;
                 }
@@ -258,48 +300,65 @@ impl VM {
                 // Implement return from function
             }
             OP_INC => {
-                self.registers[arga as usize] =
-                    Rc::new(self.registers[arga as usize].wrapping_add(1));
+                if let RegisterVal::Int(value) = self.registers[arga as usize] {
+                    self.registers[arga as usize] = RegisterVal::Int(value.wrapping_add(1));
+                }
             }
             OP_DEC => {
-                self.registers[arga as usize] =
-                    Rc::new(self.registers[arga as usize].wrapping_sub(1));
+                if let RegisterVal::Int(value) = self.registers[arga as usize] {
+                    self.registers[arga as usize] = RegisterVal::Int(value.wrapping_sub(1));
+                }
             }
             OP_BITAND => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(*left & *right);
+                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                    &self.registers[argb as usize],
+                    &self.registers[argc as usize],
+                ) {
+                    self.registers[arga as usize] = RegisterVal::Int(left & right);
+                }
             }
             OP_BITOR => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(*left | *right);
+                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                    &self.registers[argb as usize],
+                    &self.registers[argc as usize],
+                ) {
+                    self.registers[arga as usize] = RegisterVal::Int(left | right);
+                }
             }
             OP_BITXOR => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(*left ^ *right);
+                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                    &self.registers[argb as usize],
+                    &self.registers[argc as usize],
+                ) {
+                    self.registers[arga as usize] = RegisterVal::Int(left ^ right);
+                }
             }
             OP_SHL => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(*left << *right);
+                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                    &self.registers[argb as usize],
+                    &self.registers[argc as usize],
+                ) {
+                    self.registers[arga as usize] = RegisterVal::Int(left << right);
+                }
             }
             OP_SHR => {
-                let left = self.registers[argb as usize].clone();
-                let right = self.registers[argc as usize].clone();
-                self.registers[arga as usize] = Rc::new(*left >> *right);
+                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                    &self.registers[argb as usize],
+                    &self.registers[argc as usize],
+                ) {
+                    self.registers[arga as usize] = RegisterVal::Int(left >> right);
+                }
             }
             OP_CONCAT => {
-                let left = &self.string_pool[*self.registers[argb as usize] as usize];
-                let right = &self.string_pool[*self.registers[argc as usize] as usize];
-                self.registers[arga as usize] =
-                    Rc::new(left.len() as RegisterVal + right.len() as RegisterVal);
-                // Example placeholder
+                if let (RegisterVal::Str(left), RegisterVal::Str(right)) = (
+                    &self.registers[argb as usize],
+                    &self.registers[argc as usize],
+                ) {
+                    let concatenated = format!("{}{}", left, right);
+                    self.registers[arga as usize] = RegisterVal::Str(Rc::new(concatenated));
+                }
             }
-            OP_NOP => {
-                // Here for moral support B)))
-            }
+            OP_NOP => {}
             _ => unreachable!(),
         }
         self.program_counter += 1;
@@ -321,8 +380,8 @@ mod tests {
                 ASBx(OP_JUMP, 0, -2),    // Jump back to the first instruction
             ],
             vec![],
-            vec![10], // Constant pool
-            2,        // Number of registers
+            vec![RegisterVal::Int(10)], // Constant pool
+            2,                          // Number of registers
         )
     }
 
