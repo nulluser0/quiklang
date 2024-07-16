@@ -66,12 +66,14 @@ impl std::fmt::Display for Type {
             Type::Mismatch => write!(f, "(Multiple, Mismatched Return Types)"),
             Type::Function(params, return_type) => {
                 let mut params_string: String = String::new();
-                for param in params {
+                for (i, param) in params.iter().enumerate() {
+                    if i != 0 || i != params.len() - 1 {
+                        params_string.push_str(", ");
+                    }
                     if param.1 {
                         params_string.push_str("mut ")
                     }
                     params_string.push_str(&param.0.to_string());
-                    params_string.push_str(", ");
                 }
 
                 write!(f, "Function ({}) -> {}", params_string, return_type)
