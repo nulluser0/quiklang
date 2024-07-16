@@ -199,6 +199,9 @@ pub enum VMBytecodeError {
     #[error("String parse error: {0}")]
     StringParseError(#[from] std::string::FromUtf8Error),
 
+    #[error("Invalid constant type: {0}")]
+    InvalidConstantType(u8),
+
     #[error("Bytecode being read contains invalid Magic Number.")]
     InvalidOrNoMagicNumber,
 }

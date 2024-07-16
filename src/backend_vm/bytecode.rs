@@ -11,9 +11,8 @@
 //      - Register count
 //      - Const count
 //      - Instruction count
-// 4. Constant indexes which are strings, and their information -- Read only
-// 5. Constant pool/list                -- Read only
-// 6. Instructions (List of OpCodes, 32-bit/OpCode in size)    -- Read only
+// 4. Constant pool/list                -- Read only
+// 5. Instructions (List of OpCodes, 32-bit/OpCode in size)    -- Read only
 
 // Low-level overview:
 // 1. Magic Number
@@ -33,26 +32,27 @@
 //          32          4                   Instruction count - i32 number
 //          36          4                   String indication pool - i32 number
 //
-// 4. String-pointing constant pool indexes:
+// 4. Constant pool:
 //      Offset      Size (bytes)        Description
-//          40          12 (4+8)          An entry which points to a const entry in the pool, providing information of the UTF-8 string.
-//      1.                  4                   Index of constant in constant pool, i32.
-//      2.                  8                   Lens (size) of string in const pool, which is 64-bits (u64).
-//                                              Note that lens would be in bytes.
-//
-// 5. Constant pool:
-//      Offset      Size (bytes)        Description
-//          36          8 each              64-bits (u64) representing a constant. Note, alignment is very important here.
-//          -           len * 8             For strings specifically: If identified as a string from (4), it will be treated as a string.
+//          -           9 each              64-bits (u64, 8-bytes) representing a constant, after a 1-byte discriminant. Note, alignment is very important here.
+//                                              Discriminant:
+//                                                  0 - Integer
+//                                                  1 - Float
+//                                                  2 - Bool
+//                                                  3 - Null
+//                                                  4 - String
+//          -          1 + len * 8          For strings specifically: If identified as a string from (4), it will be treated as a string.
 //                                              String would be from: `(current offset) -> (current offset + len * 8).
-//                                              String would be padded with null (0) to the right until aligned with 8 bytes to next one.
 //
-// 6. Instructions:
+// 5. Instructions:
 //      Offset      Size (bytes)        Description
-// After 5. offset      4 each              32-bit (u32) representing an instruction, with each segments of the u32 representing opcodes and args.
+// After 4. offset      4 each              32-bit (u32) representing an instruction, with each segments of the u32 representing opcodes and args.
 //                                          Check instructions.rs for more info.
 
-use std::io::{Cursor, Read, Write};
+use std::{
+    io::{Cursor, Read, Write},
+    rc::Rc,
+};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
@@ -65,8 +65,7 @@ pub struct ByteCode {
     metadata: BCMetadata,
     integrity_info: BCIntegrityInfo,
     constants: Vec<RegisterVal>,
-    string_pool: Vec<String>,
-    string_indexes: Vec<Option<usize>>,
+    string_pool: Vec<Rc<String>>,
     instructions: Vec<Instruction>,
 }
 
@@ -122,30 +121,26 @@ impl ByteCode {
             num_string_points,
         };
 
-        // Read String-Pointing Constant Pool Indexes
-        let mut string_indexes: Vec<Option<usize>> = vec![None; num_constants as usize];
-        for _ in 0..num_string_points {
-            let index = cursor.read_i32::<LittleEndian>()? as usize;
-            let length = cursor.read_u64::<LittleEndian>()? as usize;
-            string_indexes[index] = Some(length)
-        }
-
         // Read Constant Pool and add to String Pool
-        let mut constants: Vec<u64> = Vec::with_capacity(num_constants as usize);
-        let mut string_pool: Vec<String> = Vec::with_capacity(num_string_points as usize);
-        for i in 0..num_constants {
-            if let Some(lens) = string_indexes[i as usize] {
-                // It is a string.
-                let mut string: Vec<u8> = vec![0; lens];
-                cursor.read_exact(&mut string)?;
-                let index = string_pool.len();
-                string_pool.push(String::from_utf8(string)?);
-                constants.push(index as u64);
-                // Calculate padding to align to the next 8-byte boundary
-                cursor.set_position(cursor.position() + ((8 - (lens % 8)) % 8) as u64);
-            } else {
-                // Not a string.
-                constants.push(cursor.read_u64::<LittleEndian>()?);
+        let mut constants: Vec<RegisterVal> = Vec::with_capacity(num_constants as usize);
+        let mut string_pool: Vec<Rc<String>> = Vec::with_capacity(num_string_points as usize);
+        for _ in 0..num_constants {
+            let discriminant = cursor.read_u8()?;
+            match discriminant {
+                0 => constants.push(RegisterVal::Int(cursor.read_i64::<LittleEndian>()?)),
+                1 => constants.push(RegisterVal::Float(cursor.read_f64::<LittleEndian>()?)),
+                2 => constants.push(RegisterVal::Bool(cursor.read_u64::<LittleEndian>()? != 0)),
+                3 => constants.push(RegisterVal::Null),
+                4 => {
+                    // It is a string.
+                    let lens = cursor.read_u64::<LittleEndian>()? as usize;
+                    let mut string: Vec<u8> = vec![0; lens];
+                    cursor.read_exact(&mut string)?;
+                    let index = string_pool.len();
+                    string_pool.push(String::from_utf8(string)?.into());
+                    constants.push(RegisterVal::Str(string_pool[index].clone()));
+                }
+                _ => return Err(VMBytecodeError::InvalidConstantType(discriminant)),
             }
         }
 
@@ -160,7 +155,6 @@ impl ByteCode {
             integrity_info,
             constants,
             string_pool,
-            string_indexes,
             instructions,
         })
     }
@@ -207,24 +201,30 @@ impl ByteCode {
         encoded_bytecode.write_i32::<LittleEndian>(bytecode.integrity_info.num_inst)?;
         encoded_bytecode.write_i32::<LittleEndian>(bytecode.integrity_info.num_string_points)?;
 
-        // Write String Info
-        for (index, length) in bytecode.string_indexes.iter().enumerate() {
-            if let Some(len) = length {
-                encoded_bytecode.write_i32::<LittleEndian>(index as i32)?;
-                encoded_bytecode.write_u64::<LittleEndian>(*len as u64)?;
-            }
-        }
-
         // Write Constant Pool
-        for (index, constant) in bytecode.constants.iter().enumerate() {
-            if let Some(len) = bytecode.string_indexes[index] {
-                let string = &bytecode.string_pool[*constant as usize];
-                encoded_bytecode.write_all(string.as_bytes())?;
-                let padding_size: usize = (8 - (len % 8)) % 8;
-                let padding: Vec<u8> = vec![0; padding_size];
-                encoded_bytecode.write_all(&padding)?;
-            } else {
-                encoded_bytecode.write_u64::<LittleEndian>(*constant)?;
+        for constant in bytecode.constants.iter() {
+            match constant {
+                RegisterVal::Int(int) => {
+                    encoded_bytecode.write_u8(0)?;
+                    encoded_bytecode.write_i64::<LittleEndian>(*int)?;
+                }
+                RegisterVal::Float(float) => {
+                    encoded_bytecode.write_u8(1)?;
+                    encoded_bytecode.write_f64::<LittleEndian>(*float)?;
+                }
+                RegisterVal::Bool(boolean) => {
+                    encoded_bytecode.write_u8(2)?;
+                    encoded_bytecode.write_u8(if *boolean { 1 } else { 0 })?;
+                    let padding_size: usize = 7; // Align to 8 bytes
+                    let padding: Vec<u8> = vec![0; padding_size];
+                    encoded_bytecode.write_all(&padding)?;
+                }
+                RegisterVal::Str(string) => {
+                    encoded_bytecode.write_u8(4)?;
+                    encoded_bytecode.write_u64::<LittleEndian>(string.len() as u64)?;
+                    encoded_bytecode.write_all(string.as_bytes())?;
+                }
+                RegisterVal::Null => encoded_bytecode.write_u8(3)?,
             }
         }
 
@@ -248,7 +248,7 @@ impl ByteCode {
         &self.constants
     }
 
-    pub fn string_pool(&self) -> &Vec<String> {
+    pub fn string_pool(&self) -> &Vec<Rc<String>> {
         &self.string_pool
     }
 }
@@ -271,17 +271,20 @@ mod tests {
 
         // Setup and Integrity Information
         bytecode.write_i32::<LittleEndian>(4).unwrap(); // Register count
-        bytecode.write_i32::<LittleEndian>(2).unwrap(); // Constant count
+        bytecode.write_i32::<LittleEndian>(3).unwrap(); // Constant count
         bytecode.write_i32::<LittleEndian>(3).unwrap(); // Instruction count
         bytecode.write_i32::<LittleEndian>(1).unwrap(); // String-pointing constant count
 
-        // String-Pointing Constant Pool Indexes
-        bytecode.write_i32::<LittleEndian>(1).unwrap(); // Index of constant in constant pool
-        bytecode.write_u64::<LittleEndian>(3).unwrap(); // Length of the string in bytes
-
         // Constant Pool
-        bytecode.write_u64::<LittleEndian>(42).unwrap(); // Non-string constant
-        bytecode.extend_from_slice(b"foo\0\0\0\0\0"); // String constant "foo"
+        bytecode.write_u8(0).unwrap(); // Discriminant for Int
+        bytecode.write_i64::<LittleEndian>(42).unwrap(); // Int constant
+        bytecode.write_u8(4).unwrap(); // Discriminant for String
+        bytecode.write_u64::<LittleEndian>(3).unwrap(); // Length of the string in bytes
+        bytecode.extend_from_slice(b"foo"); // String constant "foo"
+        bytecode.write_u8(2).unwrap(); // Discriminant for Bool
+        bytecode.write_u8(1).unwrap(); // Bool constant true
+        let padding: Vec<u8> = vec![0; 7];
+        bytecode.write_all(&padding).unwrap();
 
         // Instructions
         bytecode
@@ -308,7 +311,7 @@ mod tests {
 
         // Setup and Integrity Information
         bytecode.write_i32::<LittleEndian>(4).unwrap(); // Register count
-        bytecode.write_i32::<LittleEndian>(2).unwrap(); // Constant count
+        bytecode.write_i32::<LittleEndian>(3).unwrap(); // Constant count
         bytecode.write_i32::<LittleEndian>(3).unwrap(); // Instruction count
         bytecode.write_i32::<LittleEndian>(1).unwrap(); // String-pointing constant count
 
@@ -317,8 +320,15 @@ mod tests {
         bytecode.write_u64::<LittleEndian>(3).unwrap(); // Length of the string in bytes
 
         // Constant Pool
-        bytecode.write_u64::<LittleEndian>(42).unwrap(); // Non-string constant
-        bytecode.extend_from_slice(b"foo\0\0\0\0\0\0\0\0\0"); // String constant "foo"
+        bytecode.write_u8(0).unwrap(); // Discriminant for Int
+        bytecode.write_i64::<LittleEndian>(42).unwrap(); // Int constant
+        bytecode.write_u8(4).unwrap(); // Discriminant for String
+        bytecode.write_u64::<LittleEndian>(3).unwrap(); // Length of the string in bytes
+        bytecode.extend_from_slice(b"foo"); // String constant "foo"
+        bytecode.write_u8(2).unwrap(); // Discriminant for Bool
+        bytecode.write_u8(1).unwrap(); // Bool constant true
+        let padding: Vec<u8> = vec![0; 7];
+        bytecode.write_all(&padding).unwrap();
 
         // Instructions
         bytecode
@@ -344,10 +354,10 @@ mod tests {
             "Valid bytecode should be decoded successfully"
         );
         let bytecode = result.unwrap();
-        assert_eq!(bytecode.constants.len(), 2);
-        assert_eq!(bytecode.constants[0], 42);
+        assert_eq!(bytecode.constants.len(), 3);
+        assert_eq!(bytecode.constants[0], RegisterVal::Int(42));
         assert_eq!(bytecode.string_pool.len(), 1);
-        assert_eq!(bytecode.string_pool[0], "foo");
+        assert_eq!(bytecode.string_pool[0], Rc::new("foo".to_string()));
         assert_eq!(bytecode.instructions.len(), 3);
 
         // Check instructions

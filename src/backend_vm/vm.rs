@@ -40,7 +40,7 @@ pub enum RegisterVal {
 pub struct VM {
     registers: Vec<RegisterVal>,
     constant_pool: Vec<RegisterVal>,
-    string_pool: Vec<String>,
+    string_pool: Vec<Rc<String>>,
     program_counter: usize,
     instructions: Vec<Instruction>,
     // call_stack: Vec<CallFrame>,
@@ -49,7 +49,7 @@ pub struct VM {
 impl VM {
     pub fn new(
         instructions: Vec<Instruction>,
-        string_pool: Vec<String>,
+        string_pool: Vec<Rc<String>>,
         constant_pool: Vec<RegisterVal>,
         num_registers: usize,
     ) -> Self {
@@ -113,7 +113,7 @@ impl VM {
             ))
     }
 
-    pub fn get_string(&self, index: usize) -> Result<&String, VMRuntimeError> {
+    pub fn get_string(&self, index: usize) -> Result<&Rc<String>, VMRuntimeError> {
         self.string_pool
             .get(index)
             .ok_or(VMRuntimeError::AccessToNonExistentString(
