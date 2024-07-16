@@ -29,6 +29,7 @@ pub trait ParsetimeType: std::fmt::Debug {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
+    Any,
     String,
     Integer,
     Float,
@@ -50,6 +51,7 @@ pub trait FromType: std::fmt::Debug {
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Type::Any => write!(f, "Any"),
             Type::String => write!(f, "String"),
             Type::Integer => write!(f, "Integer"),
             Type::Float => write!(f, "Float"),
@@ -224,7 +226,7 @@ impl ParsetimeType for Expr {
             },
             Expr::FunctionCall(_, caller) => {
                 if let Expr::Identifier(fn_name) = &**caller {
-                    println!("{type_env:#?}");
+                    println!("{}", fn_name);
                     if let Some(Type::Function(_, return_type)) =
                         type_env.borrow().lookup_fn(fn_name)
                     {

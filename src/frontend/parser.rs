@@ -782,6 +782,9 @@ impl Parser {
                     });
                 }
                 for (arg, expected_type) in args.iter().zip(param_types.iter()) {
+                    if expected_type.0 == Type::Any {
+                        continue;
+                    }
                     let arg_type = arg.0.get_type(type_env, self.at().line, self.at().col)?;
                     if arg_type != expected_type.0 {
                         return Err(ParserError::TypeError {

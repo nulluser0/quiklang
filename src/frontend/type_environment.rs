@@ -57,7 +57,7 @@ fn setup_type_env(type_env: &mut TypeEnvironment) -> Result<(), ParserError> {
 
     type_env.declare_fn(
         "println",
-        Type::Null,
+        Type::Function(vec![(Type::Any, false)], Box::new(Type::Null)),
         &Token {
             token: TokenType::EOF,
             line: 0,
@@ -67,7 +67,7 @@ fn setup_type_env(type_env: &mut TypeEnvironment) -> Result<(), ParserError> {
 
     type_env.declare_fn(
         "time",
-        Type::Integer,
+        Type::Function(vec![], Box::new(Type::Integer)),
         &Token {
             token: TokenType::EOF,
             line: 0,
@@ -77,7 +77,7 @@ fn setup_type_env(type_env: &mut TypeEnvironment) -> Result<(), ParserError> {
 
     type_env.declare_fn(
         "forget",
-        Type::Null,
+        Type::Function(vec![(Type::Any, false)], Box::new(Type::Null)),
         &Token {
             token: TokenType::EOF,
             line: 0,
@@ -87,7 +87,7 @@ fn setup_type_env(type_env: &mut TypeEnvironment) -> Result<(), ParserError> {
 
     type_env.declare_fn(
         "drop",
-        Type::Null,
+        Type::Function(vec![(Type::Any, false)], Box::new(Type::Null)),
         &Token {
             token: TokenType::EOF,
             line: 0,
