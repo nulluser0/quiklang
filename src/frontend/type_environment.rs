@@ -13,6 +13,7 @@ use super::{
 #[derive(Debug, Clone)]
 pub struct TypeEnvironment {
     vars: HashMap<String, (Type, bool)>, // Type, is mutable?
+    types: HashMap<String, Type>,
     parent: Option<Rc<RefCell<TypeEnvironment>>>,
 }
 
@@ -102,6 +103,7 @@ impl TypeEnvironment {
     pub fn new() -> Result<Self, ParserError> {
         let mut type_env = TypeEnvironment {
             vars: HashMap::new(),
+            types: HashMap::new(),
             parent: None,
         };
         setup_type_env(&mut type_env)?;
@@ -111,6 +113,7 @@ impl TypeEnvironment {
     pub fn new_with_parent(parent: Rc<RefCell<TypeEnvironment>>) -> Self {
         TypeEnvironment {
             vars: HashMap::new(),
+            types: HashMap::new(),
             parent: Some(parent),
         }
     }
@@ -166,5 +169,69 @@ impl TypeEnvironment {
 
     pub fn lookup_fn(&self, name: &str) -> Option<Type> {
         self.lookup_var(name)
+    }
+
+    pub fn declare_struct(
+        &mut self,
+        name: &str,
+        fields: HashMap<String, Type>,
+        declaration: &Token,
+    ) -> Result<(), ParserError> {
+        if self.types.contains_key(name) {
+            return Err(ParserError::DeclaredExistingStruct(
+                declaration.line,
+                declaration.col,
+                name.to_string(),
+            ));
+        }
+        self.types
+            .insert(name.to_string(), Type::Struct(name.to_string(), fields));
+        Ok(())
+    }
+
+    pub fn declare_enum(
+        &mut self,
+        name: &str,
+        variants: HashMap<String, Vec<Type>>,
+        declaration: &Token,
+    ) -> Result<(), ParserError> {
+        if self.types.contains_key(name) {
+            return Err(ParserError::DeclaredExistingEnum(
+                declaration.line,
+                declaration.col,
+                name.to_string(),
+            ));
+        }
+        self.types
+            .insert(name.to_string(), Type::Enum(name.to_string(), variants));
+        Ok(())
+    }
+
+    pub fn declare_alias(
+        &mut self,
+        name: &str,
+        alias: Box<Type>,
+        declaration: &Token,
+    ) -> Result<(), ParserError> {
+        if self.types.contains_key(name) {
+            return Err(ParserError::DeclaredExistingAlias(
+                declaration.line,
+                declaration.col,
+                name.to_string(),
+            ));
+        }
+        self.types
+            .insert(name.to_string(), Type::Alias(name.to_string(), alias));
+        Ok(())
+    }
+
+    pub fn lookup_type(&self, name: &str) -> Option<Type> {
+        if let Some(typedef) = self.types.get(name) {
+            return Some(typedef.clone());
+        }
+        if let Some(ref parent) = self.parent {
+            return parent.borrow().lookup_type(name);
+        }
+        None
     }
 }

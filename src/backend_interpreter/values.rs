@@ -297,6 +297,9 @@ impl FromType for Val {
             }
             Type::Mismatch => None,
             Type::Function(_, _) => Some(ValueType::Function),
+            Type::Struct(_, _) => todo!(),
+            Type::Enum(_, _) => todo!(),
+            Type::Alias(_, _) => todo!(),
         }
     }
 }

@@ -140,6 +140,15 @@ pub enum ParserError {
     #[error("at position {0}:{1}: Cannot declare already existing function '{2}'")]
     DeclaredExistingFunction(usize, usize, String),
 
+    #[error("at position {0}:{1}: Cannot declare already existing struct '{2}'")]
+    DeclaredExistingStruct(usize, usize, String),
+
+    #[error("at position {0}:{1}: Cannot declare already existing enum '{2}'")]
+    DeclaredExistingEnum(usize, usize, String),
+
+    #[error("at position {0}:{1}: Cannot declare already existing type alias '{2}'")]
+    DeclaredExistingAlias(usize, usize, String),
+
     #[error("at position {0}:{1}: Cannot resolve non-existent variable '{2}'")]
     UndefinedVariable(usize, usize, String),
 

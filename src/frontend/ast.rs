@@ -40,6 +40,10 @@ pub enum Type {
     Array(Box<Type>),
     Tuple(Vec<Type>),
     Mismatch,
+
+    Struct(String, HashMap<String, Type>),
+    Enum(String, HashMap<String, Vec<Type>>),
+    Alias(String, Box<Type>),
     // TODO: Custom(String)
 }
 
@@ -78,6 +82,9 @@ impl std::fmt::Display for Type {
 
                 write!(f, "Function ({}) -> {}", params_string, return_type)
             }
+            Type::Struct(_, _) => todo!(),
+            Type::Enum(_, _) => todo!(),
+            Type::Alias(name, actual) => write!(f, "{} ==> {}", name, actual),
         }
     }
 }
@@ -121,6 +128,8 @@ pub enum Expr {
     BlockExpr(Vec<Stmt>), // A block expr, literally the same as `let x; {x=10} let y;` in rust.
     ForeverLoopExpr(Vec<Stmt>), // Forever loop! Has vec of stmts.
     SpecialNull, // Literally just returns null. Should ONLY be returned as a result of a semicolon.
+    StructLiteral(String, Vec<Property>),
+    EnumLiteral(String, String, Vec<Expr>),
 }
 
 impl Expr {
@@ -291,6 +300,8 @@ impl ParsetimeType for Expr {
                 .last()
                 .map_or(Ok(Type::Null), |stmt| stmt.get_type(type_env, line, col)),
             Expr::SpecialNull => Ok(Type::Null),
+            Expr::StructLiteral(_, _) => todo!(),
+            Expr::EnumLiteral(_, _, _) => todo!(),
         }
     }
 }
@@ -327,6 +338,14 @@ pub enum Stmt {
         ident: String,
         key_type_values: HashMap<String, Type>,
     },
+    EnumDefStmt {
+        ident: String,
+        variants: HashMap<String, Vec<Type>>,
+    },
+    AliasDefStmt {
+        ident: String,
+        alias: Box<Type>,
+    },
 }
 
 impl ParsetimeType for Stmt {
@@ -349,6 +368,8 @@ impl ParsetimeType for Stmt {
             },
             Stmt::FunctionDeclaration { .. } => Ok(Type::Null),
             Stmt::StructDefStmt { .. } => Ok(Type::Null),
+            Stmt::EnumDefStmt { .. } => Ok(Type::Null),
+            Stmt::AliasDefStmt { .. } => Ok(Type::Null),
         }
     }
 }

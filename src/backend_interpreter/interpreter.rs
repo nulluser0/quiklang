@@ -39,6 +39,8 @@ pub fn evaluate(
         Stmt::StructDefStmt {
             ident: _,
             key_type_values: _,
-        } => todo!(), // Handle other statement types...
+        } => todo!(),
+        Stmt::EnumDefStmt { .. } => todo!(),
+        Stmt::AliasDefStmt { .. } => todo!(), // Handle other statement types...
     }
 }

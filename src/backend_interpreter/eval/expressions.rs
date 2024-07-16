@@ -50,6 +50,8 @@ pub fn evaluate_expr(
         Expr::SpecialNull => Ok(mk_null!()),
         Expr::ConcatOp { left, right } => evaluate_concatenation_expr(*left, *right, env, root_env),
         Expr::BlockExpr(then) => evaluate_block_expr(then, env, root_env),
+        Expr::StructLiteral(_, _) => todo!(),
+        Expr::EnumLiteral(_, _, _) => todo!(),
     }
 }
 

@@ -98,6 +98,12 @@ impl Parser {
             TokenType::Keyword(Keyword::Struct) => {
                 self.parse_struct_definition(type_env, root_type_env)
             }
+            TokenType::Keyword(Keyword::Enum) => {
+                self.parse_enum_definition(type_env, root_type_env)
+            }
+            TokenType::Keyword(Keyword::Type) => {
+                self.parse_type_definition(type_env, root_type_env)
+            }
             _ => Ok(Stmt::ExprStmt(self.parse_expr(type_env, root_type_env)?)),
         }
     }
@@ -161,6 +167,94 @@ impl Parser {
             ident: name,
             key_type_values: struct_definition,
         })
+    }
+
+    fn parse_enum_definition(
+        &mut self,
+        _type_env: &Rc<RefCell<TypeEnvironment>>,
+        _root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Stmt, ParserError> {
+        self.eat(); // consume 'enum'
+        let ident = self.eat();
+        let name = match ident.token {
+            TokenType::Identifier(ident) => ident,
+            _ => return Err(ParserError::MissingIdentifier(ident.line, ident.col)),
+        };
+        self.expect(
+            TokenType::Symbol(Symbol::LeftBrace),
+            "Expected enum body following definition.",
+        )?;
+
+        let mut variants: HashMap<String, Vec<Type>> = HashMap::new();
+
+        while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
+            let key_token = self.eat();
+            let key = match key_token.token {
+                TokenType::Identifier(ident) => ident,
+                _ => {
+                    return Err(ParserError::MissingIdentifier(
+                        key_token.line,
+                        key_token.col,
+                    ))
+                }
+            };
+
+            let mut variant_types = Vec::new();
+            if self.at().token == TokenType::Symbol(Symbol::LeftParen) {
+                self.eat(); // consume '('
+                while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightParen) {
+                    let variant_type = self.parse_type_declaration()?;
+                    variant_types.push(variant_type);
+
+                    if self.at().token == TokenType::Symbol(Symbol::Comma) {
+                        self.eat(); // consume ','
+                    }
+                }
+                self.expect(
+                    TokenType::Symbol(Symbol::RightParen),
+                    "Expected right parenthesis ')' after enum variant types.",
+                )?;
+            }
+
+            variants.insert(key, variant_types);
+
+            if self.at().token == TokenType::Symbol(Symbol::Comma) {
+                self.eat(); // consume ','
+            }
+        }
+
+        self.expect(
+            TokenType::Symbol(Symbol::RightBrace),
+            "Enum body must end with a right brace '}'",
+        )?;
+
+        Ok(Stmt::EnumDefStmt {
+            ident: name,
+            variants,
+        })
+    }
+
+    fn parse_type_definition(
+        &mut self,
+        _type_env: &Rc<RefCell<TypeEnvironment>>,
+        _root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Stmt, ParserError> {
+        self.eat(); // consume 'type'
+        let ident = self.eat();
+        let name = match ident.token {
+            TokenType::Identifier(ident) => ident,
+            _ => return Err(ParserError::MissingIdentifier(ident.line, ident.col)),
+        };
+        self.expect(
+            TokenType::Operator(Operator::Assign),
+            "Expected type alias following definition.",
+        )?;
+        let alias = Box::new(self.parse_type_declaration()?);
+        self.expect(
+            TokenType::Symbol(Symbol::Semicolon),
+            "type declaration is a statement. It must end with a semicolon.",
+        )?;
+        Ok(Stmt::AliasDefStmt { ident: name, alias })
     }
 
     fn parse_break_declaration(
