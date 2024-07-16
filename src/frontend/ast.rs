@@ -226,7 +226,6 @@ impl ParsetimeType for Expr {
             },
             Expr::FunctionCall(_, caller) => {
                 if let Expr::Identifier(fn_name) = &**caller {
-                    println!("{}", fn_name);
                     if let Some(Type::Function(_, return_type)) =
                         type_env.borrow().lookup_fn(fn_name)
                     {
