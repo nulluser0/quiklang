@@ -280,6 +280,7 @@ impl FromType for Val {
     type Output = ValueType;
     fn from_type(type_val: &crate::frontend::ast::Type) -> Option<Self::Output> {
         match type_val {
+            Type::Any => Some(ValueType::Any),
             Type::String => Some(ValueType::String),
             Type::Integer => Some(ValueType::Integer),
             Type::Float => Some(ValueType::Float),
