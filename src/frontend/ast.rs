@@ -224,6 +224,7 @@ impl ParsetimeType for Expr {
             },
             Expr::FunctionCall(_, caller) => {
                 if let Expr::Identifier(fn_name) = &**caller {
+                    println!("{type_env:#?}");
                     if let Some(Type::Function(_, return_type)) =
                         type_env.borrow().lookup_fn(fn_name)
                     {
@@ -284,7 +285,7 @@ impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Expr::Identifier(keyword) => write!(f, "{:?}", keyword),
-            _ => unimplemented!(),
+            a => write!(f, "{:?}", a),
         }
     }
 }
