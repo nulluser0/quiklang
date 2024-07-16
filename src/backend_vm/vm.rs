@@ -165,52 +165,126 @@ impl VM {
                 }
             }
             OP_ADD => {
-                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                match (
                     &self.registers[argb as usize],
                     &self.registers[argc as usize],
                 ) {
-                    self.registers[arga as usize] = RegisterVal::Int(left.wrapping_add(*right));
+                    (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Int(left.wrapping_add(*right));
+                    }
+                    (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(left + right);
+                    }
+                    (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(*left as f64 + right);
+                    }
+                    (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(left + *right as f64);
+                    }
+                    _ => {}
                 }
             }
             OP_SUB => {
-                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                match (
                     &self.registers[argb as usize],
                     &self.registers[argc as usize],
                 ) {
-                    self.registers[arga as usize] = RegisterVal::Int(left.wrapping_sub(*right));
+                    (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Int(left.wrapping_sub(*right));
+                    }
+                    (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(left - right);
+                    }
+                    (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(*left as f64 - right);
+                    }
+                    (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(left - *right as f64);
+                    }
+                    _ => {}
                 }
             }
             OP_MUL => {
-                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                match (
                     &self.registers[argb as usize],
                     &self.registers[argc as usize],
                 ) {
-                    self.registers[arga as usize] = RegisterVal::Int(left.wrapping_mul(*right));
+                    (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Int(left.wrapping_mul(*right));
+                    }
+                    (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(left * right);
+                    }
+                    (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(*left as f64 * right);
+                    }
+                    (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(left * *right as f64);
+                    }
+                    _ => {}
                 }
             }
             OP_DIV => {
-                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                match (
                     &self.registers[argb as usize],
                     &self.registers[argc as usize],
                 ) {
-                    self.registers[arga as usize] = RegisterVal::Int(left.wrapping_div(*right));
+                    (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Int(left.wrapping_div(*right));
+                    }
+                    (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(left / right);
+                    }
+                    (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(*left as f64 / right);
+                    }
+                    (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(left / *right as f64);
+                    }
+                    _ => {}
                 }
             }
             OP_MOD => {
-                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                match (
                     &self.registers[argb as usize],
                     &self.registers[argc as usize],
                 ) {
-                    self.registers[arga as usize] = RegisterVal::Int(left.wrapping_rem(*right));
+                    (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Int(left.wrapping_rem(*right));
+                    }
+                    (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(left % right);
+                    }
+                    (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(*left as f64 % right);
+                    }
+                    (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(left % *right as f64);
+                    }
+                    _ => {}
                 }
             }
             OP_POW => {
-                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (
+                match (
                     &self.registers[argb as usize],
                     &self.registers[argc as usize],
                 ) {
-                    self.registers[arga as usize] =
-                        RegisterVal::Int(left.wrapping_pow(*right as u32));
+                    (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+                        self.registers[arga as usize] =
+                            RegisterVal::Int(left.wrapping_pow(*right as u32));
+                    }
+                    (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+                        self.registers[arga as usize] = RegisterVal::Float(left.powf(*right));
+                    }
+                    (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+                        self.registers[arga as usize] =
+                            RegisterVal::Float((*left as f64).powf(*right));
+                    }
+                    (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+                        self.registers[arga as usize] =
+                            RegisterVal::Float(left.powf(*right as f64));
+                    }
+                    _ => {}
                 }
             }
             OP_NOT => {
