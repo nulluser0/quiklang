@@ -52,6 +52,7 @@
 use std::{
     io::{Cursor, Read, Write},
     rc::Rc,
+    vec,
 };
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
@@ -71,20 +72,30 @@ pub struct ByteCode {
 
 #[derive(Debug, Clone)]
 pub struct BCMetadata {
-    ql_version: [u8; 8],
-    ql_vm_ver: i32,
-    flags: u64,
+    pub ql_version: [u8; 8],
+    pub ql_vm_ver: i32,
+    pub flags: u64,
 }
 
 #[derive(Debug, Clone)]
 pub struct BCIntegrityInfo {
-    num_register: i32,
-    num_constants: i32,
-    num_inst: i32,
-    num_string_points: i32,
+    pub num_register: i32,
+    pub num_constants: i32,
+    pub num_inst: i32,
+    pub num_string_points: i32,
 }
 
 impl ByteCode {
+    pub fn new(metadata: BCMetadata, integrity_info: BCIntegrityInfo) -> Self {
+        Self {
+            metadata,
+            integrity_info,
+            constants: vec![],
+            string_pool: vec![],
+            instructions: vec![],
+        }
+    }
+
     /// Decodes from a binary bytecode format, represented as u8 slice (1 byte).
     pub fn decode(bytecode: &[u8]) -> Result<ByteCode, VMBytecodeError> {
         let mut cursor = Cursor::new(bytecode);

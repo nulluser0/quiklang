@@ -12,6 +12,9 @@ criterion = "0.5.1"
 rustyline = "9.0.0"
 thiserror = "1.0.61"
 
+[build-dependencies]
+toml = "0.8.14"
+
 [lib]
 name = "quiklang"
 path = "src/lib.rs"

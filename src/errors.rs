@@ -197,7 +197,10 @@ pub enum InterpreterError {
 
 // VM Compile specific errors
 #[derive(Error, Debug)]
-pub enum VMCompileError {}
+pub enum VMCompileError {
+    #[error("IO Error occurred: {0}")]
+    IOError(#[from] std::io::Error),
+}
 
 // VM Bytecode specific errors
 #[derive(Error, Debug)]
