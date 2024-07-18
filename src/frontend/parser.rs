@@ -503,6 +503,10 @@ impl Parser {
                 is_mutable,
                 &declaration,
             )?;
+            self.expect(
+                TokenType::Symbol(Symbol::Semicolon),
+                "Variable declaration is a statement. It must end with a semicolon.",
+            )?;
             return Ok(Stmt::DeclareStmt {
                 name: identifier.to_string(),
                 is_mutable,
