@@ -1,8 +1,10 @@
 // VM (Register-based)
 
-use std::rc::Rc;
+use std::{hash::Hasher, rc::Rc};
 
 use crate::errors::VMRuntimeError;
+
+use std::hash::Hash;
 
 use super::{
     bytecode::ByteCode,
@@ -28,6 +30,23 @@ pub enum RegisterVal {
     Bool(bool),
     Str(Rc<String>),
     Null,
+}
+
+impl Eq for RegisterVal {}
+
+impl Hash for RegisterVal {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            RegisterVal::Int(val) => val.hash(state),
+            RegisterVal::Float(val) => {
+                let int_val: i64 = (*val).to_bits() as i64; // Convert to bits and hash as integer
+                int_val.hash(state);
+            }
+            RegisterVal::Bool(val) => val.hash(state),
+            RegisterVal::Str(val) => val.hash(state),
+            RegisterVal::Null => 0_u8.hash(state),
+        }
+    }
 }
 
 // A note about converting from bytecode to vm for strings specifically:

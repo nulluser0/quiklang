@@ -1,4 +1,4 @@
 pub mod bytecode;
-pub mod compiler;
+pub mod bytecode_compiler;
 pub mod instructions;
 pub mod vm;
