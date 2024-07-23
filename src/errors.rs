@@ -200,6 +200,9 @@ pub enum InterpreterError {
 pub enum VMCompileError {
     #[error("IO Error occurred: {0}")]
     IOError(#[from] std::io::Error),
+
+    #[error("Cannot resolve non-existent symbol '{0}'")]
+    UndefinedVariable(String),
 }
 
 // VM Bytecode specific errors

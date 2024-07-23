@@ -1,6 +1,6 @@
 // Compiler
 
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     backend_vm::{
@@ -11,6 +11,8 @@ use crate::{
     errors::VMCompileError,
     frontend::ast::Stmt,
 };
+
+use super::symbol_tracker::SymbolTable;
 
 const fn str_to_byte_array(s: &str) -> [u8; 8] {
     // Convert the string to a byte array with exactly 8 bytes.
@@ -28,6 +30,7 @@ const fn str_to_byte_array(s: &str) -> [u8; 8] {
 }
 
 pub struct Compiler {
+    max_reg: usize,
     reg_top: usize,
     constants: Vec<RegisterVal>,
     constant_map: HashMap<RegisterVal, usize>,
@@ -37,6 +40,7 @@ pub struct Compiler {
 impl Compiler {
     pub fn new() -> Self {
         Self {
+            max_reg: 0,
             reg_top: 0,
             constants: Vec::new(),
             constant_map: HashMap::new(),
@@ -44,21 +48,24 @@ impl Compiler {
         }
     }
 
-    fn reg_top(&self) -> usize {
+    pub(super) fn reg_top(&self) -> usize {
         self.reg_top
     }
 
-    fn allocate_register(&mut self) -> usize {
+    pub(super) fn allocate_register(&mut self) -> usize {
         let reg = self.reg_top;
         self.reg_top += 1;
+        if self.reg_top > self.max_reg {
+            self.max_reg = self.reg_top;
+        }
         reg
     }
 
-    fn deallocate_register(&mut self) {
+    pub(super) fn deallocate_register(&mut self) {
         self.reg_top -= 1;
     }
 
-    fn add_constant(&mut self, constant: RegisterVal) -> usize {
+    pub(super) fn add_constant(&mut self, constant: RegisterVal) -> usize {
         if let Some(&index) = self.constant_map.get(&constant) {
             return index;
         }
@@ -68,11 +75,11 @@ impl Compiler {
         index
     }
 
-    fn add_instruction(&mut self, instruction: Instruction) {
+    pub(super) fn add_instruction(&mut self, instruction: Instruction) {
         self.instructions.push(instruction);
     }
 
-    pub fn compile(stmts: Vec<Stmt>) -> Result<ByteCode, VMCompileError> {
+    pub fn compile(&mut self, stmts: Vec<Stmt>) -> Result<ByteCode, VMCompileError> {
         let metadata = BCMetadata {
             ql_version: str_to_byte_array(env!("CARGO_PKG_VERSION")),
             ql_vm_ver: env!("QUIKLANG_VM_VERSION").parse().unwrap(),
@@ -84,16 +91,21 @@ impl Compiler {
             num_inst: 0,
             num_string_points: 0,
         };
+        let symbol_table: &Rc<RefCell<SymbolTable>> = &Rc::new(RefCell::new(SymbolTable::new()));
         let mut bytecode = ByteCode::new(metadata, integrity_info);
         // Generate bytecode from AST
-        Self::compile_statements(&mut bytecode, stmts)?;
+        self.compile_statements(stmts, symbol_table)?;
 
         Ok(bytecode)
     }
 
-    fn compile_statements(bytecode: &mut ByteCode, stmts: Vec<Stmt>) -> Result<(), VMCompileError> {
+    fn compile_statements(
+        &mut self,
+        stmts: Vec<Stmt>,
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+    ) -> Result<(), VMCompileError> {
         for stmt in stmts {
-            Self::compile_statement(bytecode, stmt)?;
+            self.compile_statement(stmt, symbol_table)?;
         }
         Ok(())
     }
@@ -102,5 +114,31 @@ impl Compiler {
 impl Default for Compiler {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        backend_vm::instructions::to_string,
+        frontend::ast::{Expr, Literal},
+    };
+
+    use super::*;
+
+    #[test]
+    fn simple_compile_test() {
+        let mut compiler = Compiler::new();
+        compiler
+            .compile(vec![Stmt::ExprStmt(Expr::Literal(Literal::Integer(
+                209309,
+            )))])
+            .expect("compile fail");
+
+        println!("{:#?}", compiler.constants);
+
+        for inst in compiler.instructions {
+            println!("{}", to_string(inst))
+        }
     }
 }

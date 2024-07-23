@@ -1,16 +1,19 @@
 // Compiler Statements
 
-use crate::{backend_vm::bytecode::ByteCode, errors::VMCompileError, frontend::ast::Stmt};
+use std::{cell::RefCell, rc::Rc};
 
-use super::compiler::Compiler;
+use crate::{errors::VMCompileError, frontend::ast::Stmt};
+
+use super::{compiler::Compiler, symbol_tracker::SymbolTable};
 
 impl Compiler {
     pub(super) fn compile_statement(
-        bytecode: &mut ByteCode,
+        &mut self,
         stmt: Stmt,
-    ) -> Result<(), VMCompileError> {
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+    ) -> Result<usize, VMCompileError> {
         match stmt {
-            Stmt::ExprStmt(expr) => Self::compile_expression(bytecode, expr)?,
+            Stmt::ExprStmt(expr) => self.compile_expression(expr, symbol_table),
             Stmt::DeclareStmt {
                 name,
                 is_mutable,
@@ -34,6 +37,5 @@ impl Compiler {
             Stmt::EnumDefStmt { ident, variants } => todo!(),
             Stmt::AliasDefStmt { ident, alias } => todo!(),
         }
-        Ok(())
     }
 }
