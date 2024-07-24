@@ -11,7 +11,7 @@ impl Compiler {
         &mut self,
         stmt: Stmt,
         symbol_table: &Rc<RefCell<SymbolTable>>,
-    ) -> Result<usize, VMCompileError> {
+    ) -> Result<isize, VMCompileError> {
         match stmt {
             Stmt::ExprStmt(expr) => self.compile_expression(expr, symbol_table),
             Stmt::DeclareStmt {

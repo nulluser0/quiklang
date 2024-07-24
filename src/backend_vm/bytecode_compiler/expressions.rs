@@ -22,7 +22,7 @@ impl Compiler {
         &mut self,
         expr: Expr,
         symbol_table: &Rc<RefCell<SymbolTable>>,
-    ) -> Result<usize, VMCompileError> {
+    ) -> Result<isize, VMCompileError> {
         match expr {
             Expr::Literal(literal) => self.compile_literal(literal),
             Expr::Array(_, _) => todo!(),
@@ -55,7 +55,11 @@ impl Compiler {
         }
     }
 
-    fn compile_literal(&mut self, literal: Literal) -> Result<usize, VMCompileError> {
+    fn compile_literal(
+        &mut self,
+        literal: Literal,
+        require_constant: bool,
+    ) -> Result<isize, VMCompileError> {
         let constant = match literal {
             Literal::Integer(integer) => RegisterVal::Int(integer),
             Literal::Float(float) => RegisterVal::Float(float),
@@ -63,39 +67,42 @@ impl Compiler {
             Literal::Object(_) => todo!(),
         };
         let index = self.add_constant(constant);
-        let reg = self.allocate_register();
-        self.add_instruction(ABx(OP_LOADCONST, reg as i32, index as i32));
 
-        Ok(reg)
+        if require_constant {
+            let reg = self.allocate_register();
+            self.add_instruction(ABx(OP_LOADCONST, reg as i32, index as i32));
+            return Ok(reg as isize);
+        }
+
+        Ok(-(index as isize))
     }
 
     fn compile_identifier(
         &mut self,
         identifier: String,
         symbol_table: &Rc<RefCell<SymbolTable>>,
-    ) -> Result<usize, VMCompileError> {
+        require_constant: bool,
+    ) -> Result<isize, VMCompileError> {
         match identifier.as_str() {
             "null" => {
-                let reg = self.allocate_register();
-                self.add_instruction(Abc(OP_LOADNULL, reg as i32, reg as i32, 0));
-                Ok(reg)
+                let index = self.add_constant(RegisterVal::Null);
+                Ok(-(index as isize))
             }
             "true" => {
-                let reg = self.allocate_register();
-                self.add_instruction(Abc(OP_LOADBOOL, reg as i32, 1, 0));
-                Ok(reg)
+                let index = self.add_constant(RegisterVal::Bool(true));
+                Ok(-(index as isize))
             }
             "false" => {
-                let reg = self.allocate_register();
-                self.add_instruction(Abc(OP_LOADBOOL, reg as i32, 0, 0));
-                Ok(reg)
+                let index = self.add_constant(RegisterVal::Bool(false));
+                Ok(-(index as isize))
             }
             other => {
                 // No special ident_keyword. Instead, match symbol table.
-                symbol_table
+                Ok(symbol_table
                     .borrow()
                     .lookup_var(other)
-                    .ok_or(VMCompileError::UndefinedVariable(other.to_string()))
+                    .ok_or(VMCompileError::UndefinedVariable(other.to_string()))?
+                    as isize)
             }
         }
     }
@@ -106,7 +113,7 @@ impl Compiler {
         left: Expr,
         right: Expr,
         symbol_table: &Rc<RefCell<SymbolTable>>,
-    ) -> Result<usize, VMCompileError> {
+    ) -> Result<isize, VMCompileError> {
         let reg = self.allocate_register();
         let b = self.compile_expression(left, symbol_table)? as i32;
         let c = self.compile_expression(right, symbol_table)? as i32;
@@ -126,7 +133,7 @@ impl Compiler {
             BinaryOp::Modulus => OP_MOD,
         };
         self.add_instruction(Abc(opcode, reg as i32, b, c));
-        Ok(reg)
+        Ok(reg as isize)
     }
 
     fn compile_unary_op(
@@ -134,7 +141,7 @@ impl Compiler {
         op: UnaryOp,
         expr: Expr,
         symbol_table: &Rc<RefCell<SymbolTable>>,
-    ) -> Result<usize, VMCompileError> {
+    ) -> Result<isize, VMCompileError> {
         let reg = self.allocate_register();
         let b = self.compile_expression(expr, symbol_table)? as i32;
         let opcode = match op {
@@ -144,7 +151,7 @@ impl Compiler {
             UnaryOp::BitwiseNot => OP_NOT,
         };
         self.add_instruction(Abc(opcode, reg as i32, b, 0));
-        Ok(reg)
+        Ok(reg as isize)
     }
 
     fn compile_if_expr(
@@ -153,7 +160,7 @@ impl Compiler {
         then: Vec<Stmt>,
         else_stmt: Option<Vec<Stmt>>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
-    ) -> Result<usize, VMCompileError> {
+    ) -> Result<isize, VMCompileError> {
         // TODO: only return result if required, optimisation
 
         // Typical bytecode representation of if expr:
@@ -166,7 +173,7 @@ impl Compiler {
 
         // Store the if expr result
         let result_register = self.allocate_register();
-        let mut result: usize = 0;
+        let mut result: isize = 0;
 
         // Save the top register so that we can disregard the registers from the if expr after use.
         let current_reg_top = self.reg_top();
@@ -240,6 +247,6 @@ impl Compiler {
         // Reset register count back to normal in preparation for endif
         self.manually_change_register_count(current_reg_top);
 
-        Ok(result_register)
+        Ok(result_register as isize)
     }
 }

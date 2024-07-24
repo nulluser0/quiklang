@@ -36,7 +36,6 @@ const fn str_to_byte_array(s: &str) -> [u8; 8] {
 pub struct Compiler {
     max_reg: usize,
     reg_top: usize,
-    reserved_registers: HashSet<usize>,
     constants: Vec<RegisterVal>,
     constant_map: HashMap<RegisterVal, usize>,
     instructions: Vec<Instruction>,
@@ -47,7 +46,6 @@ impl Compiler {
         Self {
             max_reg: 0,
             reg_top: 0,
-            reserved_registers: HashSet::new(),
             constants: Vec::new(),
             constant_map: HashMap::new(),
             instructions: Vec::new(),
@@ -168,13 +166,13 @@ mod tests {
                     condition: Box::new(Expr::Identifier("true".to_string())),
                     then: vec![Stmt::ExprStmt(Expr::BinaryOp {
                         op: BinaryOp::Add,
-                        left: Box::new(Expr::Literal(Literal::Integer(123))),
-                        right: Box::new(Expr::Literal(Literal::Integer(123))),
+                        left: Box::new(Expr::Literal(Literal::Integer(1223))),
+                        right: Box::new(Expr::Literal(Literal::Integer(1223))),
                     })],
                     else_stmt: Some(vec![Stmt::ExprStmt(Expr::BinaryOp {
                         op: BinaryOp::Add,
-                        left: Box::new(Expr::Literal(Literal::Integer(123))),
-                        right: Box::new(Expr::Literal(Literal::Integer(123))),
+                        left: Box::new(Expr::Literal(Literal::Integer(1233))),
+                        right: Box::new(Expr::Literal(Literal::Integer(1233))),
                     })]),
                 }),
             ])

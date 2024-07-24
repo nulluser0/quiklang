@@ -405,7 +405,14 @@ pub fn set_opcode(inst: &mut Instruction, op: OpCode) {
 
 #[inline]
 pub fn get_arga(inst: Instruction) -> i32 {
-    ((inst >> 18) & 0xff) as i32
+    let a = ((inst >> 18) & 0xff) as i32;
+
+    // Convert the 8-bit value to a signed 8-bit integer
+    if a & 0x80 != 0 {
+        a | !0xff // Extend the sign bit
+    } else {
+        a
+    }
 }
 
 #[inline]
@@ -415,7 +422,12 @@ pub fn set_arga(inst: &mut Instruction, a: i32) {
 
 #[inline]
 pub fn get_argb(inst: Instruction) -> i32 {
-    (inst & 0x1ff) as i32
+    let b = (inst & 0x1ff) as i32;
+    if b & 0x100 != 0 {
+        b | !0x1ff // Extend the sign bit
+    } else {
+        b
+    }
 }
 
 #[inline]
@@ -425,7 +437,12 @@ pub fn set_argb(inst: &mut Instruction, b: i32) {
 
 #[inline]
 pub fn get_argc(inst: Instruction) -> i32 {
-    ((inst >> 9) & 0x1ff) as i32
+    let c = ((inst >> 9) & 0x1ff) as i32;
+    if c & 0x100 != 0 {
+        c | !0x1ff // Extend the sign bit
+    } else {
+        c
+    }
 }
 
 #[inline]
@@ -509,7 +526,7 @@ pub fn to_string(inst: Instruction) -> String {
 
     let ops = match prop.typ {
         OpType::Abc => format!(
-            "{:10}| {:4} | {:4}, {:4}, {:4}",
+            "{:20}| {:4} | {:4}, {:4}, {:4}",
             prop.name,
             prop.typ.to_string(),
             arga,
@@ -517,14 +534,14 @@ pub fn to_string(inst: Instruction) -> String {
             argc
         ),
         OpType::ABx => format!(
-            "{:10}| {:4} | {:4}, {:4}",
+            "{:20}| {:4} | {:4}, {:8}",
             prop.name,
             prop.typ.to_string(),
             arga,
             argbx
         ),
         OpType::AsBx => format!(
-            "{:10}| {:4} | {:4}, {:4}",
+            "{:20}| {:4} | {:4}, {:8}",
             prop.name,
             prop.typ.to_string(),
             arga,
