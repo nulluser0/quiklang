@@ -5,9 +5,9 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     backend_vm::{
         instructions::{
-            ABx, Abc, OP_ADD, OP_AND, OP_DIV, OP_EQ, OP_GE, OP_GT, OP_JUMP, OP_JUMP_IF_FALSE,
-            OP_LE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LT, OP_MOD, OP_MUL, OP_NE, OP_NOT,
-            OP_OR, OP_SUB,
+            ABx, ASBx, Abc, OP_ADD, OP_AND, OP_DIV, OP_EQ, OP_GE, OP_GT, OP_JUMP, OP_JUMP_IF_FALSE,
+            OP_LE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LT, OP_MOD, OP_MOVE, OP_MUL, OP_NE,
+            OP_NOT, OP_OR, OP_SUB,
         },
         vm::RegisterVal,
     },
@@ -154,6 +154,8 @@ impl Compiler {
         else_stmt: Option<Vec<Stmt>>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<usize, VMCompileError> {
+        // TODO: only return result if required, optimisation
+
         // Typical bytecode representation of if expr:
         //      r1 = evaluate condition
         //      jump if r1 is false to else/endif area
@@ -162,20 +164,19 @@ impl Compiler {
         //      else area
         //      endif area
 
+        // Store the if expr result
+        let result_register = self.allocate_register();
+        let mut result: usize = 0;
+
+        // Save the top register so that we can disregard the registers from the if expr after use.
+        let current_reg_top = self.reg_top();
+
         // First, get the condition's result and store its register.
         let condition_result = self.compile_expression(condition, symbol_table)?;
 
-        // Also store the if expr result
-        let mut result: usize = 0;
-
-        // Since if expr can return a value, store return value somewhere.
-
         // Add instruction to jump to else/endif if false
         let jump_to_end_or_else = self.instructions_len(); // Index of the JUMP_IF_ELSE inst
-        self.add_instruction(ABx(OP_JUMP_IF_FALSE, condition_result as i32, 0)); // Placeholder for now
-
-        // Save the top register so that we can disregard the registers from the then/else stmts.
-        let current_reg_top = self.reg_top();
+        self.add_instruction(ASBx(OP_JUMP_IF_FALSE, condition_result as i32, 0)); // Placeholder for now
 
         // Now we compile the 'then' area.
         // Create a new symbol table since we are entering a child scope.
@@ -185,6 +186,7 @@ impl Compiler {
         for stmt in then {
             result = self.compile_statement(stmt, child_symbol_table)?;
         }
+        self.add_instruction(Abc(OP_MOVE, result_register as i32, result as i32, 0));
 
         // Add placeholder jump to endif after then block
         let jump_to_end = self.instructions_len();
@@ -197,7 +199,7 @@ impl Compiler {
             // Update jump_if_false
             self.replace_instruction(
                 jump_to_end_or_else,
-                ABx(
+                ASBx(
                     OP_JUMP_IF_FALSE,
                     condition_result as i32,
                     (jump_to_end - jump_to_end_or_else) as i32,
@@ -208,7 +210,7 @@ impl Compiler {
         // There is an else stmt.
         // Create jump to endif after the then block
         // Using jump_to_end var from before.
-        self.add_instruction(ABx(OP_JUMP, 0, 0)); // Placeholder for now
+        self.add_instruction(ASBx(OP_JUMP, 0, 0)); // Placeholder for now
 
         // Compile 'else' area.
         let child_symbol_table = &Rc::new(RefCell::new(SymbolTable::new_with_parent(
@@ -217,6 +219,7 @@ impl Compiler {
         for stmt in else_stmt.unwrap() {
             result = self.compile_statement(stmt, child_symbol_table)?;
         }
+        self.add_instruction(Abc(OP_MOVE, result_register as i32, result as i32, 0));
 
         // Update jumps
         let end = self.instructions_len();
@@ -224,7 +227,7 @@ impl Compiler {
         // Jump to else stmt
         self.replace_instruction(
             jump_to_end_or_else,
-            ABx(
+            ASBx(
                 OP_JUMP_IF_FALSE,
                 condition_result as i32,
                 (jump_to_end + 1 - jump_to_end_or_else) as i32,
@@ -232,11 +235,11 @@ impl Compiler {
         );
 
         // Jump to end from then block
-        self.replace_instruction(jump_to_end, ABx(OP_JUMP, 0, (end - jump_to_end) as i32));
+        self.replace_instruction(jump_to_end, ASBx(OP_JUMP, 0, (end - jump_to_end) as i32));
 
         // Reset register count back to normal in preparation for endif
         self.manually_change_register_count(current_reg_top);
 
-        Ok(result)
+        Ok(result_register)
     }
 }

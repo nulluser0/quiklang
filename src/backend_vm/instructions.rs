@@ -445,12 +445,12 @@ pub fn set_argbx(inst: &mut Instruction, bx: i32) {
 
 #[inline]
 pub fn get_argsbx(inst: Instruction) -> i32 {
-    get_argbx(inst) // - OPCODE_MAX_SBX
+    get_argbx(inst) - (OPCODE_MAX_SBX + 1)
 }
 
 #[inline]
 pub fn set_argsbx(inst: &mut Instruction, sbx: i32) {
-    set_argbx(inst, sbx); // + OPCODE_MAX_SBX
+    set_argbx(inst, sbx + (OPCODE_MAX_SBX + 1));
 }
 
 #[allow(non_snake_case)]
@@ -535,7 +535,7 @@ pub fn to_string(inst: Instruction) -> String {
     let ops = format!("{:36}", ops);
 
     match op {
-        OP_MOVE => format!("{} | R({}) := R({})", ops, arga, argb),
+        OP_MOVE => format!("{} | R({}) := R({}), argb => arga", ops, arga, argb),
         OP_LOADCONST => format!("{} | R({}) := Kst({})", ops, arga, argbx),
         OP_LOADBOOL => format!(
             "{} | R({}) := (Bool){}; if ({}) pc++",

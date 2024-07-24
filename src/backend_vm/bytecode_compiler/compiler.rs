@@ -1,6 +1,10 @@
 // Compiler
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use crate::{
     backend_vm::{
@@ -32,6 +36,7 @@ const fn str_to_byte_array(s: &str) -> [u8; 8] {
 pub struct Compiler {
     max_reg: usize,
     reg_top: usize,
+    reserved_registers: HashSet<usize>,
     constants: Vec<RegisterVal>,
     constant_map: HashMap<RegisterVal, usize>,
     instructions: Vec<Instruction>,
@@ -42,6 +47,7 @@ impl Compiler {
         Self {
             max_reg: 0,
             reg_top: 0,
+            reserved_registers: HashSet::new(),
             constants: Vec::new(),
             constant_map: HashMap::new(),
             instructions: Vec::new(),
@@ -141,7 +147,7 @@ impl Default for Compiler {
 #[cfg(test)]
 mod tests {
     use crate::{
-        backend_vm::instructions::to_string,
+        backend_vm::instructions::{get_argsbx, to_string, ASBx, OP_JUMP},
         frontend::ast::{BinaryOp, Expr, Literal},
     };
 
@@ -179,5 +185,11 @@ mod tests {
         for inst in compiler.instructions {
             println!("{}", to_string(inst))
         }
+    }
+
+    #[test]
+    fn sbx_test() {
+        let sbx = ASBx(OP_JUMP, 3, 1);
+        println!("{:#b} | sBx: {}", sbx, get_argsbx(sbx));
     }
 }
