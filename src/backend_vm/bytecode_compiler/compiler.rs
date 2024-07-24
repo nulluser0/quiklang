@@ -52,6 +52,15 @@ impl Compiler {
         self.reg_top
     }
 
+    pub(super) fn manually_change_register_count(&mut self, count: usize) -> usize {
+        let reg = self.reg_top;
+        self.reg_top = count;
+        if self.reg_top > self.max_reg {
+            self.max_reg = self.reg_top;
+        }
+        reg
+    }
+
     pub(super) fn allocate_register(&mut self) -> usize {
         let reg = self.reg_top;
         self.reg_top += 1;
@@ -77,6 +86,18 @@ impl Compiler {
 
     pub(super) fn add_instruction(&mut self, instruction: Instruction) {
         self.instructions.push(instruction);
+    }
+
+    pub(super) fn instructions_len(&mut self) -> usize {
+        self.instructions.len()
+    }
+
+    pub(super) fn replace_instruction(&mut self, len: usize, instruction: Instruction) {
+        self.instructions[len] = instruction
+    }
+
+    pub(super) fn pop_instruction(&mut self) -> Option<Instruction> {
+        self.instructions.pop()
     }
 
     pub fn compile(&mut self, stmts: Vec<Stmt>) -> Result<ByteCode, VMCompileError> {
@@ -121,7 +142,7 @@ impl Default for Compiler {
 mod tests {
     use crate::{
         backend_vm::instructions::to_string,
-        frontend::ast::{Expr, Literal},
+        frontend::ast::{BinaryOp, Expr, Literal},
     };
 
     use super::*;
@@ -130,9 +151,14 @@ mod tests {
     fn simple_compile_test() {
         let mut compiler = Compiler::new();
         compiler
-            .compile(vec![Stmt::ExprStmt(Expr::Literal(Literal::Integer(
-                209309,
-            )))])
+            .compile(vec![
+                Stmt::ExprStmt(Expr::Literal(Literal::Integer(209309))),
+                Stmt::ExprStmt(Expr::BinaryOp {
+                    op: BinaryOp::Add,
+                    left: Box::new(Expr::Literal(Literal::Integer(123))),
+                    right: Box::new(Expr::Literal(Literal::Integer(123))),
+                }),
+            ])
             .expect("compile fail");
 
         println!("{:#?}", compiler.constants);
