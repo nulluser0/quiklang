@@ -165,6 +165,11 @@ impl Compiler {
         // First, get the condition's result and store its register.
         let condition_result = self.compile_expression(condition, symbol_table)?;
 
+        // Also store the if expr result
+        let mut result: usize = 0;
+
+        // Since if expr can return a value, store return value somewhere.
+
         // Add instruction to jump to else/endif if false
         let jump_to_end_or_else = self.instructions_len(); // Index of the JUMP_IF_ELSE inst
         self.add_instruction(ABx(OP_JUMP_IF_FALSE, condition_result as i32, 0)); // Placeholder for now
@@ -178,7 +183,7 @@ impl Compiler {
             symbol_table.clone(),
         )));
         for stmt in then {
-            self.compile_statement(stmt, child_symbol_table)?;
+            result = self.compile_statement(stmt, child_symbol_table)?;
         }
 
         // Add placeholder jump to endif after then block
@@ -210,7 +215,7 @@ impl Compiler {
             symbol_table.clone(),
         )));
         for stmt in else_stmt.unwrap() {
-            self.compile_statement(stmt, child_symbol_table)?;
+            result = self.compile_statement(stmt, child_symbol_table)?;
         }
 
         // Update jumps
@@ -232,6 +237,6 @@ impl Compiler {
         // Reset register count back to normal in preparation for endif
         self.manually_change_register_count(current_reg_top);
 
-        todo!()
+        Ok(result)
     }
 }

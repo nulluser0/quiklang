@@ -113,7 +113,7 @@ impl Compiler {
             num_string_points: 0,
         };
         let symbol_table: &Rc<RefCell<SymbolTable>> = &Rc::new(RefCell::new(SymbolTable::new()));
-        let mut bytecode = ByteCode::new(metadata, integrity_info);
+        let bytecode = ByteCode::new(metadata, integrity_info);
         // Generate bytecode from AST
         self.compile_statements(stmts, symbol_table)?;
 
@@ -157,6 +157,19 @@ mod tests {
                     op: BinaryOp::Add,
                     left: Box::new(Expr::Literal(Literal::Integer(123))),
                     right: Box::new(Expr::Literal(Literal::Integer(123))),
+                }),
+                Stmt::ExprStmt(Expr::IfExpr {
+                    condition: Box::new(Expr::Identifier("true".to_string())),
+                    then: vec![Stmt::ExprStmt(Expr::BinaryOp {
+                        op: BinaryOp::Add,
+                        left: Box::new(Expr::Literal(Literal::Integer(123))),
+                        right: Box::new(Expr::Literal(Literal::Integer(123))),
+                    })],
+                    else_stmt: Some(vec![Stmt::ExprStmt(Expr::BinaryOp {
+                        op: BinaryOp::Add,
+                        left: Box::new(Expr::Literal(Literal::Integer(123))),
+                        right: Box::new(Expr::Literal(Literal::Integer(123))),
+                    })]),
                 }),
             ])
             .expect("compile fail");

@@ -28,10 +28,10 @@ pub const OPCODE_SIZE_C: OpCodeSize = 9;
 pub const OPCODE_SIZE_BX: OpCodeSize = 18;
 pub const OPCODE_SIZE_SBX: OpCodeSize = 18;
 
-pub const OPCODE_MAX_A: OpCodeSize = 1 << (OPCODE_SIZE_A - 1);
-pub const OPCODE_MAX_B: OpCodeSize = 1 << (OPCODE_SIZE_B - 1);
-pub const OPCODE_MAX_C: OpCodeSize = 1 << (OPCODE_SIZE_C - 1);
-pub const OPCODE_MAX_BX: OpCodeSize = 1 << (OPCODE_SIZE_BX - 1);
+pub const OPCODE_MAX_A: OpCodeSize = (1 << OPCODE_SIZE_A) - 1;
+pub const OPCODE_MAX_B: OpCodeSize = (1 << OPCODE_SIZE_B) - 1;
+pub const OPCODE_MAX_C: OpCodeSize = (1 << OPCODE_SIZE_C) - 1;
+pub const OPCODE_MAX_BX: OpCodeSize = (1 << OPCODE_SIZE_BX) - 1;
 pub const OPCODE_MAX_SBX: OpCodeSize = OPCODE_MAX_BX >> 1;
 
 // Opcodes
@@ -445,12 +445,12 @@ pub fn set_argbx(inst: &mut Instruction, bx: i32) {
 
 #[inline]
 pub fn get_argsbx(inst: Instruction) -> i32 {
-    get_argbx(inst) - OPCODE_MAX_SBX
+    get_argbx(inst) // - OPCODE_MAX_SBX
 }
 
 #[inline]
 pub fn set_argsbx(inst: &mut Instruction, sbx: i32) {
-    set_argbx(inst, sbx + OPCODE_MAX_SBX);
+    set_argbx(inst, sbx); // + OPCODE_MAX_SBX
 }
 
 #[allow(non_snake_case)]
