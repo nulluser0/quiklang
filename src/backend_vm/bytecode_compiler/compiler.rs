@@ -194,6 +194,7 @@ mod tests {
             ])
             .expect("compile fail");
 
+        println!("{}", compiler.max_reg);
         println!("{:#?}", compiler.constants);
 
         for inst in compiler.instructions {
