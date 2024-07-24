@@ -4,11 +4,14 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     backend_vm::{
-        instructions::{ABx, Abc, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL},
+        instructions::{
+            ABx, Abc, OP_ADD, OP_AND, OP_DIV, OP_EQ, OP_GE, OP_GT, OP_LE, OP_LOADBOOL,
+            OP_LOADCONST, OP_LOADNULL, OP_LT, OP_MOD, OP_MUL, OP_NE, OP_OR, OP_SUB,
+        },
         vm::RegisterVal,
     },
     errors::VMCompileError,
-    frontend::ast::{Expr, Literal},
+    frontend::ast::{BinaryOp, Expr, Literal},
 };
 
 use super::{compiler::Compiler, symbol_tracker::SymbolTable};
@@ -26,7 +29,9 @@ impl Compiler {
             Expr::Tuple(_) => todo!(),
             Expr::AssignmentExpr { assignee, expr } => todo!(),
             Expr::ConcatOp { left, right } => todo!(),
-            Expr::BinaryOp { op, left, right } => todo!(),
+            Expr::BinaryOp { op, left, right } => {
+                self.compile_binary_op(op, *left, *right, symbol_table)
+            }
             Expr::UnaryOp(_, _) => todo!(),
             Expr::FunctionCall(_, _) => todo!(),
             Expr::Member(_, _) => todo!(),
@@ -92,5 +97,34 @@ impl Compiler {
                     .ok_or(VMCompileError::UndefinedVariable(other.to_string()))
             }
         }
+    }
+
+    fn compile_binary_op(
+        &mut self,
+        op: BinaryOp,
+        left: Expr,
+        right: Expr,
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+    ) -> Result<usize, VMCompileError> {
+        let reg = self.allocate_register();
+        let b = self.compile_expression(left, symbol_table)? as i32;
+        let c = self.compile_expression(right, symbol_table)? as i32;
+        let opcode = match op {
+            BinaryOp::Add => OP_ADD,
+            BinaryOp::Subtract => OP_SUB,
+            BinaryOp::Multiply => OP_MUL,
+            BinaryOp::Divide => OP_DIV,
+            BinaryOp::GreaterThan => OP_GT,
+            BinaryOp::LessThan => OP_LT,
+            BinaryOp::GreaterOrEqual => OP_GE,
+            BinaryOp::LessOrEqual => OP_LE,
+            BinaryOp::Equal => OP_EQ,
+            BinaryOp::NotEqual => OP_NE,
+            BinaryOp::And => OP_AND,
+            BinaryOp::Or => OP_OR,
+            BinaryOp::Modulus => OP_MOD,
+        };
+        self.add_instruction(Abc(opcode, reg as i32, b, c));
+        Ok(reg)
     }
 }

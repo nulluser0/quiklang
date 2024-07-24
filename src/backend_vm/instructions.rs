@@ -55,26 +55,27 @@ pub const OP_NOT: OpCode = 10;
 pub const OP_AND: OpCode = 11;
 pub const OP_OR: OpCode = 12;
 pub const OP_EQ: OpCode = 13;
-pub const OP_LT: OpCode = 14;
-pub const OP_LE: OpCode = 15;
-pub const OP_GT: OpCode = 16;
-pub const OP_GE: OpCode = 17;
-pub const OP_JUMP: OpCode = 18; // A  PC += A
-pub const OP_JUMP_IF_TRUE: OpCode = 19;
-pub const OP_JUMP_IF_FALSE: OpCode = 20; // A B  if (!R(A)) PC += B
-pub const OP_CALL: OpCode = 21; // A B  Call function at R(A) with B arguments
-pub const OP_TAILCALL: OpCode = 22;
-pub const OP_RETURN: OpCode = 23; // A  Return with R(A)
-pub const OP_INC: OpCode = 24; // A  R(A)++
-pub const OP_DEC: OpCode = 25; // A  R(A)--
-pub const OP_BITAND: OpCode = 26; // A B C  R(A) := R(B) & R(C)
-pub const OP_BITOR: OpCode = 27; // A B C  R(A) := R(B) | R(C)
-pub const OP_BITXOR: OpCode = 28; // A B C  R(A) := R(B) ^ R(C)
-pub const OP_SHL: OpCode = 29; // A B C  R(A) := R(B) << R(C)
-pub const OP_SHR: OpCode = 30; // A B C  R(A) := R(B) >> R(C)
-pub const OP_CONCAT: OpCode = 31;
+pub const OP_NE: OpCode = 14;
+pub const OP_LT: OpCode = 15;
+pub const OP_LE: OpCode = 16;
+pub const OP_GT: OpCode = 17;
+pub const OP_GE: OpCode = 18;
+pub const OP_JUMP: OpCode = 19; // A  PC += A
+pub const OP_JUMP_IF_TRUE: OpCode = 20;
+pub const OP_JUMP_IF_FALSE: OpCode = 21; // A B  if (!R(A)) PC += B
+pub const OP_CALL: OpCode = 22; // A B  Call function at R(A) with B arguments
+pub const OP_TAILCALL: OpCode = 23;
+pub const OP_RETURN: OpCode = 24; // A  Return with R(A)
+pub const OP_INC: OpCode = 25; // A  R(A)++
+pub const OP_DEC: OpCode = 26; // A  R(A)--
+pub const OP_BITAND: OpCode = 27; // A B C  R(A) := R(B) & R(C)
+pub const OP_BITOR: OpCode = 28; // A B C  R(A) := R(B) | R(C)
+pub const OP_BITXOR: OpCode = 29; // A B C  R(A) := R(B) ^ R(C)
+pub const OP_SHL: OpCode = 30; // A B C  R(A) := R(B) << R(C)
+pub const OP_SHR: OpCode = 31; // A B C  R(A) := R(B) >> R(C)
+pub const OP_CONCAT: OpCode = 32;
 // NOP
-pub const OP_NOP: OpCode = 32;
+pub const OP_NOP: OpCode = 33;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum OpArgMode {
@@ -218,6 +219,14 @@ pub static OP_NAMES: &[OpProp; OP_NOP as usize + 1] = &[
     },
     OpProp {
         name: "EQ",
+        is_test: true,
+        set_reg_a: true,
+        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+        typ: OpType::Abc,
+    },
+    OpProp {
+        name: "NE",
         is_test: true,
         set_reg_a: true,
         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
@@ -543,6 +552,7 @@ pub fn to_string(inst: Instruction) -> String {
         OP_AND => format!("{} | R({}) := R({}) and R({})", ops, arga, argb, argc),
         OP_OR => format!("{} | R({}) := R({}) or R({})", ops, arga, argb, argc),
         OP_EQ => format!("{} | R({}) = (RK({}) == RK({})", ops, arga, argb, argc),
+        OP_NE => format!("{} | R({}) := RK({}) != RK({})", ops, arga, argb, argc),
         OP_LT => format!("{} | R({}) = (RK({}) < RK({})", ops, arga, argb, argc),
         OP_LE => format!("{} | R({}) = (RK({}) <= RK({})", ops, arga, argb, argc),
         OP_GT => format!("{} | R({}) = (RK({}) > RK({})", ops, arga, argb, argc),
