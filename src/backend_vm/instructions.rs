@@ -534,14 +534,14 @@ pub fn to_string(inst: Instruction) -> String {
             argc
         ),
         OpType::ABx => format!(
-            "{:20}| {:4} | {:4}, {:8}",
+            "{:20}| {:4} | {:4}, {:10}",
             prop.name,
             prop.typ.to_string(),
             arga,
             argbx
         ),
         OpType::AsBx => format!(
-            "{:20}| {:4} | {:4}, {:8}",
+            "{:20}| {:4} | {:4}, {:10}",
             prop.name,
             prop.typ.to_string(),
             arga,

@@ -21,12 +21,16 @@ impl Compiler {
     pub(super) fn compile_expression(
         &mut self,
         expr: Expr,
+        require_constant_as_register: bool, // true = allocates register to a constant.
+        require_result: bool, // true = certain exprs will return a result, like ifs, loops, fors, whiles, blocks.
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<isize, VMCompileError> {
         match expr {
-            Expr::Literal(literal) => self.compile_literal(literal),
+            Expr::Literal(literal) => self.compile_literal(literal, require_constant_as_register),
             Expr::Array(_, _) => todo!(),
-            Expr::Identifier(identifier) => self.compile_identifier(identifier, symbol_table),
+            Expr::Identifier(identifier) => {
+                self.compile_identifier(identifier, symbol_table, require_constant_as_register)
+            }
             Expr::Tuple(_) => todo!(),
             Expr::AssignmentExpr { assignee, expr } => todo!(),
             Expr::ConcatOp { left, right } => todo!(),
@@ -40,7 +44,7 @@ impl Compiler {
                 condition,
                 then,
                 else_stmt,
-            } => self.compile_if_expr(*condition, then, else_stmt, symbol_table),
+            } => self.compile_if_expr(*condition, then, else_stmt, require_result, symbol_table),
             Expr::ForExpr {
                 identifier,
                 iterable,
@@ -58,7 +62,7 @@ impl Compiler {
     fn compile_literal(
         &mut self,
         literal: Literal,
-        require_constant: bool,
+        require_constant_as_register: bool,
     ) -> Result<isize, VMCompileError> {
         let constant = match literal {
             Literal::Integer(integer) => RegisterVal::Int(integer),
@@ -68,7 +72,7 @@ impl Compiler {
         };
         let index = self.add_constant(constant);
 
-        if require_constant {
+        if require_constant_as_register {
             let reg = self.allocate_register();
             self.add_instruction(ABx(OP_LOADCONST, reg as i32, index as i32));
             return Ok(reg as isize);
@@ -81,19 +85,34 @@ impl Compiler {
         &mut self,
         identifier: String,
         symbol_table: &Rc<RefCell<SymbolTable>>,
-        require_constant: bool,
+        require_constant_as_register: bool,
     ) -> Result<isize, VMCompileError> {
         match identifier.as_str() {
             "null" => {
                 let index = self.add_constant(RegisterVal::Null);
+                if require_constant_as_register {
+                    let reg = self.allocate_register();
+                    self.add_instruction(Abc(OP_LOADNULL, reg as i32, reg as i32, 0));
+                    return Ok(reg as isize);
+                }
                 Ok(-(index as isize))
             }
             "true" => {
                 let index = self.add_constant(RegisterVal::Bool(true));
+                if require_constant_as_register {
+                    let reg = self.allocate_register();
+                    self.add_instruction(Abc(OP_LOADBOOL, reg as i32, 1, 0));
+                    return Ok(reg as isize);
+                }
                 Ok(-(index as isize))
             }
             "false" => {
                 let index = self.add_constant(RegisterVal::Bool(false));
+                if require_constant_as_register {
+                    let reg = self.allocate_register();
+                    self.add_instruction(Abc(OP_LOADBOOL, reg as i32, 0, 0));
+                    return Ok(reg as isize);
+                }
                 Ok(-(index as isize))
             }
             other => {
@@ -115,8 +134,8 @@ impl Compiler {
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<isize, VMCompileError> {
         let reg = self.allocate_register();
-        let b = self.compile_expression(left, symbol_table)? as i32;
-        let c = self.compile_expression(right, symbol_table)? as i32;
+        let b = self.compile_expression(left, false, true, symbol_table)? as i32;
+        let c = self.compile_expression(right, false, true, symbol_table)? as i32;
         let opcode = match op {
             BinaryOp::Add => OP_ADD,
             BinaryOp::Subtract => OP_SUB,
@@ -143,7 +162,7 @@ impl Compiler {
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<isize, VMCompileError> {
         let reg = self.allocate_register();
-        let b = self.compile_expression(expr, symbol_table)? as i32;
+        let b = self.compile_expression(expr, false, true, symbol_table)? as i32;
         let opcode = match op {
             UnaryOp::LogicalNot => OP_NOT,
             UnaryOp::ArithmeticNegative => todo!(),
@@ -159,6 +178,7 @@ impl Compiler {
         condition: Expr,
         then: Vec<Stmt>,
         else_stmt: Option<Vec<Stmt>>,
+        require_result: bool,
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<isize, VMCompileError> {
         // TODO: only return result if required, optimisation
@@ -171,15 +191,18 @@ impl Compiler {
         //      else area
         //      endif area
 
-        // Store the if expr result
-        let result_register = self.allocate_register();
+        // Store the if expr result if required
+        let result_register = self.reg_top();
+        if require_result {
+            self.allocate_register();
+        }
         let mut result: isize = 0;
 
         // Save the top register so that we can disregard the registers from the if expr after use.
         let current_reg_top = self.reg_top();
 
         // First, get the condition's result and store its register.
-        let condition_result = self.compile_expression(condition, symbol_table)?;
+        let condition_result = self.compile_expression(condition, true, true, symbol_table)?;
 
         // Add instruction to jump to else/endif if false
         let jump_to_end_or_else = self.instructions_len(); // Index of the JUMP_IF_ELSE inst
@@ -193,7 +216,9 @@ impl Compiler {
         for stmt in then {
             result = self.compile_statement(stmt, child_symbol_table)?;
         }
-        self.add_instruction(Abc(OP_MOVE, result_register as i32, result as i32, 0));
+        if require_result {
+            self.add_instruction(Abc(OP_MOVE, result_register as i32, result as i32, 0));
+        }
 
         // Add placeholder jump to endif after then block
         let jump_to_end = self.instructions_len();
@@ -226,7 +251,9 @@ impl Compiler {
         for stmt in else_stmt.unwrap() {
             result = self.compile_statement(stmt, child_symbol_table)?;
         }
-        self.add_instruction(Abc(OP_MOVE, result_register as i32, result as i32, 0));
+        if require_result {
+            self.add_instruction(Abc(OP_MOVE, result_register as i32, result as i32, 0));
+        }
 
         // Update jumps
         let end = self.instructions_len();

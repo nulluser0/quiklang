@@ -2,7 +2,10 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{errors::VMCompileError, frontend::ast::Stmt};
+use crate::{
+    errors::VMCompileError,
+    frontend::ast::{Expr, Stmt},
+};
 
 use super::{compiler::Compiler, symbol_tracker::SymbolTable};
 
@@ -13,14 +16,14 @@ impl Compiler {
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<isize, VMCompileError> {
         match stmt {
-            Stmt::ExprStmt(expr) => self.compile_expression(expr, symbol_table),
+            Stmt::ExprStmt(expr) => self.compile_expression(expr, true, false, symbol_table),
             Stmt::DeclareStmt {
                 name,
                 is_mutable,
                 is_global,
                 var_type,
                 expr,
-            } => todo!(),
+            } => self.compile_declare_stmt(name, is_global, expr, symbol_table),
             Stmt::ReturnStmt(_) => todo!(),
             Stmt::BreakStmt(_) => todo!(),
             Stmt::FunctionDeclaration {
@@ -37,5 +40,22 @@ impl Compiler {
             Stmt::EnumDefStmt { ident, variants } => todo!(),
             Stmt::AliasDefStmt { ident, alias } => todo!(),
         }
+    }
+
+    fn compile_declare_stmt(
+        &mut self,
+        name: String,
+        is_global: bool,
+        expr: Option<Expr>,
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+    ) -> Result<isize, VMCompileError> {
+        let reg;
+        if let Some(inner) = expr {
+            reg = self.compile_expression(inner, true, true, symbol_table)?;
+        } else {
+            reg = self.allocate_register() as isize;
+        }
+        symbol_table.borrow_mut().declare_var(name, reg as usize);
+        Ok(reg)
     }
 }

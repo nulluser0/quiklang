@@ -146,7 +146,7 @@ impl Default for Compiler {
 mod tests {
     use crate::{
         backend_vm::instructions::{get_argsbx, to_string, ASBx, OP_JUMP},
-        frontend::ast::{BinaryOp, Expr, Literal},
+        frontend::ast::{BinaryOp, Expr, Literal, Type},
     };
 
     use super::*;
@@ -175,6 +175,17 @@ mod tests {
                         right: Box::new(Expr::Literal(Literal::Integer(1233))),
                     })]),
                 }),
+                Stmt::DeclareStmt {
+                    name: "idk".to_string(),
+                    is_mutable: false,
+                    is_global: false,
+                    var_type: Type::Integer,
+                    expr: Some(Expr::IfExpr {
+                        condition: Box::new(Expr::Identifier("false".to_string())),
+                        then: vec![Stmt::ExprStmt(Expr::Literal(Literal::Integer(42)))],
+                        else_stmt: Some(vec![Stmt::ExprStmt(Expr::Literal(Literal::Integer(21)))]),
+                    }),
+                },
             ])
             .expect("compile fail");
 
