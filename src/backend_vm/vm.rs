@@ -377,18 +377,15 @@ impl VM {
             }
             OP_JUMP => {
                 self.program_counter = (self.program_counter as i32 + argsbx) as usize;
-                return;
             }
             OP_JUMP_IF_TRUE => {
                 if let RegisterVal::Bool(true) = self.registers[arga as usize] {
                     self.program_counter = (self.program_counter as i32 + argsbx) as usize;
-                    return;
                 }
             }
             OP_JUMP_IF_FALSE => {
                 if let RegisterVal::Bool(false) = self.registers[arga as usize] {
                     self.program_counter = (self.program_counter as i32 + argsbx) as usize;
-                    return;
                 }
             }
             OP_CALL => {

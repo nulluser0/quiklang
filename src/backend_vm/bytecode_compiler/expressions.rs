@@ -234,7 +234,7 @@ impl Compiler {
                 ASBx(
                     OP_JUMP_IF_FALSE,
                     condition_result as i32,
-                    (jump_to_end - jump_to_end_or_else) as i32,
+                    (jump_to_end - jump_to_end_or_else - 1) as i32,
                 ),
             )
         }
@@ -264,12 +264,15 @@ impl Compiler {
             ASBx(
                 OP_JUMP_IF_FALSE,
                 condition_result as i32,
-                (jump_to_end + 1 - jump_to_end_or_else) as i32,
+                (jump_to_end - jump_to_end_or_else) as i32,
             ),
         );
 
         // Jump to end from then block
-        self.replace_instruction(jump_to_end, ASBx(OP_JUMP, 0, (end - jump_to_end) as i32));
+        self.replace_instruction(
+            jump_to_end,
+            ASBx(OP_JUMP, 0, (end - jump_to_end - 1) as i32),
+        );
 
         // Reset register count back to normal in preparation for endif
         self.manually_change_register_count(current_reg_top);
