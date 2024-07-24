@@ -156,7 +156,7 @@ mod tests {
         let mut compiler = Compiler::new();
         compiler
             .compile(vec![
-                Stmt::ExprStmt(Expr::Literal(Literal::Integer(209309))),
+                // Stmt::ExprStmt(Expr::Literal(Literal::Integer(209309))),
                 Stmt::ExprStmt(Expr::BinaryOp {
                     op: BinaryOp::Add,
                     left: Box::new(Expr::Literal(Literal::Integer(123))),
@@ -186,6 +186,11 @@ mod tests {
                         else_stmt: Some(vec![Stmt::ExprStmt(Expr::Literal(Literal::Integer(21)))]),
                     }),
                 },
+                Stmt::ExprStmt(Expr::BinaryOp {
+                    op: BinaryOp::Add,
+                    left: Box::new(Expr::Identifier("idk".to_string())),
+                    right: Box::new(Expr::Literal(Literal::Integer(12))),
+                }),
             ])
             .expect("compile fail");
 

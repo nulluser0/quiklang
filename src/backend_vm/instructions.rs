@@ -511,6 +511,11 @@ pub fn rk_ask(v: i32) -> i32 {
     v | OP_BIT_RK
 }
 
+#[inline]
+pub fn rk_to_k(v: i32) -> i32 {
+    (v & 0x1FF) & !OP_BIT_RK
+}
+
 pub fn to_string(inst: Instruction) -> String {
     let op = get_opcode(inst);
     if op > OP_NOP {
@@ -551,6 +556,14 @@ pub fn to_string(inst: Instruction) -> String {
 
     let ops = format!("{:36}", ops);
 
+    let format_rk = |v| {
+        if is_k(v) {
+            format!("K({})", rk_to_k(v))
+        } else {
+            format!("R({})", v)
+        }
+    };
+
     match op {
         OP_MOVE => format!("{} | R({}) := R({}), argb => arga", ops, arga, argb),
         OP_LOADCONST => format!("{} | R({}) := Kst({})", ops, arga, argbx),
@@ -559,21 +572,105 @@ pub fn to_string(inst: Instruction) -> String {
             ops, arga, argb, argc
         ),
         OP_LOADNULL => format!("{} | R({}) := ... := R({}) := nil", ops, arga, argb),
-        OP_ADD => format!("{} | R({}) := RK({}) + RK({})", ops, arga, argb, argc),
-        OP_SUB => format!("{} | R({}) := RK({}) - RK({})", ops, arga, argb, argc),
-        OP_MUL => format!("{} | R({}) := RK({}) * RK({})", ops, arga, argb, argc),
-        OP_DIV => format!("{} | R({}) := RK({}) / RK({})", ops, arga, argb, argc),
-        OP_MOD => format!("{} | R({}) := RK({}) % RK({})", ops, arga, argb, argc),
-        OP_POW => format!("{} | R({}) := RK({}) ^ RK({})", ops, arga, argb, argc),
+        OP_ADD => format!(
+            "{} | R({}) := {} + {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_SUB => format!(
+            "{} | R({}) := {} - {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_MUL => format!(
+            "{} | R({}) := {} * {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_DIV => format!(
+            "{} | R({}) := {} / {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_MOD => format!(
+            "{} | R({}) := {} % {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_POW => format!(
+            "{} | R({}) := {} ^ {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
         OP_NOT => format!("{} | R({}) := not R({})", ops, arga, argb),
-        OP_AND => format!("{} | R({}) := R({}) and R({})", ops, arga, argb, argc),
-        OP_OR => format!("{} | R({}) := R({}) or R({})", ops, arga, argb, argc),
-        OP_EQ => format!("{} | R({}) = (RK({}) == RK({})", ops, arga, argb, argc),
-        OP_NE => format!("{} | R({}) := RK({}) != RK({})", ops, arga, argb, argc),
-        OP_LT => format!("{} | R({}) = (RK({}) < RK({})", ops, arga, argb, argc),
-        OP_LE => format!("{} | R({}) = (RK({}) <= RK({})", ops, arga, argb, argc),
-        OP_GT => format!("{} | R({}) = (RK({}) > RK({})", ops, arga, argb, argc),
-        OP_GE => format!("{} | R({}) = (RK({}) >= RK({})", ops, arga, argb, argc),
+        OP_AND => format!(
+            "{} | R({}) := {} and {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_OR => format!(
+            "{} | R({}) := {} or {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_EQ => format!(
+            "{} | R({}) = ({} == {})",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_NE => format!(
+            "{} | R({}) := {} != {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_LT => format!(
+            "{} | R({}) = ({} < {})",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_LE => format!(
+            "{} | R({}) = ({} <= {})",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_GT => format!(
+            "{} | R({}) = ({} > {})",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_GE => format!(
+            "{} | R({}) = ({} >= {})",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
         OP_JUMP => format!("{} | pc += {}", ops, argsbx),
         OP_JUMP_IF_TRUE => format!("{} | if R({}) is true then pc += {}", ops, arga, argsbx),
         OP_JUMP_IF_FALSE => format!("{} | if R({}) is false then pc += {}", ops, arga, argsbx),
@@ -586,20 +683,23 @@ pub fn to_string(inst: Instruction) -> String {
             ops, arga, arga, arga, argb
         ),
         OP_RETURN => format!("{} | return R({}) ... R({}+{}-2)", ops, arga, arga, argb),
-        OP_INC => format!("{} | R({}) += 1", op, arga),
-        OP_DEC => format!("{} | R({}) -= 1", op, arga),
+        OP_INC => format!("{} | R({}) += 1", ops, arga),
+        OP_DEC => format!("{} | R({}) -= 1", ops, arga),
         OP_BITAND => format!(
             "{} | R({}) := R({}) bitwise and R({})",
-            op, arga, argb, argc
+            ops, arga, argb, argc
         ),
-        OP_BITOR => format!("{} | R({}) := R({}) bitwise or R({})", op, arga, argb, argc),
+        OP_BITOR => format!(
+            "{} | R({}) := R({}) bitwise or R({})",
+            ops, arga, argb, argc
+        ),
         OP_BITXOR => format!(
             "{} | R({}) := R({}) bitwise exclusive or R({})",
-            op, arga, argb, argc
+            ops, arga, argb, argc
         ),
-        OP_SHL => format!("{} | R({}) := R({}) << R({})", op, arga, argb, argc),
-        OP_SHR => format!("{} | R({}) := R({}) >> R({})", op, arga, argb, argc),
-        OP_CONCAT => format!("{} | R({}) := R({}) & R({})", op, arga, argb, argc),
+        OP_SHL => format!("{} | R({}) := R({}) << R({})", ops, arga, argb, argc),
+        OP_SHR => format!("{} | R({}) := R({}) >> R({})", ops, arga, argb, argc),
+        OP_CONCAT => format!("{} | R({}) := R({}) & R({})", ops, arga, argb, argc),
         OP_NOP => ops.to_string(),
         _ => unreachable!(),
     }

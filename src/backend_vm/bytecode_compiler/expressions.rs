@@ -5,9 +5,9 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     backend_vm::{
         instructions::{
-            ABx, ASBx, Abc, OP_ADD, OP_AND, OP_DIV, OP_EQ, OP_GE, OP_GT, OP_JUMP, OP_JUMP_IF_FALSE,
-            OP_LE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LT, OP_MOD, OP_MOVE, OP_MUL, OP_NE,
-            OP_NOT, OP_OR, OP_SUB,
+            rk_ask, ABx, ASBx, Abc, OP_ADD, OP_AND, OP_DIV, OP_EQ, OP_GE, OP_GT, OP_JUMP,
+            OP_JUMP_IF_FALSE, OP_LE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LT, OP_MOD,
+            OP_MOVE, OP_MUL, OP_NE, OP_NOT, OP_OR, OP_SUB,
         },
         vm::RegisterVal,
     },
@@ -78,7 +78,7 @@ impl Compiler {
             return Ok(reg as isize);
         }
 
-        Ok(-(index as isize))
+        Ok((rk_ask(index as i32)) as isize)
     }
 
     fn compile_identifier(
@@ -89,31 +89,31 @@ impl Compiler {
     ) -> Result<isize, VMCompileError> {
         match identifier.as_str() {
             "null" => {
-                let index = self.add_constant(RegisterVal::Null);
                 if require_constant_as_register {
                     let reg = self.allocate_register();
                     self.add_instruction(Abc(OP_LOADNULL, reg as i32, reg as i32, 0));
                     return Ok(reg as isize);
                 }
-                Ok(-(index as isize))
+                let index = self.add_constant(RegisterVal::Null);
+                Ok((rk_ask(index as i32)) as isize)
             }
             "true" => {
-                let index = self.add_constant(RegisterVal::Bool(true));
                 if require_constant_as_register {
                     let reg = self.allocate_register();
                     self.add_instruction(Abc(OP_LOADBOOL, reg as i32, 1, 0));
                     return Ok(reg as isize);
                 }
-                Ok(-(index as isize))
+                let index = self.add_constant(RegisterVal::Bool(true));
+                Ok((rk_ask(index as i32)) as isize)
             }
             "false" => {
-                let index = self.add_constant(RegisterVal::Bool(false));
                 if require_constant_as_register {
                     let reg = self.allocate_register();
                     self.add_instruction(Abc(OP_LOADBOOL, reg as i32, 0, 0));
                     return Ok(reg as isize);
                 }
-                Ok(-(index as isize))
+                let index = self.add_constant(RegisterVal::Bool(false));
+                Ok((rk_ask(index as i32)) as isize)
             }
             other => {
                 // No special ident_keyword. Instead, match symbol table.
