@@ -171,14 +171,15 @@ mod tests {
     fn compile_including_parse_etc() {
         let source_code = r#"
         let n = 5;
-        let a = 
+        let a = block {
             if n <= 1 {
                 1
             } else {
                 n
-            };
+            }
+        };
         
-        let bruh = 1 + 2;
+        a + 1
         "#
         .to_string();
 

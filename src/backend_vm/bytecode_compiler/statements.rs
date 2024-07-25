@@ -21,7 +21,12 @@ impl Compiler {
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         match stmt {
-            Stmt::ExprStmt(expr) => self.compile_expression(expr, true, false, symbol_table),
+            Stmt::ExprStmt(expr) => self.compile_expression(
+                expr,
+                require_constant_as_register,
+                require_result,
+                symbol_table,
+            ),
             Stmt::DeclareStmt {
                 name,
                 is_mutable,

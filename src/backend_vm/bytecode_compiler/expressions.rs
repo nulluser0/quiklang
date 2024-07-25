@@ -317,6 +317,7 @@ impl Compiler {
         if require_result {
             self.allocate_register();
         }
+        let mut result = ReturnValue::Normal(0);
         // Save current top register to restore later
         let current_reg_top = self.reg_top();
 
@@ -340,7 +341,7 @@ impl Compiler {
             symbol_table.clone(),
         )));
         for stmt in then {
-            let result = self.compile_statement(stmt, true, true, child_symbol_table)?;
+            result = self.compile_statement(stmt, true, true, child_symbol_table)?;
             if let ReturnValue::Break(inner) = result {
                 if require_result {
                     self.add_instruction(Abc(OP_MOVE, result_register as i32, inner as i32, 0));
@@ -351,7 +352,12 @@ impl Compiler {
             }
         }
         if require_result {
-            self.add_instruction(Abc(OP_MOVE, result_register as i32, result as i32, 0));
+            self.add_instruction(Abc(
+                OP_MOVE,
+                result_register as i32,
+                result.safe_unwrap() as i32,
+                0,
+            ));
         }
 
         // Add instruction to jump back to the start of the loop
