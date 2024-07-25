@@ -29,7 +29,7 @@ pub fn run_vm(
                 }
             }
         }
-        Err(e) => panic!(e),
+        Err(e) => panic!("{}", e),
     }
 }
 
