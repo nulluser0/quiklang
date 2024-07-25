@@ -7,14 +7,17 @@ use crate::{
     frontend::ast::{Expr, Stmt},
 };
 
-use super::{compiler::Compiler, symbol_tracker::SymbolTable};
+use super::{
+    compiler::{Compiler, ReturnValue},
+    symbol_tracker::SymbolTable,
+};
 
 impl Compiler {
     pub(super) fn compile_statement(
         &mut self,
         stmt: Stmt,
         symbol_table: &Rc<RefCell<SymbolTable>>,
-    ) -> Result<isize, VMCompileError> {
+    ) -> Result<ReturnValue, VMCompileError> {
         match stmt {
             Stmt::ExprStmt(expr) => self.compile_expression(expr, true, false, symbol_table),
             Stmt::DeclareStmt {
@@ -24,8 +27,8 @@ impl Compiler {
                 var_type,
                 expr,
             } => self.compile_declare_stmt(name, is_global, expr, symbol_table),
-            Stmt::ReturnStmt(_) => todo!(),
-            Stmt::BreakStmt(_) => todo!(),
+            Stmt::ReturnStmt(expr) => self.compile_return_stmt(expr, symbol_table),
+            Stmt::BreakStmt(expr) => self.compile_break_stmt(expr, symbol_table),
             Stmt::FunctionDeclaration {
                 parameters,
                 name,
@@ -48,14 +51,44 @@ impl Compiler {
         is_global: bool,
         expr: Option<Expr>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
-    ) -> Result<isize, VMCompileError> {
+    ) -> Result<ReturnValue, VMCompileError> {
         let reg;
         if let Some(inner) = expr {
-            reg = self.compile_expression(inner, true, true, symbol_table)?;
+            reg = self
+                .compile_expression(inner, true, true, symbol_table)?
+                .safe_unwrap();
         } else {
             reg = self.allocate_register() as isize;
         }
         symbol_table.borrow_mut().declare_var(name, reg as usize);
-        Ok(reg)
+        Ok(ReturnValue::Normal(reg))
+    }
+
+    fn compile_return_stmt(
+        &mut self,
+        expr: Option<Expr>,
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+    ) -> Result<ReturnValue, VMCompileError> {
+        if let Some(inner) = expr {
+            let reg = self
+                .compile_expression(inner, true, true, symbol_table)?
+                .safe_unwrap();
+            return Ok(ReturnValue::Return(reg));
+        }
+        Ok(ReturnValue::Return(0))
+    }
+
+    fn compile_break_stmt(
+        &mut self,
+        expr: Option<Expr>,
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+    ) -> Result<ReturnValue, VMCompileError> {
+        if let Some(inner) = expr {
+            let reg = self
+                .compile_expression(inner, true, true, symbol_table)?
+                .safe_unwrap();
+            return Ok(ReturnValue::Break(reg));
+        }
+        Ok(ReturnValue::Break(0))
     }
 }

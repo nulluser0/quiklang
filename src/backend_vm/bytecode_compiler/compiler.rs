@@ -1,10 +1,6 @@
 // Compiler
 
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     backend_vm::{
@@ -17,6 +13,22 @@ use crate::{
 };
 
 use super::symbol_tracker::SymbolTable;
+
+pub(super) enum ReturnValue {
+    Normal(isize), // A standard isize format.
+    Break(isize),  // Standard isize with Break discriminant.
+    Return(isize), // Standard isize with Return discriminant.
+}
+
+impl ReturnValue {
+    pub(super) fn safe_unwrap(&self) -> isize {
+        match self {
+            ReturnValue::Normal(i) => *i,
+            ReturnValue::Break(i) => *i,
+            ReturnValue::Return(i) => *i,
+        }
+    }
+}
 
 const fn str_to_byte_array(s: &str) -> [u8; 8] {
     // Convert the string to a byte array with exactly 8 bytes.
@@ -146,10 +158,37 @@ impl Default for Compiler {
 mod tests {
     use crate::{
         backend_vm::instructions::{get_argsbx, to_string, ASBx, OP_JUMP},
-        frontend::ast::{BinaryOp, Expr, Literal, Type},
+        frontend::{
+            ast::{BinaryOp, Expr, Literal, Type},
+            type_environment::TypeEnvironment,
+        },
+        utils::run::run_vm,
     };
 
     use super::*;
+
+    #[test]
+    fn compile_including_parse_etc() {
+        let source_code = r#"
+        let n = 1;
+        let a = block {
+            if n <= 1 {
+                1
+            } else {
+                n
+            }
+        };
+        
+        let bruh = 1 + 2
+        "#
+        .to_string();
+
+        let root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
+        let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+            root_type_env.clone(),
+        )));
+        run_vm(source_code.clone(), &type_env, &root_type_env);
+    }
 
     #[test]
     fn simple_compile_test() {
