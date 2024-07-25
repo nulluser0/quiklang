@@ -23,6 +23,31 @@ use super::{
 //     base: usize,
 // }
 
+// TODO: Consider using this:
+//      Replace Rc<T> with *const T
+//      As a result, carefully manage memory in the parsetime and compiletime.
+//      In Parsetime, variables are dropped after their scope is dropped.
+//      Example
+//      block {
+//          let x = [20]; // x is a pointer to a heap array.
+//          block {
+//              x.push(23); // x, an array, has its push method called. It modifies the heap array by accessing pointer.
+//          }
+//          // more stuff with x
+//      } // x, a pointer to heap allocated array value, is dropped. It should be done by a "destructor" insstruction, which reads register's
+//      //   pointer to the heap object, then destroys the heap object.
+//      x.pop() // Parse error, x no longer exists (dropped) and cannot be accessed.
+//
+//      Issues. What about heap allocated objects in a heap allocated object (like an array)? How do we know all the references to that array don't exist?
+//          Very temporary (bandaid-ahh) solution: pointers and concept of shared variables are not implemented. Theoretically, it should be fine to just
+//          drop the "popped" object in the parent object.
+//      When concepts of pointers/references/shared variables comes up, a solution is to ensure:
+//          let A = B; where A is pointer/reference/share of heap object B (B would be represented as a heap pointer in vm runtime btw).
+//          B must not be dropped/out of scope before A
+//              let b = [123];
+//                  block {
+//                      let a = share b; // Valid, b does not go out of scope when a is alive.
+//                  }
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum RegisterVal {
     Int(i64),
