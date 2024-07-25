@@ -58,10 +58,10 @@ impl Hash for RegisterVal {
 #[derive(Debug)]
 pub struct VM {
     registers: Vec<RegisterVal>,
-    constant_pool: Vec<RegisterVal>,
-    string_pool: Vec<Rc<String>>,
+    pub constant_pool: Vec<RegisterVal>,
+    pub string_pool: Vec<Rc<String>>,
     program_counter: usize,
-    instructions: Vec<Instruction>,
+    pub instructions: Vec<Instruction>,
     // call_stack: Vec<CallFrame>,
 }
 

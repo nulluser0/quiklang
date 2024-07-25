@@ -234,7 +234,7 @@ impl Compiler {
         )));
         for stmt in then {
             result = self
-                .compile_statement(stmt, child_symbol_table)?
+                .compile_statement(stmt, true, true, child_symbol_table)?
                 .safe_unwrap();
         }
         if require_result {
@@ -257,7 +257,9 @@ impl Compiler {
                     condition_result as i32,
                     (jump_to_end - jump_to_end_or_else - 1) as i32,
                 ),
-            )
+            );
+
+            return Ok(ReturnValue::Normal(result_register as isize));
         }
 
         // There is an else stmt.
@@ -271,7 +273,7 @@ impl Compiler {
         )));
         for stmt in else_stmt.unwrap() {
             result = self
-                .compile_statement(stmt, child_symbol_table)?
+                .compile_statement(stmt, true, true, child_symbol_table)?
                 .safe_unwrap();
         }
         if require_result {
@@ -338,7 +340,7 @@ impl Compiler {
             symbol_table.clone(),
         )));
         for stmt in then {
-            let result = self.compile_statement(stmt, child_symbol_table)?;
+            let result = self.compile_statement(stmt, true, true, child_symbol_table)?;
             if let ReturnValue::Break(inner) = result {
                 if require_result {
                     self.add_instruction(Abc(OP_MOVE, result_register as i32, inner as i32, 0));
@@ -403,7 +405,7 @@ impl Compiler {
         )));
         for stmt in block {
             result = self
-                .compile_statement(stmt, child_symbol_table)?
+                .compile_statement(stmt, true, true, child_symbol_table)?
                 .safe_unwrap();
         }
         if require_result {
@@ -441,7 +443,7 @@ impl Compiler {
             symbol_table.clone(),
         )));
         for stmt in block {
-            let result = self.compile_statement(stmt, child_symbol_table)?;
+            let result = self.compile_statement(stmt, true, true, child_symbol_table)?;
             if let ReturnValue::Break(inner) = result {
                 if require_result {
                     self.add_instruction(Abc(OP_MOVE, result_register as i32, inner as i32, 0));

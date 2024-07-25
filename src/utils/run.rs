@@ -25,7 +25,7 @@ pub fn run_vm(
                 }
                 Err(e) => {
                     print_e(errors::Error::VMCompileError(e));
-                    VM::new(vec![], vec![], vec![], 0)
+                    VM::new(vec![0], vec![], vec![], 0)
                 }
             }
         }

@@ -16,6 +16,8 @@ impl Compiler {
     pub(super) fn compile_statement(
         &mut self,
         stmt: Stmt,
+        require_constant_as_register: bool,
+        require_result: bool,
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         match stmt {

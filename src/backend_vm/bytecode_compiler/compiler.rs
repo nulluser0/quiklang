@@ -142,7 +142,7 @@ impl Compiler {
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<(), VMCompileError> {
         for stmt in stmts {
-            self.compile_statement(stmt, symbol_table)?;
+            self.compile_statement(stmt, true, false, symbol_table)?;
         }
         Ok(())
     }
@@ -160,9 +160,9 @@ mod tests {
         backend_vm::instructions::{get_argsbx, to_string, ASBx, OP_JUMP},
         frontend::{
             ast::{BinaryOp, Expr, Literal, Type},
+            parser,
             type_environment::TypeEnvironment,
         },
-        utils::run::run_vm,
     };
 
     use super::*;
@@ -170,16 +170,15 @@ mod tests {
     #[test]
     fn compile_including_parse_etc() {
         let source_code = r#"
-        let n = 1;
-        let a = block {
+        let n = 5;
+        let a = 
             if n <= 1 {
                 1
             } else {
                 n
-            }
-        };
+            };
         
-        let bruh = 1 + 2
+        let bruh = 1 + 2;
         "#
         .to_string();
 
@@ -187,7 +186,19 @@ mod tests {
         let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
             root_type_env.clone(),
         )));
-        run_vm(source_code.clone(), &type_env, &root_type_env);
+        let mut parser = parser::Parser::new();
+        let ast = parser
+            .produce_ast(source_code, &type_env, &root_type_env)
+            .expect("fail");
+        println!("{:#?}", ast.statements);
+        let mut compiler = Compiler::new();
+        compiler.compile(ast.statements).expect("fail parse");
+        println!("{}", compiler.max_reg);
+        println!("{:#?}", compiler.constants);
+
+        for inst in compiler.instructions {
+            println!("{}", to_string(inst))
+        }
     }
 
     #[test]
