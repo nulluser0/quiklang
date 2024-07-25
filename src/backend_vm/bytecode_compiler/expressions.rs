@@ -350,6 +350,9 @@ impl Compiler {
                 break_positions.push(break_pos);
             }
         }
+        if require_result {
+            self.add_instruction(Abc(OP_MOVE, result_register as i32, result as i32, 0));
+        }
 
         // Add instruction to jump back to the start of the loop
         let jump_back_to_start = self.instructions_len();
