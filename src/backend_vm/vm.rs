@@ -10,10 +10,10 @@ use super::{
     bytecode::ByteCode,
     instructions::{
         get_arga, get_argb, get_argbx, get_argc, get_argsbx, get_opcode, Instruction, OP_ADD,
-        OP_AND, OP_BITAND, OP_BITOR, OP_BITXOR, OP_CALL, OP_CONCAT, OP_DEC, OP_DIV, OP_EQ, OP_GE,
-        OP_GT, OP_INC, OP_JUMP, OP_JUMP_IF_FALSE, OP_JUMP_IF_TRUE, OP_LE, OP_LOADBOOL,
-        OP_LOADCONST, OP_LOADNULL, OP_LT, OP_MOD, OP_MOVE, OP_MUL, OP_NE, OP_NOP, OP_NOT, OP_OR,
-        OP_POW, OP_RETURN, OP_SHL, OP_SHR, OP_SUB, OP_TAILCALL,
+        OP_AND, OP_BITAND, OP_BITOR, OP_BITXOR, OP_CALL, OP_CONCAT, OP_DEC, OP_DESTRUCTOR, OP_DIV,
+        OP_EQ, OP_GE, OP_GT, OP_INC, OP_JUMP, OP_JUMP_IF_FALSE, OP_JUMP_IF_TRUE, OP_LE,
+        OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LT, OP_MOD, OP_MOVE, OP_MUL, OP_NE, OP_NOP,
+        OP_NOT, OP_OR, OP_POW, OP_RETURN, OP_SHL, OP_SHR, OP_SUB, OP_TAILCALL,
     },
 };
 
@@ -480,6 +480,10 @@ impl VM {
                     let concatenated = format!("{}{}", left, right);
                     self.registers[arga as usize] = RegisterVal::Str(Rc::new(concatenated));
                 }
+            }
+            OP_DESTRUCTOR => {
+                // destroy heap objs, where A is a pointer to the heap obj flagged for destruction.
+                todo!()
             }
             OP_NOP => {}
             _ => unreachable!(),

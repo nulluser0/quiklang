@@ -74,8 +74,9 @@ pub const OP_BITXOR: OpCode = 29; // A B C  R(A) := R(B) ^ R(C)
 pub const OP_SHL: OpCode = 30; // A B C  R(A) := R(B) << R(C)
 pub const OP_SHR: OpCode = 31; // A B C  R(A) := R(B) >> R(C)
 pub const OP_CONCAT: OpCode = 32;
-// NOP
-pub const OP_NOP: OpCode = 33;
+pub const OP_DESTRUCTOR: OpCode = 33; // A B C  R(A) where A is a pointer to heap obj, heap obj is destroyed.
+                                      // NOP
+pub const OP_NOP: OpCode = 34;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum OpArgMode {
@@ -375,6 +376,14 @@ pub static OP_NAMES: &[OpProp; OP_NOP as usize + 1] = &[
         set_reg_a: true,
         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+        typ: OpType::Abc,
+    },
+    OpProp {
+        name: "DESTRUCTOR",
+        is_test: false,
+        set_reg_a: true,
+        mode_arg_b: OpArgMode::NotUsed,
+        mode_arg_c: OpArgMode::NotUsed,
         typ: OpType::Abc,
     },
     OpProp {
@@ -700,6 +709,7 @@ pub fn to_string(inst: Instruction) -> String {
         OP_SHL => format!("{} | R({}) := R({}) << R({})", ops, arga, argb, argc),
         OP_SHR => format!("{} | R({}) := R({}) >> R({})", ops, arga, argb, argc),
         OP_CONCAT => format!("{} | R({}) := R({}) & R({})", ops, arga, argb, argc),
+        OP_DESTRUCTOR => format!("{} | R({}) -> destructor", ops, arga),
         OP_NOP => ops.to_string(),
         _ => unreachable!(),
     }
