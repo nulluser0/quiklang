@@ -73,9 +73,11 @@ pub const OP_BITOR: OpCode = 28; // A B C  R(A) := R(B) | R(C)
 pub const OP_BITXOR: OpCode = 29; // A B C  R(A) := R(B) ^ R(C)
 pub const OP_SHL: OpCode = 30; // A B C  R(A) := R(B) << R(C)
 pub const OP_SHR: OpCode = 31; // A B C  R(A) := R(B) >> R(C)
-pub const OP_CONCAT: OpCode = 32;
+pub const OP_CONCAT: OpCode = 32; // A B C  R(A) := RK(B) & RK(C)
 pub const OP_DESTRUCTOR: OpCode = 33; // A B C  R(A) where A is a pointer to heap obj, heap obj is destroyed.
                                       // NOP
+
+// TODO: Add both array, string, hashmap, etc. (Heap-allocated objects) instructions
 pub const OP_NOP: OpCode = 34;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
