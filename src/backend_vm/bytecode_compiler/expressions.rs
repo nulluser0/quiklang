@@ -35,7 +35,9 @@ impl Compiler {
                 self.compile_identifier(identifier, symbol_table, require_constant_as_register)
             }
             Expr::Tuple(_) => todo!(),
-            Expr::AssignmentExpr { assignee, expr } => todo!(),
+            Expr::AssignmentExpr { assignee, expr } => {
+                self.compile_assignment(*assignee, *expr, symbol_table)
+            }
             Expr::ConcatOp { left, right } => todo!(),
             Expr::BinaryOp { op, left, right } => {
                 self.compile_binary_op(op, *left, *right, symbol_table)
@@ -137,6 +139,22 @@ impl Compiler {
                 ))
             }
         }
+    }
+
+    fn compile_assignment(
+        &mut self,
+        assignee: Expr,
+        expr: Expr,
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+    ) -> Result<ReturnValue, VMCompileError> {
+        let reg = self
+            .compile_expression(assignee, true, true, symbol_table)?
+            .safe_unwrap();
+        let reassigned = self
+            .compile_expression(expr, true, true, symbol_table)?
+            .safe_unwrap();
+        self.add_instruction(Abc(OP_MOVE, reg as i32, reassigned as i32, 0)); // NOTE: Move is a glorified "clone". Move may be replcaed by a real move, and a clone OP might be added.
+        Ok(ReturnValue::Normal(reg))
     }
 
     fn compile_binary_op(
