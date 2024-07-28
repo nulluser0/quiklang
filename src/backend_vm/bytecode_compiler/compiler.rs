@@ -170,7 +170,7 @@ mod tests {
     #[test]
     fn compile_including_parse_etc() {
         let source_code = r#"
-        let n = 5;
+        let mut n = 5;
         let a = block {
             if n <= 1 {
                 1
@@ -179,7 +179,7 @@ mod tests {
             }
         };
         
-        a + 1
+        n = a + 1
         "#
         .to_string();
 
