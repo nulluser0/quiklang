@@ -2,16 +2,17 @@
 
 // The typical structure of the bytecode follows:
 // 1. Magic Number QLBC (0x514C4243)
-// 2. Metadata                          -- Can be edited but shouldn't
+// 2. Metadata                              -- Can be edited but shouldn't
 //      - QuikLang Version:
 //          - Which QuikLang Compiler compiled the code
 //          - Qlang VM Runtime Version, must be the same number to run
 //      - Flags
-// 3. Setup and Integrity information:  -- Read only
+// 3. Setup and Integrity information:      -- Read only
 //      - Register count
 //      - Const count
 //      - Instruction count
-// 4. Constant pool/list                -- Read only
+// 4. Constant pool/list                    -- Read only
+// 5. QFFI (extern/foreign) Functions list  -- Read only
 // 5. Instructions (List of OpCodes, 32-bit/OpCode in size)    -- Read only
 
 // Low-level overview:
@@ -44,7 +45,11 @@
 //          -          1 + len * 8          For strings specifically: If identified as a string from (4), it will be treated as a string.
 //                                              String would be from: `(current offset) -> (current offset + len * 8).
 //
-// 5. Instructions:
+// 5. QFFI (extern/foreign) Functions:
+//      Offset      Size (bytes)        Description
+//          -           TODO!
+//
+// 6. Instructions:
 //      Offset      Size (bytes)        Description
 // After 4. offset      4 each              32-bit (u32) representing an instruction, with each segments of the u32 representing opcodes and args.
 //                                          Check instructions.rs for more info.
