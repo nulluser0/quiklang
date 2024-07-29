@@ -64,6 +64,7 @@ pub const OP_JUMP: OpCode = 19; // A  PC += A
 pub const OP_JUMP_IF_TRUE: OpCode = 20;
 pub const OP_JUMP_IF_FALSE: OpCode = 21; // A B  if (!R(A)) PC += B
 pub const OP_CALL: OpCode = 22; // A B  Call function at R(A) with B arguments
+pub const OP_QFFI_CALL: OpCode = 23; // A B  Call FFI (extern) function at R(A) with B arguments. TODO: A is index to FFI registry, then called by QFFI.
 pub const OP_TAILCALL: OpCode = 23;
 pub const OP_RETURN: OpCode = 24; // A  Return with R(A)
 pub const OP_INC: OpCode = 25; // A  R(A)++
