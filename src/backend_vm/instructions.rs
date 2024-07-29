@@ -75,10 +75,18 @@ pub const OP_SHL: OpCode = 30; // A B C  R(A) := R(B) << R(C)
 pub const OP_SHR: OpCode = 31; // A B C  R(A) := R(B) >> R(C)
 pub const OP_CONCAT: OpCode = 32; // A B C  R(A) := RK(B) & RK(C)
 pub const OP_DESTRUCTOR: OpCode = 33; // A B C  R(A) where A is a pointer to heap obj, heap obj is destroyed.
-                                      // NOP
-
-// TODO: Add both array, string, hashmap, etc. (Heap-allocated objects) instructions
-pub const OP_NOP: OpCode = 34;
+                                      // TODO: Add both array, string, hashmap, etc. (Heap-allocated objects) instructions
+pub const OP_ARRAY_ALLOCATE: OpCode = 34; // A B C  R(A) := allocate_array(b - size)
+pub const OP_HASHMAP_ALLOCATE: OpCode = 35; // A B C  R(A) := allocate_hashmap(b - size)
+pub const OP_HASHSET_ALLOCATE: OpCode = 36; // A B C  R(A) := allocate_hashset(b - size)
+pub const OP_STRING_ALLOCATE: OpCode = 37; // A B C  R(A) := allocate_string(b - size)
+pub const OP_ARRAY_OR_HASHSET_PUSH: OpCode = 37; // A B C  array/hashset(A).push(C)
+pub const OP_ARRAY_OR_HASHSET_POP: OpCode = 38; // A B C  R(A) := array/hashset(B).pop()
+pub const OP_GROWABLE_SET: OpCode = 39; // A B C  growable(A)[R(B)].set(C)
+pub const OP_GROWABLE_GET: OpCode = 40; // A B C  R(A) := growable(B)[R(C)]
+pub const OP_HASHMAP_OR_HASHSET_CONTAINS: OpCode = 41; // A B C  R(A) := hashmap/hashset(B).contains(C)
+pub const OP_GROWABLE_REMOVE: OpCode = 42; // A B C  R(A) := growable(B).remove(R(C))
+pub const OP_NOP: OpCode = 34; // NOP
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum OpArgMode {
