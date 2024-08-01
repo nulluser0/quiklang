@@ -20,8 +20,12 @@ name = "quiklang"
 path = "src/lib.rs"
 
 [[bin]]
-name = "quiklang_bin"
-path = "src/bin/main.rs"
+name = "quiklang"
+path = "src/bin/quiklang.rs"
+
+[[bin]]
+name = "quiklangc"
+path = "src/bin/quiklangc.rs"
 
 [profile.release]
 lto = "fat"
