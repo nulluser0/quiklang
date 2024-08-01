@@ -153,7 +153,7 @@ impl ByteCode {
             match discriminant {
                 0 => constants.push(RegisterVal::Int(cursor.read_i64::<LittleEndian>()?)),
                 1 => constants.push(RegisterVal::Float(cursor.read_f64::<LittleEndian>()?)),
-                2 => constants.push(RegisterVal::Bool(cursor.read_u64::<LittleEndian>()? != 0)),
+                2 => constants.push(RegisterVal::Bool(cursor.read_u8()? != 0)),
                 3 => constants.push(RegisterVal::Null),
                 4 => {
                     // It is a string.
@@ -222,9 +222,6 @@ impl ByteCode {
                 RegisterVal::Bool(boolean) => {
                     encoded_bytecode.write_u8(2)?;
                     encoded_bytecode.write_u8(if *boolean { 1 } else { 0 })?;
-                    let padding_size: usize = 7; // Align to 8 bytes
-                    let padding: Vec<u8> = vec![0; padding_size];
-                    encoded_bytecode.write_all(&padding)?;
                 }
                 RegisterVal::Str(string) => {
                     encoded_bytecode.write_u8(4)?;
@@ -279,7 +276,6 @@ mod tests {
         bytecode.write_i32::<LittleEndian>(4).unwrap(); // Register count
         bytecode.write_i32::<LittleEndian>(3).unwrap(); // Constant count
         bytecode.write_i32::<LittleEndian>(3).unwrap(); // Instruction count
-        bytecode.write_i32::<LittleEndian>(1).unwrap(); // String-pointing constant count
 
         // Constant Pool
         bytecode.write_u8(0).unwrap(); // Discriminant for Int
@@ -289,8 +285,6 @@ mod tests {
         bytecode.extend_from_slice(b"foo"); // String constant "foo"
         bytecode.write_u8(2).unwrap(); // Discriminant for Bool
         bytecode.write_u8(1).unwrap(); // Bool constant true
-        let padding: Vec<u8> = vec![0; 7];
-        bytecode.write_all(&padding).unwrap();
 
         // Instructions
         bytecode
@@ -333,8 +327,6 @@ mod tests {
         bytecode.extend_from_slice(b"foo"); // String constant "foo"
         bytecode.write_u8(2).unwrap(); // Discriminant for Bool
         bytecode.write_u8(1).unwrap(); // Bool constant true
-        let padding: Vec<u8> = vec![0; 7];
-        bytecode.write_all(&padding).unwrap();
 
         // Instructions
         bytecode
@@ -355,6 +347,7 @@ mod tests {
         let valid_bytecode = create_valid_bytecode();
         let result = ByteCode::decode(&valid_bytecode);
         println!("{:#?}", result);
+        println!("{:#?}", Abc(OP_MOVE, 0, 1, 0));
         assert!(
             result.is_ok(),
             "Valid bytecode should be decoded successfully"

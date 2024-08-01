@@ -160,8 +160,16 @@ impl Default for Compiler {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        fs::File,
+        io::{Read, Write},
+    };
+
     use crate::{
-        backend_vm::instructions::{get_argsbx, to_string, ASBx, OP_JUMP},
+        backend_vm::{
+            instructions::{get_argsbx, to_string, ASBx, OP_JUMP},
+            vm::VM,
+        },
         frontend::{
             ast::{BinaryOp, Expr, Literal, Type},
             parser,
@@ -197,13 +205,33 @@ mod tests {
             .expect("fail");
         println!("{:#?}", ast.statements);
         let mut compiler = Compiler::new();
-        compiler.compile(ast.statements).expect("fail parse");
-        println!("{}", compiler.max_reg);
-        println!("{:#?}", compiler.constants);
+        let bytecode = compiler.compile(ast.statements).expect("fail parse");
+        println!("{}", bytecode.integrity_info.num_register);
+        println!("{:#?}", bytecode.constants);
 
-        for inst in compiler.instructions {
+        for inst in bytecode.instructions.clone() {
             println!("{}", to_string(inst))
         }
+
+        println!("ENCoded: {:#?}", bytecode);
+
+        let encoded_bytecode = ByteCode::encode(&bytecode).unwrap();
+        let mut file = File::create("test.qlbc").unwrap();
+        file.write_all(&encoded_bytecode).unwrap();
+
+        let mut raw_bytecode: Vec<u8> = vec![];
+        let mut read_file = File::open("test.qlbc").unwrap();
+        read_file.read_to_end(&mut raw_bytecode).unwrap();
+        let decoded_bytecode = ByteCode::decode(&raw_bytecode).unwrap();
+
+        println!("DECoded: {:#?}", decoded_bytecode);
+
+        let mut vm = VM::from_bytecode(bytecode);
+        println!("{:#?}", vm);
+
+        vm.execute();
+
+        println!("{:#?}", vm);
     }
 
     #[test]
