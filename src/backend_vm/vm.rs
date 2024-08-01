@@ -142,7 +142,6 @@ impl PartialOrd for RegisterVal {
 pub struct VM {
     registers: Vec<RegisterVal>,
     pub constant_pool: Vec<RegisterVal>,
-    pub string_pool: Vec<Rc<String>>,
     program_counter: usize,
     pub instructions: Vec<Instruction>,
     // call_stack: Vec<CallFrame>,
@@ -151,14 +150,12 @@ pub struct VM {
 impl VM {
     pub fn new(
         instructions: Vec<Instruction>,
-        string_pool: Vec<Rc<String>>,
         constant_pool: Vec<RegisterVal>,
         num_registers: usize,
     ) -> Self {
         VM {
             registers: vec![RegisterVal::Null; num_registers],
             constant_pool,
-            string_pool,
             program_counter: 0,
             instructions,
         }
@@ -167,7 +164,6 @@ impl VM {
     pub fn from_bytecode(bytecode: ByteCode) -> Self {
         VM::new(
             bytecode.instructions().clone(),
-            bytecode.string_pool().clone(),
             bytecode.constant_pool().clone(),
             *bytecode.register_count() as usize,
         )
@@ -212,15 +208,6 @@ impl VM {
             .ok_or(VMRuntimeError::AccessToNonExistentConstant(
                 index,
                 self.constant_pool.len(),
-            ))
-    }
-
-    pub fn get_string(&self, index: usize) -> Result<&Rc<String>, VMRuntimeError> {
-        self.string_pool
-            .get(index)
-            .ok_or(VMRuntimeError::AccessToNonExistentString(
-                index,
-                self.string_pool.len(),
             ))
     }
 
@@ -564,7 +551,6 @@ mod tests {
                 ABx(OP_LOADCONST, 1, 0), // Load constant K(0) into register R(1)
                 ASBx(OP_JUMP, 0, -2),    // Jump back to the first instruction
             ],
-            vec![],
             vec![RegisterVal::Int(10)], // Constant pool
             2,                          // Number of registers
         )

@@ -55,7 +55,6 @@
 
 use std::{
     io::{Cursor, Read, Write},
-    rc::Rc,
     vec,
 };
 
@@ -70,7 +69,6 @@ pub struct ByteCode {
     metadata: BCMetadata,
     integrity_info: BCIntegrityInfo,
     constants: Vec<RegisterVal>,
-    string_pool: Vec<Rc<String>>,
     instructions: Vec<Instruction>,
 }
 
@@ -95,9 +93,24 @@ impl ByteCode {
             metadata,
             integrity_info,
             constants: vec![],
-            string_pool: vec![],
             instructions: vec![],
         }
+    }
+
+    pub fn set_constants(&mut self, constants: Vec<RegisterVal>) {
+        self.constants = constants
+    }
+
+    pub fn set_instructions(&mut self, instructions: Vec<Instruction>) {
+        self.instructions = instructions
+    }
+
+    pub fn set_metadata(&mut self, metadata: BCMetadata) {
+        self.metadata = metadata
+    }
+
+    pub fn set_integrity_info(&mut self, integrity_info: BCIntegrityInfo) {
+        self.integrity_info = integrity_info
     }
 
     /// Decodes from a binary bytecode format, represented as u8 slice (1 byte).
@@ -138,7 +151,6 @@ impl ByteCode {
 
         // Read Constant Pool and add to String Pool
         let mut constants: Vec<RegisterVal> = Vec::with_capacity(num_constants as usize);
-        let mut string_pool: Vec<Rc<String>> = Vec::with_capacity(num_string_points as usize);
         for _ in 0..num_constants {
             let discriminant = cursor.read_u8()?;
             match discriminant {
@@ -151,9 +163,7 @@ impl ByteCode {
                     let lens = cursor.read_u64::<LittleEndian>()? as usize;
                     let mut string: Vec<u8> = vec![0; lens];
                     cursor.read_exact(&mut string)?;
-                    let index = string_pool.len();
-                    string_pool.push(String::from_utf8(string)?.into());
-                    constants.push(RegisterVal::Str(string_pool[index].clone()));
+                    constants.push(RegisterVal::Str(String::from_utf8(string)?.into()));
                 }
                 _ => return Err(VMBytecodeError::InvalidConstantType(discriminant)),
             }
@@ -169,7 +179,6 @@ impl ByteCode {
             metadata,
             integrity_info,
             constants,
-            string_pool,
             instructions,
         })
     }
@@ -179,7 +188,6 @@ impl ByteCode {
         //      4                                       - Magic number              - fixed size
         //      20                                      - Metadata info             - fixed size
         //      16                                      - Integrity info            - fixed size
-        // each 12 * num_string_points                  - String info               - variable size
         // each 8 * (num_constants - num_string_points) - Constants (excl strings)  - variable size
         // each string_len + (8 - (string_len % 8)) % 8 - String constants          - variable size - 1 string len = 1 byte. String len aligned to 8 bytes.
         // each 4 * numm_inst                           - Instructions              - variable size
@@ -188,17 +196,9 @@ impl ByteCode {
         let non_string_constant_size: usize = 8
             * (bytecode.integrity_info.num_constants - bytecode.integrity_info.num_string_points)
                 as usize;
-        let mut string_constants_size: usize = 0;
-        for string in &bytecode.string_pool {
-            let string_len = string.len();
-            string_constants_size += string_len + ((8 - (string_len % 8)) % 8)
-        }
         let instructions_size: usize = 4 * bytecode.integrity_info.num_inst as usize;
-        let total_size = fixed_sizes
-            + string_info_size
-            + non_string_constant_size
-            + string_constants_size
-            + instructions_size;
+        let total_size =
+            fixed_sizes + string_info_size + non_string_constant_size + instructions_size;
 
         let mut encoded_bytecode: Vec<u8> = Vec::with_capacity(total_size);
 
@@ -264,10 +264,6 @@ impl ByteCode {
 
     pub fn constant_pool(&self) -> &Vec<RegisterVal> {
         &self.constants
-    }
-
-    pub fn string_pool(&self) -> &Vec<Rc<String>> {
-        &self.string_pool
     }
 }
 
@@ -374,8 +370,6 @@ mod tests {
         let bytecode = result.unwrap();
         assert_eq!(bytecode.constants.len(), 3);
         assert_eq!(bytecode.constants[0], RegisterVal::Int(42));
-        assert_eq!(bytecode.string_pool.len(), 1);
-        assert_eq!(bytecode.string_pool[0], Rc::new("foo".to_string()));
         assert_eq!(bytecode.instructions.len(), 3);
 
         // Check instructions
