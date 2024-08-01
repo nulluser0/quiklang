@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     fs::File,
-    io::{Read, Write},
+    io::{Read, Seek, SeekFrom, Write},
     process,
     rc::Rc,
 };
@@ -47,6 +47,11 @@ fn list(file_path: &str) {
         Ok(_) => {
             if &buffer == b"QLBC" {
                 {
+                    // Rewind the file cursor back to the start
+                    file.seek(SeekFrom::Start(0)).unwrap_or_else(|e| {
+                        println!("Error seeking file {}: {}", file_path, e);
+                        process::exit(1);
+                    });
                     let mut bytecode: Vec<u8> = Vec::new();
                     file.read_exact(&mut bytecode).unwrap_or_else(|e| {
                         println!("Error reading file {}: {}", file_path, e);
@@ -59,6 +64,11 @@ fn list(file_path: &str) {
                     println!("{}", bytecode_decoded)
                 }
             } else {
+                // Rewind the file cursor back to the start
+                file.seek(SeekFrom::Start(0)).unwrap_or_else(|e| {
+                    println!("Error seeking file {}: {}", file_path, e);
+                    process::exit(1);
+                });
                 let bytecode = compile(file_path);
                 println!("{}", bytecode)
             }
