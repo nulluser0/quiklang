@@ -48,7 +48,6 @@
 // 5. QFFI (extern/foreign) Functions:
 //      Offset      Size (bytes)        Description
 //          -           TODO!
-//
 // 6. Instructions:
 //      Offset      Size (bytes)        Description
 // After 4. offset      4 each              32-bit (u32) representing an instruction, with each segments of the u32 representing opcodes and args.
@@ -241,6 +240,9 @@ impl ByteCode {
                     encoded_bytecode.write_all(string.as_bytes())?;
                 }
                 RegisterVal::Null => encoded_bytecode.write_u8(3)?,
+                RegisterVal::Array(_) => todo!(),
+                RegisterVal::HashMap(_) => todo!(),
+                RegisterVal::HashSet(_) => todo!(),
             }
         }
 

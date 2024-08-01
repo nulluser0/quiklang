@@ -1,6 +1,11 @@
 // VM (Register-based)
 
-use std::{hash::Hasher, rc::Rc};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+    hash::Hasher,
+    rc::Rc,
+};
 
 use crate::errors::VMRuntimeError;
 
@@ -48,12 +53,15 @@ use super::{
 //                  block {
 //                      let a = share b; // Valid, b does not go out of scope when a is alive.
 //                  }
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RegisterVal {
     Int(i64),
     Float(f64),
     Bool(bool),
     Str(Rc<String>),
+    Array(Rc<Vec<RegisterVal>>),
+    HashMap(Rc<HashMap<RegisterVal, RegisterVal>>),
+    HashSet(Rc<HashSet<RegisterVal>>),
     Null,
 }
 
@@ -70,6 +78,55 @@ impl Hash for RegisterVal {
             RegisterVal::Bool(val) => val.hash(state),
             RegisterVal::Str(val) => val.hash(state),
             RegisterVal::Null => 0_u8.hash(state),
+            RegisterVal::Array(val) => val.hash(state),
+            RegisterVal::HashMap(val) => {
+                // Iterate over the entries and hash them
+                for (key, value) in val.iter() {
+                    key.hash(state);
+                    value.hash(state);
+                }
+            }
+            RegisterVal::HashSet(val) => {
+                // Iterate over the items and hash them
+                for item in val.iter() {
+                    item.hash(state);
+                }
+            }
+        }
+    }
+}
+
+impl PartialOrd for RegisterVal {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (RegisterVal::Int(a), RegisterVal::Int(b)) => a.partial_cmp(b),
+            (RegisterVal::Float(a), RegisterVal::Float(b)) => a.partial_cmp(b),
+            (RegisterVal::Bool(a), RegisterVal::Bool(b)) => a.partial_cmp(b),
+            (RegisterVal::Str(a), RegisterVal::Str(b)) => a.partial_cmp(b),
+            (RegisterVal::Array(a), RegisterVal::Array(b)) => a.partial_cmp(b),
+            (RegisterVal::HashMap(a), RegisterVal::HashMap(b)) => a.len().partial_cmp(&b.len()),
+            (RegisterVal::HashSet(a), RegisterVal::HashSet(b)) => a.len().partial_cmp(&b.len()),
+            (RegisterVal::Null, RegisterVal::Null) => Some(Ordering::Equal),
+
+            // Comparisons between Int and Float
+            (RegisterVal::Int(a), RegisterVal::Float(b)) => (*a as f64).partial_cmp(b),
+            (RegisterVal::Float(a), RegisterVal::Int(b)) => a.partial_cmp(&(*b as f64)),
+
+            // Define the ordering between different types
+            (RegisterVal::Int(_), _) => Some(Ordering::Less),
+            (_, RegisterVal::Int(_)) => Some(Ordering::Greater),
+            (RegisterVal::Float(_), _) => Some(Ordering::Less),
+            (_, RegisterVal::Float(_)) => Some(Ordering::Greater),
+            (RegisterVal::Bool(_), _) => Some(Ordering::Less),
+            (_, RegisterVal::Bool(_)) => Some(Ordering::Greater),
+            (RegisterVal::Str(_), _) => Some(Ordering::Less),
+            (_, RegisterVal::Str(_)) => Some(Ordering::Greater),
+            (RegisterVal::Array(_), _) => Some(Ordering::Less),
+            (_, RegisterVal::Array(_)) => Some(Ordering::Greater),
+            (RegisterVal::HashMap(_), _) => Some(Ordering::Less),
+            (_, RegisterVal::HashMap(_)) => Some(Ordering::Greater),
+            (RegisterVal::HashSet(_), _) => Some(Ordering::Less),
+            (_, RegisterVal::HashSet(_)) => Some(Ordering::Greater),
         }
     }
 }
