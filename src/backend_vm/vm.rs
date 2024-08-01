@@ -65,6 +65,7 @@ pub enum RegisterVal {
     Null,
 }
 
+// Manual implementations of certain traits
 impl Eq for RegisterVal {}
 
 impl Hash for RegisterVal {
