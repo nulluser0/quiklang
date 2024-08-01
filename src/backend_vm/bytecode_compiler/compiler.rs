@@ -221,10 +221,7 @@ mod tests {
         println!("DECoded: {}", decoded_bytecode);
 
         let mut vm = VM::from_bytecode(bytecode);
-        println!("{:#?}", vm);
-
         vm.execute();
-
         println!("{:#?}", vm);
     }
 
