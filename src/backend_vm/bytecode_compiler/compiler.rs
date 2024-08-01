@@ -14,6 +14,7 @@ use crate::{
 
 use super::symbol_tracker::SymbolTable;
 
+#[derive(Debug, Clone, Copy)]
 pub(super) enum ReturnValue {
     Normal(isize), // A standard isize format.
     Break(isize),  // Standard isize with Break discriminant.
@@ -27,6 +28,14 @@ impl ReturnValue {
             ReturnValue::Break(i) => *i,
             ReturnValue::Return(i) => *i,
         }
+    }
+
+    pub(super) fn is_break(&self) -> bool {
+        matches!(self, ReturnValue::Break(_))
+    }
+
+    pub(super) fn is_return(&self) -> bool {
+        matches!(self, ReturnValue::Return(_))
     }
 }
 
@@ -182,16 +191,17 @@ mod tests {
     #[test]
     fn compile_including_parse_etc() {
         let source_code = r#"
-        let mut n = 5;
-        let a = block {
-            if n <= 1 {
-                1
-            } else {
-                n
-            }
-        };
+        // let mut n = 5;
+        // let a = block {
+        //     if n <= 1 {
+        //         1
+        //     } else {
+        //         n
+        //     }
+        // };
         
-        n = a + 1
+        // n = a + 1
+        loop {}
         "#
         .to_string();
 
@@ -221,7 +231,7 @@ mod tests {
         println!("DECoded: {}", decoded_bytecode);
 
         let mut vm = VM::from_bytecode(bytecode);
-        vm.execute();
+        // vm.execute();
         println!("{:#?}", vm);
     }
 

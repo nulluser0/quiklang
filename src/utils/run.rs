@@ -1,11 +1,41 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     backend_interpreter::{environment::Environment, interpreter::evaluate},
-    backend_vm::{bytecode_compiler::compiler::Compiler, vm::VM},
+    backend_vm::{
+        bytecode_compiler::compiler::Compiler,
+        vm::{RegisterVal, VM},
+    },
     errors::{self, Error},
     frontend::{parser, type_environment::TypeEnvironment},
 };
+
+pub fn run_vm_repl(
+    input: String,
+    type_env: &Rc<RefCell<TypeEnvironment>>,
+    root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    compiler: &mut Compiler,
+    vm: &mut VM,
+) {
+    let mut parser = parser::Parser::new();
+    match parser.produce_ast(input, type_env, root_type_env) {
+        Ok(program) => {
+            match compiler.compile(program.statements) {
+                Ok(bytecode) => {
+                    vm.constant_pool = bytecode.constants;
+                    vm.instructions = bytecode.instructions;
+                    vm.set_max_register(bytecode.integrity_info.num_register as usize);
+                    vm.execute();
+                    // TODO: for now only for debugging...
+                }
+                Err(e) => {
+                    print_e(errors::Error::VMCompileError(e));
+                }
+            }
+        }
+        Err(e) => panic!("{}", e),
+    }
+}
 
 pub fn run_vm(
     input: String,
@@ -33,7 +63,7 @@ pub fn run_vm(
     }
 }
 
-pub fn run(
+pub fn run_interpreter(
     input: String,
     env: &Rc<RefCell<Environment>>,
     type_env: &Rc<RefCell<TypeEnvironment>>,

@@ -158,7 +158,7 @@ impl PartialOrd for RegisterVal {
 pub struct VM {
     registers: Vec<RegisterVal>,
     pub constant_pool: Vec<RegisterVal>,
-    program_counter: usize,
+    pub program_counter: usize,
     pub instructions: Vec<Instruction>,
     // call_stack: Vec<CallFrame>,
 }
@@ -194,6 +194,16 @@ impl VM {
                 index,
                 self.registers.len(),
             ))
+        }
+    }
+
+    pub fn set_max_register(&mut self, num_registers: usize) {
+        if num_registers > self.registers.len() {
+            // Extend the registers vector with default values
+            self.registers.resize(num_registers, RegisterVal::Null);
+        } else {
+            // Truncate the registers vector
+            self.registers.truncate(num_registers);
         }
     }
 
@@ -238,6 +248,7 @@ impl VM {
     }
 
     pub fn execute_instruction(&mut self, inst: Instruction) {
+        println!("Current: {}", self.program_counter);
         let op = get_opcode(inst);
         let arga = get_arga(inst);
         let argb = get_argb(inst);
