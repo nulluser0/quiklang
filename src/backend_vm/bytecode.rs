@@ -66,10 +66,10 @@ use super::{instructions::Instruction, vm::RegisterVal};
 
 #[derive(Debug, Clone)]
 pub struct ByteCode {
-    metadata: BCMetadata,
-    integrity_info: BCIntegrityInfo,
-    constants: Vec<RegisterVal>,
-    instructions: Vec<Instruction>,
+    pub metadata: BCMetadata,
+    pub integrity_info: BCIntegrityInfo,
+    pub constants: Vec<RegisterVal>,
+    pub instructions: Vec<Instruction>,
 }
 
 #[derive(Debug, Clone)]
@@ -84,7 +84,6 @@ pub struct BCIntegrityInfo {
     pub num_register: i32,
     pub num_constants: i32,
     pub num_inst: i32,
-    pub num_string_points: i32,
 }
 
 impl ByteCode {
@@ -97,21 +96,21 @@ impl ByteCode {
         }
     }
 
-    pub fn set_constants(&mut self, constants: Vec<RegisterVal>) {
-        self.constants = constants
-    }
+    // pub fn set_constants(&mut self, constants: Vec<RegisterVal>) {
+    //     self.constants = constants
+    // }
 
-    pub fn set_instructions(&mut self, instructions: Vec<Instruction>) {
-        self.instructions = instructions
-    }
+    // pub fn set_instructions(&mut self, instructions: Vec<Instruction>) {
+    //     self.instructions = instructions
+    // }
 
-    pub fn set_metadata(&mut self, metadata: BCMetadata) {
-        self.metadata = metadata
-    }
+    // pub fn set_metadata(&mut self, metadata: BCMetadata) {
+    //     self.metadata = metadata
+    // }
 
-    pub fn set_integrity_info(&mut self, integrity_info: BCIntegrityInfo) {
-        self.integrity_info = integrity_info
-    }
+    // pub fn set_integrity_info(&mut self, integrity_info: BCIntegrityInfo) {
+    //     self.integrity_info = integrity_info
+    // }
 
     /// Decodes from a binary bytecode format, represented as u8 slice (1 byte).
     pub fn decode(bytecode: &[u8]) -> Result<ByteCode, VMBytecodeError> {
@@ -140,13 +139,11 @@ impl ByteCode {
         let num_register = cursor.read_i32::<LittleEndian>()?;
         let num_constants = cursor.read_i32::<LittleEndian>()?;
         let num_inst = cursor.read_i32::<LittleEndian>()?;
-        let num_string_points = cursor.read_i32::<LittleEndian>()?;
 
         let integrity_info = BCIntegrityInfo {
             num_register,
             num_constants,
             num_inst,
-            num_string_points,
         };
 
         // Read Constant Pool and add to String Pool
@@ -192,13 +189,9 @@ impl ByteCode {
         // each string_len + (8 - (string_len % 8)) % 8 - String constants          - variable size - 1 string len = 1 byte. String len aligned to 8 bytes.
         // each 4 * numm_inst                           - Instructions              - variable size
         let fixed_sizes: usize = 4 + 20 + 16;
-        let string_info_size: usize = 12 * bytecode.integrity_info.num_string_points as usize;
-        let non_string_constant_size: usize = 8
-            * (bytecode.integrity_info.num_constants - bytecode.integrity_info.num_string_points)
-                as usize;
+        let constant_size: usize = bytecode.integrity_info.num_constants as usize;
         let instructions_size: usize = 4 * bytecode.integrity_info.num_inst as usize;
-        let total_size =
-            fixed_sizes + string_info_size + non_string_constant_size + instructions_size;
+        let total_size = fixed_sizes + constant_size + instructions_size;
 
         let mut encoded_bytecode: Vec<u8> = Vec::with_capacity(total_size);
 
@@ -214,7 +207,6 @@ impl ByteCode {
         encoded_bytecode.write_i32::<LittleEndian>(bytecode.integrity_info.num_register)?;
         encoded_bytecode.write_i32::<LittleEndian>(bytecode.integrity_info.num_constants)?;
         encoded_bytecode.write_i32::<LittleEndian>(bytecode.integrity_info.num_inst)?;
-        encoded_bytecode.write_i32::<LittleEndian>(bytecode.integrity_info.num_string_points)?;
 
         // Write Constant Pool
         for constant in bytecode.constants.iter() {

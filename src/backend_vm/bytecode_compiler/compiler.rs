@@ -1,6 +1,6 @@
 // Compiler
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, mem::swap, rc::Rc};
 
 use crate::{
     backend_vm::{
@@ -122,16 +122,20 @@ impl Compiler {
             ql_vm_ver: env!("QUIKLANG_VM_VERSION").parse().unwrap(),
             flags: 0,
         };
-        let integrity_info = BCIntegrityInfo {
-            num_register: 0,
-            num_constants: 0,
-            num_inst: 0,
-            num_string_points: 0,
-        };
         let symbol_table: &Rc<RefCell<SymbolTable>> = &Rc::new(RefCell::new(SymbolTable::new()));
-        let bytecode = ByteCode::new(metadata, integrity_info);
         // Generate bytecode from AST
         self.compile_statements(stmts, symbol_table)?;
+
+        let integrity_info = BCIntegrityInfo {
+            num_register: self.max_reg as i32,
+            num_constants: self.constants.len() as i32,
+            num_inst: self.instructions.len() as i32,
+        };
+
+        let mut bytecode = ByteCode::new(metadata, integrity_info);
+
+        swap(&mut self.constants, &mut bytecode.constants);
+        swap(&mut self.instructions, &mut bytecode.instructions);
 
         Ok(bytecode)
     }
