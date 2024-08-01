@@ -203,17 +203,11 @@ mod tests {
         let ast = parser
             .produce_ast(source_code, &type_env, &root_type_env)
             .expect("fail");
-        println!("{:#?}", ast.statements);
         let mut compiler = Compiler::new();
         let bytecode = compiler.compile(ast.statements).expect("fail parse");
-        println!("{}", bytecode.integrity_info.num_register);
-        println!("{:#?}", bytecode.constants);
+        println!("{}", bytecode);
 
-        for inst in bytecode.instructions.clone() {
-            println!("{}", to_string(inst))
-        }
-
-        println!("ENCoded: {:#?}", bytecode);
+        println!("ENCoded: {}", bytecode);
 
         let encoded_bytecode = ByteCode::encode(&bytecode).unwrap();
         let mut file = File::create("test.qlbc").unwrap();
@@ -224,7 +218,7 @@ mod tests {
         read_file.read_to_end(&mut raw_bytecode).unwrap();
         let decoded_bytecode = ByteCode::decode(&raw_bytecode).unwrap();
 
-        println!("DECoded: {:#?}", decoded_bytecode);
+        println!("DECoded: {}", decoded_bytecode);
 
         let mut vm = VM::from_bytecode(bytecode);
         println!("{:#?}", vm);

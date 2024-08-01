@@ -53,14 +53,16 @@
 // After 4. offset      4 each              32-bit (u32) representing an instruction, with each segments of the u32 representing opcodes and args.
 //                                          Check instructions.rs for more info.
 
+use core::str;
 use std::{
+    fmt::Display,
     io::{Cursor, Read, Write},
     vec,
 };
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
-use crate::errors::VMBytecodeError;
+use crate::{backend_vm::instructions::to_string, errors::VMBytecodeError};
 
 use super::{instructions::Instruction, vm::RegisterVal};
 
@@ -84,6 +86,52 @@ pub struct BCIntegrityInfo {
     pub num_register: i32,
     pub num_constants: i32,
     pub num_inst: i32,
+}
+
+impl Display for ByteCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let version_as_string: &str = match str::from_utf8(&self.metadata.ql_version) {
+            Ok(result) => result,
+            Err(e) => &format!("Failed to decode version: {}", e),
+        };
+        let mut constants_fragments: Vec<String> = Vec::new();
+        for (i, constant) in self.constants.iter().enumerate() {
+            constants_fragments.push(format!("{:10}| {}", i, constant));
+        }
+        let constants_string = constants_fragments.join("\n");
+        let mut instructions_fragments: Vec<String> = Vec::new();
+        for (i, instruction) in self.instructions.iter().enumerate() {
+            instructions_fragments.push(format!("{:10}| {}", i, to_string(*instruction)))
+        }
+        let instructions_string = instructions_fragments.join("\n");
+        write!(
+            f,
+            r#"QLBC - Quiklang Bytecode
+        -----------------------------
+        Quiklang Version:    {}
+        Quiklang VM Version: {}
+        Flags:               {}
+        -----------------------------
+        No. Registers:       {}
+        No. Constants:       {}
+        No. Instructions:    {}
+        -----------------------------
+        Constants:
+        {}
+        -----------------------------
+        Instructions:
+        {}
+        "#,
+            version_as_string,
+            self.metadata.ql_vm_ver,
+            self.metadata.flags,
+            self.integrity_info.num_register,
+            self.integrity_info.num_constants,
+            self.integrity_info.num_inst,
+            constants_string,
+            instructions_string
+        )
+    }
 }
 
 impl ByteCode {

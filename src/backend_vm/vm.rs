@@ -66,6 +66,21 @@ pub enum RegisterVal {
     Null,
 }
 
+impl std::fmt::Display for RegisterVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RegisterVal::Int(int) => write!(f, "{:10}| {}", "integer", int),
+            RegisterVal::Float(float) => write!(f, "{:10}| {}", "float", float),
+            RegisterVal::Bool(boolean) => write!(f, "{:10}| {}", "bool", boolean),
+            RegisterVal::Str(string) => write!(f, "{:10}| {}", "string", string),
+            RegisterVal::Array(array) => write!(f, "{:10}| {:?}", "array", array),
+            RegisterVal::HashMap(hashmap) => write!(f, "{:10}| {:?}", "hashmap", hashmap),
+            RegisterVal::HashSet(hashset) => write!(f, "{:10}| {:?}", "hashset", hashset),
+            RegisterVal::Null => write!(f, "{:10}| null", "null"),
+        }
+    }
+}
+
 // Manual implementations of certain traits
 impl Eq for RegisterVal {}
 
