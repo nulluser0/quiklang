@@ -42,33 +42,24 @@ fn list(file_path: &str) {
         process::exit(1);
     });
 
-    let mut buffer = [0; 4];
+    let mut buffer: Vec<u8> = Vec::new();
     match file.read_exact(&mut buffer) {
         Ok(_) => {
             if &buffer == b"QLBC" {
                 {
-                    // Rewind the file cursor back to the start
-                    file.seek(SeekFrom::Start(0)).unwrap_or_else(|e| {
-                        println!("Error seeking file {}: {}", file_path, e);
-                        process::exit(1);
-                    });
-                    let mut bytecode: Vec<u8> = Vec::new();
-                    file.read_exact(&mut bytecode).unwrap_or_else(|e| {
+                    let mut buffer = Vec::new();
+                    file.read_to_end(&mut buffer).unwrap_or_else(|e| {
                         println!("Error reading file {}: {}", file_path, e);
                         process::exit(1);
                     });
-                    let bytecode_decoded = ByteCode::decode(&bytecode).unwrap_or_else(|e| {
+
+                    let bytecode_decoded = ByteCode::decode(&buffer).unwrap_or_else(|e| {
                         println!("Bytecode decode error: {}", e);
                         process::exit(1);
                     });
                     println!("{}", bytecode_decoded)
                 }
             } else {
-                // Rewind the file cursor back to the start
-                file.seek(SeekFrom::Start(0)).unwrap_or_else(|e| {
-                    println!("Error seeking file {}: {}", file_path, e);
-                    process::exit(1);
-                });
                 let bytecode = compile(file_path);
                 println!("{}", bytecode)
             }
