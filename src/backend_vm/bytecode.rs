@@ -107,20 +107,20 @@ impl Display for ByteCode {
         write!(
             f,
             r#"QLBC - Quiklang Bytecode
-        -----------------------------
-        Quiklang Version:    {}
-        Quiklang VM Version: {}
-        Flags:               {}
-        -----------------------------
-        No. Registers:       {}
-        No. Constants:       {}
-        No. Instructions:    {}
-        -----------------------------
-        Constants:
-        {}
-        -----------------------------
-        Instructions:
-        {}
+-----------------------------
+Quiklang Version:    {}
+Quiklang VM Version: {}
+Flags:               {}
+-----------------------------
+No. Registers:       {}
+No. Constants:       {}
+No. Instructions:    {}
+-----------------------------
+Constants:
+{}
+-----------------------------
+Instructions:
+{}
         "#,
             version_as_string,
             self.metadata.ql_vm_ver,
