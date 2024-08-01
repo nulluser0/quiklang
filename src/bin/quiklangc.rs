@@ -42,32 +42,25 @@ fn list(file_path: &str) {
         process::exit(1);
     });
 
+    // Read the entire file into buffer
     let mut buffer: Vec<u8> = Vec::new();
-    match file.read_exact(&mut buffer) {
-        Ok(_) => {
-            if &buffer == b"QLBC" {
-                {
-                    let mut buffer = Vec::new();
-                    file.read_to_end(&mut buffer).unwrap_or_else(|e| {
-                        println!("Error reading file {}: {}", file_path, e);
-                        process::exit(1);
-                    });
+    file.read_to_end(&mut buffer).unwrap_or_else(|e| {
+        println!("Error reading file {}: {}", file_path, e);
+        process::exit(1);
+    });
 
-                    let bytecode_decoded = ByteCode::decode(&buffer).unwrap_or_else(|e| {
-                        println!("Bytecode decode error: {}", e);
-                        process::exit(1);
-                    });
-                    println!("{}", bytecode_decoded)
-                }
-            } else {
-                let bytecode = compile(file_path);
-                println!("{}", bytecode)
-            }
-        }
-        Err(e) => {
-            println!("Error reading file {}: {}", file_path, e);
+    // Check if the first 4 bytes are "QLBC"
+    if buffer.len() >= 4 && &buffer[..4] == b"QLBC" {
+        // Decode the bytecode
+        let bytecode_decoded = ByteCode::decode(&buffer).unwrap_or_else(|e| {
+            println!("Bytecode decode error: {}", e);
             process::exit(1);
-        }
+        });
+        println!("{}", bytecode_decoded);
+    } else {
+        // Compile the file
+        let bytecode = compile(file_path);
+        println!("{}", bytecode);
     }
 }
 
