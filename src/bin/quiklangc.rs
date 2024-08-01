@@ -53,7 +53,7 @@ fn list(file_path: &str) {
                         process::exit(1);
                     });
                     let bytecode_decoded = ByteCode::decode(&bytecode).unwrap_or_else(|e| {
-                        println!("{}", e);
+                        println!("Bytecode decode error: {}", e);
                         process::exit(1);
                     });
                     println!("{}", bytecode_decoded)
