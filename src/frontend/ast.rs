@@ -38,6 +38,7 @@ pub enum Type {
     Bool,
     Function(Vec<(Type, bool)>, Box<Type>),
     Array(Box<Type>),
+    Range(Box<Type>),
     Tuple(Vec<Type>),
     Mismatch,
 
@@ -63,6 +64,7 @@ impl std::fmt::Display for Type {
             Type::Null => write!(f, "Null"),
             Type::Bool => write!(f, "Bool"),
             Type::Array(inner) => write!(f, "Array<{}>", inner),
+            Type::Range(inner) => write!(f, "Range<{}>", inner),
             Type::Tuple(inner) => {
                 let elements: Vec<String> = inner.iter().map(|val| format!("{}", val)).collect();
                 write!(f, "({})", elements.join(", "))
@@ -93,6 +95,12 @@ impl std::fmt::Display for Type {
 pub enum Expr {
     Literal(Literal),
     Array(Vec<Expr>, Type),
+    Range {
+        start: Box<Expr>,
+        end: Box<Expr>,
+        inclusive: bool,
+        defined_type: Type,
+    },
     Identifier(String),
     Tuple(Vec<(Expr, Type)>),
     AssignmentExpr {
@@ -156,6 +164,7 @@ impl ParsetimeType for Expr {
         match self {
             Expr::Literal(literal) => literal.get_type(type_env, line, col),
             Expr::Array(_, defined_type) => Ok(Type::Array(Box::new(defined_type.clone()))),
+            Expr::Range { defined_type, .. } => Ok(Type::Range(Box::new(defined_type.clone()))),
             Expr::Identifier(ident) => Ok(type_env
                 .borrow()
                 .lookup_var(ident)

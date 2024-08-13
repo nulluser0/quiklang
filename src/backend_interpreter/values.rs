@@ -18,6 +18,7 @@ pub enum ValueType {
     NativeFunction,
     Function,
     Array(Box<ValueType>),
+    Range(Box<ValueType>),
     Tuple(Vec<ValueType>),
     Iterator(Box<ValueType>),
     Special, // Stuff like breaks, returns, etc.
@@ -38,6 +39,7 @@ impl std::fmt::Display for ValueType {
             ValueType::NativeFunction => write!(f, "NativeFunction"),
             ValueType::Function => write!(f, "Function"),
             ValueType::Array(inner) => write!(f, "Array<{}>", inner),
+            ValueType::Range(inner) => write!(f, "Range<{}>", inner),
             ValueType::Tuple(inner) => {
                 let elements: Vec<String> = inner.iter().map(|val| format!("{}", val)).collect();
                 write!(f, "({})", elements.join(", "))
@@ -178,6 +180,32 @@ impl std::fmt::Display for ArrayVal {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct RangeVal {
+    pub start: Box<Val>,
+    pub end: Box<Val>,
+    pub inclusive: bool,
+    pub inner_type: ValueType,
+}
+
+impl RuntimeVal for RangeVal {
+    fn get_type(&self) -> ValueType {
+        ValueType::Range(Box::new(self.inner_type.clone()))
+    }
+}
+
+impl std::fmt::Display for RangeVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{}{}",
+            self.start,
+            if self.inclusive { "..=" } else { ".." },
+            self.end
+        )
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct TupleVal {
     pub values: Vec<Val>,
 }
@@ -236,6 +264,43 @@ impl RuntimeVal for IteratorVal {
 }
 
 #[derive(Debug)]
+pub struct RangeIterator {
+    start: i64,
+    end: i64,
+    inclusive: bool,
+}
+
+impl RangeIterator {
+    pub fn new(start: i64, end: i64, inclusive: bool) -> Self {
+        Self {
+            start,
+            end,
+            inclusive,
+        }
+    }
+}
+
+impl Iterator for RangeIterator {
+    fn next(&mut self) -> Option<Val> {
+        if self.inclusive {
+            if self.start <= self.end {
+                let value = self.start;
+                self.start += 1;
+                Some(Val::Integer(IntegerVal { value }))
+            } else {
+                None
+            }
+        } else if self.start < self.end {
+            let value = self.start;
+            self.start += 1;
+            Some(Val::Integer(IntegerVal { value }))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct ArrayIterator {
     array: Vec<Val>,
     index: usize,
@@ -271,6 +336,7 @@ pub enum Val {
     NativeFunction(NativeFunctionVal),
     Function(Rc<FunctionVal>),
     Array(ArrayVal),
+    Range(RangeVal),
     Tuple(TupleVal),
     Special(SpecialVal),
     Iterator(IteratorVal),
@@ -288,6 +354,7 @@ impl FromType for Val {
             Type::Null => Some(ValueType::Null),
             Type::Bool => Some(ValueType::Bool),
             Type::Array(inner) => Some(ValueType::Array(Box::new(Val::from_type(inner)?))),
+            Type::Range(inner) => Some(ValueType::Array(Box::new(Val::from_type(inner)?))),
             Type::Tuple(inner_types) => {
                 let values: Vec<ValueType> = inner_types
                     .iter()
@@ -317,6 +384,17 @@ impl Val {
         }
         Ok(())
     }
+
+    pub fn to_i64(&self) -> Result<i64, InterpreterError> {
+        match self {
+            Val::Integer(IntegerVal { value }) => Ok(*value),
+            _ => Err(InterpreterError::TypeError {
+                message: "Value is not an integer.".to_string(),
+                expected: ValueType::Integer,
+                found: self.get_type(),
+            }),
+        }
+    }
 }
 
 impl Val {
@@ -325,6 +403,11 @@ impl Val {
             Val::Array(array_val) => {
                 Ok(Rc::new(RefCell::new(ArrayIterator::new(array_val.values))))
             }
+            Val::Range(range_val) => Ok(Rc::new(RefCell::new(RangeIterator::new(
+                range_val.start.to_i64()?,
+                range_val.end.to_i64()?,
+                range_val.inclusive,
+            )))),
             _ => Err(InterpreterError::TypeError {
                 message: "Value is not iterable.".to_string(),
                 expected: ValueType::Iterator(Box::new(ValueType::Any)),
@@ -349,6 +432,9 @@ impl RuntimeVal for Val {
                 values: _,
                 inner_type,
             }) => ValueType::Array(Box::new(inner_type.clone())),
+            Val::Range(RangeVal { inner_type, .. }) => {
+                ValueType::Range(Box::new(inner_type.clone()))
+            }
             Val::Tuple(inner) => inner.get_type(),
             Val::Iterator(IteratorVal {
                 iterator: _,
@@ -374,6 +460,7 @@ impl std::fmt::Display for Val {
                 write!(f, "fn:{}", function_val.name)
             }
             Val::Array(values) => write!(f, "{}", values),
+            Val::Range(values) => write!(f, "{}", values),
             Val::Tuple(values) => write!(f, "{}", values),
             Val::Iterator(IteratorVal {
                 iterator,

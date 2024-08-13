@@ -7,8 +7,8 @@ use crate::{
         environment::Environment,
         interpreter::evaluate,
         values::{
-            ArrayVal, BoolVal, FloatVal, IntegerVal, NullVal, ObjectVal, RuntimeVal, SpecialVal,
-            SpecialValKeyword, StringVal, ToFloat, TupleVal, Val, ValueType,
+            ArrayVal, BoolVal, FloatVal, IntegerVal, NullVal, ObjectVal, RangeVal, RuntimeVal,
+            SpecialVal, SpecialValKeyword, StringVal, ToFloat, TupleVal, Val, ValueType,
         },
     },
     errors::InterpreterError,
@@ -47,6 +47,12 @@ pub fn evaluate_expr(
         Expr::Array(elements, elements_type) => {
             evaluate_array_expr(elements, elements_type, env, root_env)
         }
+        Expr::Range {
+            start,
+            end,
+            inclusive,
+            defined_type,
+        } => evaluate_range_expr(*start, *end, inclusive, defined_type, env, root_env),
         Expr::SpecialNull => Ok(mk_null!()),
         Expr::ConcatOp { left, right } => evaluate_concatenation_expr(*left, *right, env, root_env),
         Expr::BlockExpr(then) => evaluate_block_expr(then, env, root_env),
@@ -82,6 +88,25 @@ pub fn evaluate_array_expr(
     Ok(Val::Array(ArrayVal {
         values: evaluated_elements,
         inner_type: Val::from_type(&elements_type)
+            .expect("Unable to convert Type to ValueType. This should not happen."),
+    }))
+}
+
+pub fn evaluate_range_expr(
+    start: Expr,
+    end: Expr,
+    inclusive: bool,
+    defined_type: Type,
+    env: &Rc<RefCell<Environment>>,
+    root_env: &Rc<RefCell<Environment>>,
+) -> Result<Val, InterpreterError> {
+    let start = Box::new(evaluate_expr(start, env, root_env)?);
+    let end = Box::new(evaluate_expr(end, env, root_env)?);
+    Ok(Val::Range(RangeVal {
+        start,
+        end,
+        inclusive,
+        inner_type: Val::from_type(&defined_type)
             .expect("Unable to convert Type to ValueType. This should not happen."),
     }))
 }

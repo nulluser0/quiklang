@@ -31,6 +31,12 @@ impl Compiler {
         match expr {
             Expr::Literal(literal) => self.compile_literal(literal, require_constant_as_register),
             Expr::Array(_, _) => todo!(),
+            Expr::Range {
+                start,
+                end,
+                inclusive,
+                defined_type,
+            } => todo!(),
             Expr::Identifier(identifier) => {
                 self.compile_identifier(identifier, symbol_table, require_constant_as_register)
             }

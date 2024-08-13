@@ -756,6 +756,60 @@ impl Parser {
         Ok(left)
     }
 
+    fn parse_range_expr(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+        start_expr: Expr,
+    ) -> Result<Expr, ParserError> {
+        let inclusive = match self.eat().token {
+            TokenType::Operator(Operator::RangeInclusive) => true,
+            TokenType::Operator(Operator::RangeExclusive) => false,
+            _ => {
+                return Err(ParserError::InvalidOperator(
+                    self.at().line,
+                    self.at().col,
+                    self.at().token.clone(),
+                ))
+            }
+        };
+
+        let end_expr = self.parse_expr(type_env, root_type_env)?;
+
+        match start_expr.get_type(type_env, self.at().line, self.at().col)? {
+            Type::Integer => {}
+            e => {
+                return Err(ParserError::TypeError {
+                    expected: Type::Integer,
+                    found: e,
+                    line: self.at().line,
+                    col: self.at().col,
+                    message: "First argument for Range Expr should be integer.".to_string(),
+                })
+            }
+        }
+
+        match end_expr.get_type(type_env, self.at().line, self.at().col)? {
+            Type::Integer => {}
+            e => {
+                return Err(ParserError::TypeError {
+                    expected: Type::Integer,
+                    found: e,
+                    line: self.at().line,
+                    col: self.at().col,
+                    message: "Second argument for Range Expr should be integer.".to_string(),
+                })
+            }
+        }
+
+        Ok(Expr::Range {
+            start: Box::new(start_expr),
+            end: Box::new(end_expr),
+            inclusive,
+            defined_type: Type::Integer,
+        })
+    }
+
     fn parse_additive_expr(
         &mut self,
         type_env: &Rc<RefCell<TypeEnvironment>>,
@@ -767,6 +821,13 @@ impl Parser {
             self.at().token,
             TokenType::Operator(Operator::Add) | TokenType::Operator(Operator::Subtract)
         ) {
+            if matches!(
+                self.at().token,
+                TokenType::Operator(Operator::RangeInclusive)
+                    | TokenType::Operator(Operator::RangeExclusive)
+            ) {
+                return self.parse_range_expr(type_env, root_type_env, left);
+            }
             let operator_astoken = self.eat();
             let operator: BinaryOp = match operator_astoken.token {
                 TokenType::Operator(op) => op.into(),
