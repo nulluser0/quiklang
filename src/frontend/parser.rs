@@ -152,6 +152,7 @@ impl Parser {
                     if self.at().token == TokenType::Symbol(Symbol::RightBrace) {
                         break;
                     } else {
+                        self.eat();
                         continue;
                     }
                 }
