@@ -227,7 +227,7 @@ impl Compiler {
         // We assume this is correct
         let function = self.compile_expression(caller, false, true, symbol_table)?;
 
-        // Function result
+        // Function result (and function run base)
         let result = self.allocate_register();
 
         // Args lens
@@ -243,7 +243,12 @@ impl Compiler {
         }
 
         // Call function
-        self.add_instruction(Abc(OP_CALL, function.safe_unwrap() as i32, arg_lens, 0));
+        self.add_instruction(Abc(
+            OP_CALL,
+            function.safe_unwrap() as i32,
+            arg_lens,
+            result as i32,
+        ));
 
         Ok(ReturnValue::Normal(result as isize))
     }

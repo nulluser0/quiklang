@@ -23,9 +23,10 @@ use super::{
     },
 };
 
+#[derive(Debug)]
 struct CallFrame {
-    return_pc: usize, // PC to return to
-    base: usize,      // Base register
+    pub return_pc: usize, // PC to return to
+    pub base: usize,      // Base register
 }
 
 // TODO: Consider using this:
@@ -163,16 +164,17 @@ impl PartialOrd for RegisterVal {
 pub struct VM {
     registers: Vec<RegisterVal>,
     pub constant_pool: Vec<RegisterVal>,
-    // pub function_indexes: Vec<usize>,
+    pub function_indexes: Vec<usize>,
     pub program_counter: usize,
     pub instructions: Vec<Instruction>,
-    // call_stack: Vec<CallFrame>,
+    call_stack: Vec<CallFrame>,
 }
 
 impl VM {
     pub fn new(
         instructions: Vec<Instruction>,
         constant_pool: Vec<RegisterVal>,
+        function_indexes: Vec<usize>,
         num_registers: usize,
     ) -> Self {
         VM {
@@ -180,6 +182,8 @@ impl VM {
             constant_pool,
             program_counter: 0,
             instructions,
+            function_indexes,
+            call_stack: vec![],
         }
     }
 
@@ -187,6 +191,12 @@ impl VM {
         VM::new(
             bytecode.instructions().clone(),
             bytecode.constant_pool().clone(),
+            bytecode
+                .qlang_functions
+                .iter()
+                .map(|f| *f as usize)
+                .collect::<Vec<usize>>()
+                .clone(),
             *bytecode.register_count() as usize,
         )
     }
@@ -590,13 +600,41 @@ impl VM {
                 }
             }
             OP_CALL => {
-                // Implement function call
+                // A is the pointer to a function on function_indexes
+                // B is the number of args to be pushed into the function's scope
+                // C is the base
+
+                let function_index = match self.registers[arga as usize] {
+                    RegisterVal::Int(index) => index as usize,
+                    _ => panic!("Expected function index in Register R({})", arga),
+                };
+
+                // Save callframe
+                let call_frame = CallFrame {
+                    return_pc: self.program_counter,
+                    base: argc as usize,
+                };
+
+                // push callframe
+                self.call_stack.push(call_frame);
+
+                // Set the program counter to the function's starting instruction
+                if function_index < self.function_indexes.len() {
+                    self.program_counter = self.function_indexes[function_index];
+                    return;
+                } else {
+                    panic!("Invalid function index: {}", function_index);
+                }
             }
             OP_TAILCALL => {
                 // Implement tail call optimization
             }
             OP_RETURN => {
-                // Implement return from function
+                if let Some(call_frame) = self.call_stack.pop() {
+                    self.program_counter = call_frame.return_pc;
+                } else {
+                    panic!("STACK UNDERFLOW")
+                }
             }
             OP_INC => {
                 if let RegisterVal::Int(value) = self.registers[arga as usize] {
@@ -731,7 +769,8 @@ mod tests {
                 ASBx(OP_JUMP, 0, -2),    // Jump back to the first instruction
             ],
             vec![RegisterVal::Int(10)], // Constant pool
-            2,                          // Number of registers
+            vec![],
+            2, // Number of registers
         )
     }
 

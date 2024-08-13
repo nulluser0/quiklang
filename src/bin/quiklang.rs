@@ -92,7 +92,7 @@ fn repl_vm() {
     println!("Running experimental VM backend mode. Some things may be broken.");
 
     let mut compiler = Compiler::new();
-    let mut vm = VM::new(vec![], vec![], 0);
+    let mut vm = VM::new(vec![], vec![], vec![], 0);
 
     let mut root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
     let mut type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
@@ -126,7 +126,7 @@ fn repl_vm() {
                         root_type_env.clone(),
                     )));
                     compiler = Compiler::new();
-                    vm = VM::new(vec![], vec![], 0);
+                    vm = VM::new(vec![], vec![], vec![], 0);
                     continue;
                 }
 
