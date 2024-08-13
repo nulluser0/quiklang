@@ -76,7 +76,8 @@ pub const OP_SHL: OpCode = 30; // A B C  R(A) := R(B) << R(C)
 pub const OP_SHR: OpCode = 31; // A B C  R(A) := R(B) >> R(C)
 pub const OP_CONCAT: OpCode = 32; // A B C  R(A) := RK(B) & RK(C)
 pub const OP_DESTRUCTOR: OpCode = 33; // A B C  R(A) where A is a pointer to heap obj, heap obj is destroyed.
-                                      // TODO: Add both array, string, hashmap, etc. (Heap-allocated objects) instructions
+pub const OP_EXIT: OpCode = 34; // A B C  A is exit code, default 0.
+                                // TODO: Add both array, string, hashmap, etc. (Heap-allocated objects) instructions
 pub const OP_ARRAY_ALLOCATE: OpCode = 34; // A B C  R(A) := allocate_array(b - size)
 pub const OP_HASHMAP_ALLOCATE: OpCode = 35; // A B C  R(A) := allocate_hashmap(b - size)
 pub const OP_HASHSET_ALLOCATE: OpCode = 36; // A B C  R(A) := allocate_hashset(b - size)
@@ -87,7 +88,7 @@ pub const OP_GROWABLE_SET: OpCode = 39; // A B C  growable(A)[R(B)].set(C)
 pub const OP_GROWABLE_GET: OpCode = 40; // A B C  R(A) := growable(B)[R(C)]
 pub const OP_HASHMAP_OR_HASHSET_CONTAINS: OpCode = 41; // A B C  R(A) := hashmap/hashset(B).contains(C)
 pub const OP_GROWABLE_REMOVE: OpCode = 42; // A B C  R(A) := growable(B).remove(R(C))
-pub const OP_NOP: OpCode = 34; // NOP
+pub const OP_NOP: OpCode = 35; // NOP
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum OpArgMode {
@@ -391,6 +392,14 @@ pub static OP_NAMES: &[OpProp; OP_NOP as usize + 1] = &[
     },
     OpProp {
         name: "DESTRUCTOR",
+        is_test: false,
+        set_reg_a: true,
+        mode_arg_b: OpArgMode::NotUsed,
+        mode_arg_c: OpArgMode::NotUsed,
+        typ: OpType::Abc,
+    },
+    OpProp {
+        name: "EXIT",
         is_test: false,
         set_reg_a: true,
         mode_arg_b: OpArgMode::NotUsed,
@@ -718,6 +727,7 @@ pub fn to_string(inst: Instruction) -> String {
         OP_SHR => format!("{} | R({}) := R({}) >> R({})", ops, arga, argb, argc),
         OP_CONCAT => format!("{} | R({}) := R({}) & R({})", ops, arga, argb, argc),
         OP_DESTRUCTOR => format!("{} | R({}) -> destructor", ops, arga),
+        OP_EXIT => format!("{} | std::process::exit({})", ops, arga),
         OP_NOP => ops.to_string(),
         _ => unreachable!(),
     }

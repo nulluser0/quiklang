@@ -21,7 +21,6 @@ pub fn run_vm_repl(
                 Ok(bytecode) => {
                     vm.constant_pool = bytecode.constants;
                     vm.instructions = bytecode.instructions;
-                    vm.set_max_register(bytecode.integrity_info.num_register as usize);
                     vm.execute();
                     // TODO: for now only for debugging...
                 }

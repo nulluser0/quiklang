@@ -5,7 +5,7 @@ use std::{cell::RefCell, collections::HashMap, mem::swap, rc::Rc};
 use crate::{
     backend_vm::{
         bytecode::{BCIntegrityInfo, BCMetadata, ByteCode},
-        instructions::{Abc, Instruction, OP_NOP},
+        instructions::{Abc, Instruction, OP_EXIT, OP_NOP},
         vm::RegisterVal,
     },
     errors::VMCompileError,
@@ -169,6 +169,7 @@ impl Compiler {
         let mut bytecode = ByteCode::new(metadata, integrity_info);
 
         // Append function_insts into main instructions
+        self.add_instruction(Abc(OP_EXIT, 0, 0, 0)); // Prevent unintended execution of functions
         self.add_instruction(Abc(OP_NOP, 0, 0, 0)); // Some break to briefly indicate that this is an area for functions. This will not be run since code should
                                                     // not run anyways
 
