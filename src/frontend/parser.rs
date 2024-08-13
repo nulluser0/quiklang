@@ -147,7 +147,7 @@ impl Parser {
             struct_definition.insert(key, key_type);
 
             // ',', ',)', or ')'
-            match self.eat().token {
+            match self.at().token {
                 TokenType::Symbol(Symbol::Comma) => {
                     if self.at().token == TokenType::Symbol(Symbol::RightBrace) {
                         break;
