@@ -101,6 +101,15 @@ impl Parser {
             TokenType::Keyword(Keyword::Enum) => {
                 self.parse_enum_definition(type_env, root_type_env)
             }
+            TokenType::Keyword(Keyword::Extern) => {
+                self.eat();
+                match self.at().token {
+                    TokenType::Keyword(Keyword::Fn) => {
+                        self.parse_extern_fn_declaration(type_env, root_type_env)
+                    }
+                    _ => Err(ParserError::MissingExternFn),
+                }
+            }
             TokenType::Keyword(Keyword::Type) => {
                 self.parse_type_definition(type_env, root_type_env)
             }
@@ -304,6 +313,62 @@ impl Parser {
             "return declaration is a statement. It must end with a semicolon.",
         )?;
         Ok(Stmt::ReturnStmt(Some(expr)))
+    }
+
+    fn parse_extern_fn_declaration(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Stmt, ParserError> {
+        let declaration = self.eat();
+        let ident = self.eat();
+        let name = match ident.token {
+            TokenType::Identifier(name) => name,
+            _ => {
+                return Err(ParserError::MissingFunctionIdentifier(
+                    ident.line, ident.col,
+                ))
+            }
+        };
+        let args: Vec<(Expr, Type, bool)> = self.parse_args_with_types(type_env, root_type_env)?;
+        let mut params: Vec<(String, Type, bool)> = Vec::new();
+        for arg in args {
+            match arg {
+                (Expr::Identifier(name), param_type, is_mut) => {
+                    params.push((name, param_type, is_mut))
+                }
+                _ => return Err(ParserError::InvalidFunctionParameter(ident.line, ident.col)),
+            }
+        }
+        let mut return_type = Type::Null;
+        if self.at().token == TokenType::Symbol(Symbol::Arrow) {
+            // Defined return type
+            self.eat();
+            return_type = self.parse_type_declaration()?;
+        }
+
+        // Declare the function into the declared scope
+        let fn_type = Type::Function(
+            params
+                .iter()
+                .map(|(_, t, is_mut)| (t.clone(), *is_mut))
+                .collect(),
+            Box::new(return_type.clone()),
+        );
+        type_env
+            .borrow_mut()
+            .declare_fn(&name, fn_type.clone(), &declaration)?;
+
+        self.expect(
+            TokenType::Symbol(Symbol::Semicolon),
+            "Extern function declarations must end with a semicolon.",
+        )?;
+
+        Ok(Stmt::ExternFnDeclaration {
+            parameters: params,
+            name,
+            return_type,
+        })
     }
 
     fn parse_fn_declaration(

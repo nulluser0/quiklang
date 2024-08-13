@@ -74,6 +74,9 @@ pub enum ParserError {
     #[error("`async` must be followed by `fn`")]
     MissingAsyncFn,
 
+    #[error("`extern` must be followed by `fn`")]
+    MissingExternFn,
+
     #[error("at position {0}:{1}: `break` found outside of loop context")]
     BreakOutsideLoop(usize, usize),
 

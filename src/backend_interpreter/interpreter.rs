@@ -41,6 +41,7 @@ pub fn evaluate(
             key_type_values: _,
         } => todo!(),
         Stmt::EnumDefStmt { .. } => todo!(),
-        Stmt::AliasDefStmt { .. } => todo!(), // Handle other statement types...
+        Stmt::AliasDefStmt { .. } => todo!(),
+        Stmt::ExternFnDeclaration { .. } => todo!(), // Handle other statement types...
     }
 }

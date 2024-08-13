@@ -57,6 +57,11 @@ impl Compiler {
             } => todo!(),
             Stmt::EnumDefStmt { ident, variants } => todo!(),
             Stmt::AliasDefStmt { ident, alias } => todo!(),
+            Stmt::ExternFnDeclaration {
+                parameters,
+                name,
+                return_type,
+            } => todo!(),
         }
     }
 

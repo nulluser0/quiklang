@@ -343,6 +343,11 @@ pub enum Stmt {
         body: Vec<Stmt>,
         is_async: bool,
     }, // Parameters, Name, Body, Is async?
+    ExternFnDeclaration {
+        parameters: Vec<(String, Type, bool)>,
+        name: String,
+        return_type: Type,
+    },
     StructDefStmt {
         ident: String,
         key_type_values: HashMap<String, Type>,
@@ -376,6 +381,7 @@ impl ParsetimeType for Stmt {
                 None => Ok(Type::Null),
             },
             Stmt::FunctionDeclaration { .. } => Ok(Type::Null),
+            Stmt::ExternFnDeclaration { .. } => Ok(Type::Null),
             Stmt::StructDefStmt { .. } => Ok(Type::Null),
             Stmt::EnumDefStmt { .. } => Ok(Type::Null),
             Stmt::AliasDefStmt { .. } => Ok(Type::Null),

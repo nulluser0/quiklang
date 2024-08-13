@@ -78,6 +78,7 @@ pub enum Keyword {
     Enum,   // enum
     Type,   // type
     Impl,   // impl
+    Extern, // extern
 }
 
 impl FromStr for Keyword {
@@ -108,6 +109,7 @@ impl FromStr for Keyword {
             "enum" => Ok(Keyword::Enum),
             "type" => Ok(Keyword::Type),
             "impl" => Ok(Keyword::Impl),
+            "extern" => Ok(Keyword::Extern),
             _ => Err(format!("{} is not a keyword.", s)),
         }
     }
@@ -139,6 +141,7 @@ impl std::fmt::Display for Keyword {
             Keyword::Enum => write!(f, "Keyword 'enum'"),
             Keyword::Type => write!(f, "Keyword 'type'"),
             Keyword::Impl => write!(f, "Keyword 'impl'"),
+            Keyword::Extern => write!(f, "Keyword 'extern'"),
         }
     }
 }
