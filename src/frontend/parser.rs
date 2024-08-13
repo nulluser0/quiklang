@@ -126,7 +126,7 @@ impl Parser {
 
         let mut struct_definition: HashMap<String, Type> = HashMap::new();
 
-        while self.not_eof() && self.at().token == TokenType::Symbol(Symbol::RightBrace) {
+        while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
             // ident
             let key_token = self.eat();
             let key = match key_token.token {
