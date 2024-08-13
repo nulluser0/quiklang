@@ -10,6 +10,7 @@
 // 3. Setup and Integrity information:      -- Read only
 //      - Register count
 //      - Const count
+//      - QL Functions count
 //      - Instruction count
 // 4. Constant pool/list                    -- Read only
 // 5. QLang Functions list                  -- Read only
@@ -31,8 +32,9 @@
 //      Offset      Size (bytes)        Description
 //          24          4                   Register count - i32 number
 //          28          4                   Constant count - i32 number
-//          32          4                   Instruction count - i32 number
-//          36          4                   String indication pool - i32 number
+//          32          4                   QL Functions count - i32 number
+//          36          4                   Instruction count - i32 number
+//          40          4                   String indication pool - i32 number
 //
 // 4. Constant pool:
 //      Offset      Size (bytes)        Description
@@ -76,6 +78,7 @@ pub struct ByteCode {
     pub metadata: BCMetadata,
     pub integrity_info: BCIntegrityInfo,
     pub constants: Vec<RegisterVal>,
+    pub qlang_functions: Vec<u64>,
     pub instructions: Vec<Instruction>,
 }
 
@@ -90,6 +93,7 @@ pub struct BCMetadata {
 pub struct BCIntegrityInfo {
     pub num_register: i32,
     pub num_constants: i32,
+    pub num_qlang_functions: i32,
     pub num_inst: i32,
 }
 
@@ -104,6 +108,12 @@ impl Display for ByteCode {
             constants_fragments.push(format!("{:10}| {}", i, constant));
         }
         let constants_string = constants_fragments.join("\n");
+        let qlang_functions_string: String = self
+            .qlang_functions
+            .iter()
+            .map(|inner| inner.to_string())
+            .collect::<Vec<String>>()
+            .join("\n");
         let mut instructions_fragments: Vec<String> = Vec::new();
         for (i, instruction) in self.instructions.iter().enumerate() {
             instructions_fragments.push(format!("{:10}| {}", i, to_string(*instruction)))
@@ -119,9 +129,13 @@ Flags:               {}
 -----------------------------
 No. Registers:       {}
 No. Constants:       {}
+No. QL Functions:    {}
 No. Instructions:    {}
 -----------------------------
 Constants:
+{}
+-----------------------------
+Quiklang Functions:
 {}
 -----------------------------
 Instructions:
@@ -132,8 +146,10 @@ Instructions:
             self.metadata.flags,
             self.integrity_info.num_register,
             self.integrity_info.num_constants,
+            self.integrity_info.num_qlang_functions,
             self.integrity_info.num_inst,
             constants_string,
+            qlang_functions_string,
             instructions_string
         )
     }
@@ -146,6 +162,7 @@ impl ByteCode {
             integrity_info,
             constants: vec![],
             instructions: vec![],
+            qlang_functions: vec![],
         }
     }
 
@@ -191,12 +208,14 @@ impl ByteCode {
         // Read Integrity Info
         let num_register = cursor.read_i32::<LittleEndian>()?;
         let num_constants = cursor.read_i32::<LittleEndian>()?;
+        let num_qlang_functions = cursor.read_i32::<LittleEndian>()?;
         let num_inst = cursor.read_i32::<LittleEndian>()?;
 
         let integrity_info = BCIntegrityInfo {
             num_register,
             num_constants,
             num_inst,
+            num_qlang_functions,
         };
 
         // Read Constant Pool and add to String Pool
@@ -219,6 +238,12 @@ impl ByteCode {
             }
         }
 
+        // Read QLang functions
+        let mut qlang_functions: Vec<u64> = Vec::with_capacity(num_qlang_functions as usize);
+        for _ in 0..num_qlang_functions {
+            qlang_functions.push(cursor.read_u64::<LittleEndian>()?);
+        }
+
         // Read Instructions
         let mut instructions = Vec::with_capacity(num_inst as usize);
         for _ in 0..num_inst {
@@ -230,6 +255,7 @@ impl ByteCode {
             integrity_info,
             constants,
             instructions,
+            qlang_functions,
         })
     }
 
@@ -241,10 +267,10 @@ impl ByteCode {
         // each 8 * (num_constants - num_string_points) - Constants (excl strings)  - variable size
         // each string_len + (8 - (string_len % 8)) % 8 - String constants          - variable size - 1 string len = 1 byte. String len aligned to 8 bytes.
         // each 4 * numm_inst                           - Instructions              - variable size
-        let fixed_sizes: usize = 4 + 20 + 16;
+        const FIXED_SIZES: usize = 4 + 20 + 16;
         let constant_size: usize = bytecode.integrity_info.num_constants as usize;
         let instructions_size: usize = 4 * bytecode.integrity_info.num_inst as usize;
-        let total_size = fixed_sizes + constant_size + instructions_size;
+        let total_size = FIXED_SIZES + constant_size + instructions_size;
 
         let mut encoded_bytecode: Vec<u8> = Vec::with_capacity(total_size);
 
@@ -259,6 +285,7 @@ impl ByteCode {
         // Write Integrity Info
         encoded_bytecode.write_i32::<LittleEndian>(bytecode.integrity_info.num_register)?;
         encoded_bytecode.write_i32::<LittleEndian>(bytecode.integrity_info.num_constants)?;
+        encoded_bytecode.write_i32::<LittleEndian>(bytecode.integrity_info.num_qlang_functions)?;
         encoded_bytecode.write_i32::<LittleEndian>(bytecode.integrity_info.num_inst)?;
 
         // Write Constant Pool
@@ -287,6 +314,11 @@ impl ByteCode {
                 RegisterVal::HashMap(_) => todo!(),
                 RegisterVal::HashSet(_) => todo!(),
             }
+        }
+
+        // Write QLang Functions
+        for function in &bytecode.qlang_functions {
+            encoded_bytecode.write_u64::<LittleEndian>(*function)?;
         }
 
         // Write Instructions
@@ -329,6 +361,7 @@ mod tests {
         // Setup and Integrity Information
         bytecode.write_i32::<LittleEndian>(4).unwrap(); // Register count
         bytecode.write_i32::<LittleEndian>(3).unwrap(); // Constant count
+        bytecode.write_i32::<LittleEndian>(0).unwrap(); // QL Functions count
         bytecode.write_i32::<LittleEndian>(3).unwrap(); // Instruction count
 
         // Constant Pool

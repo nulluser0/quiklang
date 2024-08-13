@@ -5,7 +5,7 @@ use std::{cell::RefCell, collections::HashMap, mem::swap, rc::Rc};
 use crate::{
     backend_vm::{
         bytecode::{BCIntegrityInfo, BCMetadata, ByteCode},
-        instructions::Instruction,
+        instructions::{Abc, Instruction, OP_NOP},
         vm::RegisterVal,
     },
     errors::VMCompileError,
@@ -159,12 +159,25 @@ impl Compiler {
             num_register: self.max_reg as i32,
             num_constants: self.constants.len() as i32,
             num_inst: self.instructions.len() as i32,
+            num_qlang_functions: self.function_insts.len() as i32,
         };
 
         let mut bytecode = ByteCode::new(metadata, integrity_info);
 
+        // Append function_insts into main instructions
+        self.add_instruction(Abc(OP_NOP, 0, 0, 0)); // Some break to briefly indicate that this is an area for functions. This will not be run since code should
+                                                    // not run anyways
+
+        let mut qlang_functions: Vec<u64> = Vec::new();
+        for fn_inst in &mut self.function_insts {
+            let fn_index = self.instructions.len();
+            self.instructions.append(fn_inst);
+            qlang_functions.push(fn_index as u64);
+        }
+
         swap(&mut self.constants, &mut bytecode.constants);
         swap(&mut self.instructions, &mut bytecode.instructions);
+        bytecode.qlang_functions = qlang_functions;
 
         Ok(bytecode)
     }
