@@ -264,6 +264,15 @@ impl VM {
     }
 
     pub fn execute_instruction(&mut self, inst: Instruction) {
+        let offset = self
+            .call_stack
+            .last()
+            .unwrap_or(&CallFrame {
+                return_pc: 0,
+                base: 0,
+            })
+            .base;
+
         let op = get_opcode(inst);
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -272,12 +281,12 @@ impl VM {
         let argsbx = get_argsbx(inst);
         match op {
             OP_MOVE => {
-                let value = self.registers[argb as usize].clone();
-                self.registers[arga as usize] = value;
+                let value = self.registers[argb as usize + offset].clone();
+                self.registers[arga as usize + offset] = value;
             }
             OP_LOADCONST => {
-                let value = self.constant_pool[argbx as usize].clone();
-                self.registers[arga as usize] = value;
+                let value = self.constant_pool[argbx as usize + offset].clone();
+                self.registers[arga as usize + offset] = value;
             }
             OP_LOADBOOL => {
                 let value = if argb != 0 {
@@ -285,40 +294,43 @@ impl VM {
                 } else {
                     RegisterVal::Bool(false)
                 };
-                self.registers[arga as usize] = value;
+                self.registers[arga as usize + offset] = value;
                 if argc != 0 {
                     self.program_counter += 1;
                 }
             }
             OP_LOADNULL => {
                 for i in arga as usize..=argb as usize {
-                    self.registers[i] = RegisterVal::Null;
+                    self.registers[i + offset] = RegisterVal::Null;
                 }
             }
             OP_ADD => {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
                 } else {
-                    self.registers[argc as usize].clone()
+                    self.registers[argc as usize + offset].clone()
                 };
 
                 match (b_val, c_val) {
                     (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Int(left.wrapping_add(right));
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Int(left.wrapping_add(right));
                     }
                     (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left + right);
+                        self.registers[arga as usize + offset] = RegisterVal::Float(left + right);
                     }
                     (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left as f64 + right);
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Float(left as f64 + right);
                     }
                     (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left + right as f64);
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Float(left + right as f64);
                     }
                     _ => {}
                 }
@@ -327,26 +339,29 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
                 } else {
-                    self.registers[argc as usize].clone()
+                    self.registers[argc as usize + offset].clone()
                 };
 
                 match (b_val, c_val) {
                     (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Int(left.wrapping_sub(right));
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Int(left.wrapping_sub(right));
                     }
                     (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left - right);
+                        self.registers[arga as usize + offset] = RegisterVal::Float(left - right);
                     }
                     (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left as f64 - right);
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Float(left as f64 - right);
                     }
                     (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left - right as f64);
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Float(left - right as f64);
                     }
                     _ => {}
                 }
@@ -355,26 +370,29 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
                 } else {
-                    self.registers[argc as usize].clone()
+                    self.registers[argc as usize + offset].clone()
                 };
 
                 match (b_val, c_val) {
                     (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Int(left.wrapping_mul(right));
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Int(left.wrapping_mul(right));
                     }
                     (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left * right);
+                        self.registers[arga as usize + offset] = RegisterVal::Float(left * right);
                     }
                     (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left as f64 * right);
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Float(left as f64 * right);
                     }
                     (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left * right as f64);
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Float(left * right as f64);
                     }
                     _ => {}
                 }
@@ -383,26 +401,29 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
                 } else {
-                    self.registers[argc as usize].clone()
+                    self.registers[argc as usize + offset].clone()
                 };
 
                 match (b_val, c_val) {
                     (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Int(left.wrapping_div(right));
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Int(left.wrapping_div(right));
                     }
                     (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left / right);
+                        self.registers[arga as usize + offset] = RegisterVal::Float(left / right);
                     }
                     (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left as f64 / right);
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Float(left as f64 / right);
                     }
                     (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left / right as f64);
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Float(left / right as f64);
                     }
                     _ => {}
                 }
@@ -411,26 +432,29 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
                 } else {
-                    self.registers[argc as usize].clone()
+                    self.registers[argc as usize + offset].clone()
                 };
 
                 match (b_val, c_val) {
                     (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Int(left.wrapping_rem(right));
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Int(left.wrapping_rem(right));
                     }
                     (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left % right);
+                        self.registers[arga as usize + offset] = RegisterVal::Float(left % right);
                     }
                     (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left as f64 % right);
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Float(left as f64 % right);
                     }
                     (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left % right as f64);
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Float(left % right as f64);
                     }
                     _ => {}
                 }
@@ -439,79 +463,81 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
                 } else {
-                    self.registers[argc as usize].clone()
+                    self.registers[argc as usize + offset].clone()
                 };
 
                 match (b_val, c_val) {
                     (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize] =
+                        self.registers[arga as usize + offset] =
                             RegisterVal::Int(left.wrapping_pow(right as u32));
                     }
                     (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left.powf(right));
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Float(left.powf(right));
                     }
                     (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize] =
+                        self.registers[arga as usize + offset] =
                             RegisterVal::Float((left as f64).powf(right));
                     }
                     (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize] = RegisterVal::Float(left.powf(right as f64));
+                        self.registers[arga as usize + offset] =
+                            RegisterVal::Float(left.powf(right as f64));
                     }
                     _ => {}
                 }
             }
             OP_NOT => {
-                if let RegisterVal::Int(value) = self.registers[argb as usize] {
-                    self.registers[arga as usize] = RegisterVal::Int(!value);
+                if let RegisterVal::Int(value) = self.registers[argb as usize + offset] {
+                    self.registers[arga as usize + offset] = RegisterVal::Int(!value);
                 }
             }
             OP_AND => {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
                 } else {
-                    self.registers[argc as usize].clone()
+                    self.registers[argc as usize + offset].clone()
                 };
 
                 if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-                    self.registers[arga as usize] = RegisterVal::Int(left & right);
+                    self.registers[arga as usize + offset] = RegisterVal::Int(left & right);
                 }
             }
             OP_OR => {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
                 } else {
-                    self.registers[argc as usize].clone()
+                    self.registers[argc as usize + offset].clone()
                 };
 
                 if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-                    self.registers[arga as usize] = RegisterVal::Int(left | right);
+                    self.registers[arga as usize + offset] = RegisterVal::Int(left | right);
                 }
             }
             OP_EQ => {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
                 } else {
-                    self.registers[argc as usize].clone()
+                    self.registers[argc as usize + offset].clone()
                 };
 
                 self.registers[arga as usize] = RegisterVal::Bool(b_val == c_val);
@@ -520,12 +546,12 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
                 } else {
-                    self.registers[argc as usize].clone()
+                    self.registers[argc as usize + offset].clone()
                 };
 
                 self.registers[arga as usize] = RegisterVal::Bool(b_val != c_val);
@@ -534,12 +560,12 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
                 } else {
-                    self.registers[argc as usize].clone()
+                    self.registers[argc as usize + offset].clone()
                 };
 
                 self.registers[arga as usize] = RegisterVal::Bool(b_val < c_val);
@@ -548,12 +574,12 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
                 } else {
-                    self.registers[argc as usize].clone()
+                    self.registers[argc as usize + offset].clone()
                 };
 
                 self.registers[arga as usize] = RegisterVal::Bool(b_val <= c_val);
@@ -562,12 +588,12 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
                 } else {
-                    self.registers[argc as usize].clone()
+                    self.registers[argc as usize + offset].clone()
                 };
 
                 self.registers[arga as usize] = RegisterVal::Bool(b_val > c_val);
@@ -576,12 +602,12 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
                 } else {
-                    self.registers[argc as usize].clone()
+                    self.registers[argc as usize + offset].clone()
                 };
 
                 self.registers[arga as usize] = RegisterVal::Bool(b_val >= c_val);
@@ -650,7 +676,7 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
@@ -666,7 +692,7 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
@@ -682,7 +708,7 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
@@ -698,7 +724,7 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
@@ -714,7 +740,7 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()
@@ -730,7 +756,7 @@ impl VM {
                 let b_val = if is_k(argb) {
                     self.constant_pool[rk_to_k(argb) as usize].clone()
                 } else {
-                    self.registers[argb as usize].clone()
+                    self.registers[argb as usize + offset].clone()
                 };
                 let c_val = if is_k(argc) {
                     self.constant_pool[rk_to_k(argc) as usize].clone()

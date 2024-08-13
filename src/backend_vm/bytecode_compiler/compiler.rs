@@ -93,6 +93,10 @@ impl Compiler {
         index
     }
 
+    pub(super) fn function_len(&mut self) -> usize {
+        self.function_insts.len()
+    }
+
     pub(super) fn reg_top(&self) -> usize {
         self.reg_top
     }
@@ -275,7 +279,7 @@ mod tests {
 
         println!("DECoded: {}", decoded_bytecode);
 
-        let mut vm = VM::from_bytecode(bytecode);
+        let vm = VM::from_bytecode(bytecode);
         // vm.execute();
         println!("{:#?}", vm);
     }

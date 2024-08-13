@@ -91,6 +91,10 @@ impl Compiler {
         let mut function_compiler = self.new_fake_compiler();
         let function_symbol_table = &Rc::new(RefCell::new(SymbolTable::new()));
 
+        function_symbol_table
+            .borrow_mut()
+            .declare_var(name.clone(), self.function_len());
+
         // Allocate result register
         let result_register = function_compiler.allocate_register();
 
