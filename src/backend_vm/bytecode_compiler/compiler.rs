@@ -60,6 +60,7 @@ pub struct Compiler {
     constants: Vec<RegisterVal>,
     constant_map: HashMap<RegisterVal, usize>,
     instructions: Vec<Instruction>,
+    functions: Vec<Vec<Instruction>>,
 }
 
 impl Compiler {
@@ -70,7 +71,26 @@ impl Compiler {
             constants: Vec::new(),
             constant_map: HashMap::new(),
             instructions: Vec::new(),
+            functions: Vec::new(),
         }
+    }
+
+    // Fake compiler instance which is used mainly for function declaration compilation
+    pub(super) fn new_fake_compiler(&self) -> Self {
+        Self {
+            max_reg: 0, // Made 0 so functions are compiled as normal
+            reg_top: 0, // same
+            constants: self.constants.clone(),
+            constant_map: self.constant_map.clone(),
+            instructions: Vec::new(), // New set of instructions
+            functions: self.functions.clone(),
+        }
+    }
+
+    pub(super) fn add_function(&mut self, fake_compiler: &mut Compiler) -> usize {
+        let index = self.functions.len();
+        self.instructions.append(&mut fake_compiler.instructions);
+        index
     }
 
     pub(super) fn reg_top(&self) -> usize {
@@ -149,7 +169,7 @@ impl Compiler {
         Ok(bytecode)
     }
 
-    fn compile_statements(
+    pub(super) fn compile_statements(
         &mut self,
         stmts: Vec<Stmt>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
@@ -158,6 +178,18 @@ impl Compiler {
             self.compile_statement(stmt, true, false, symbol_table)?;
         }
         Ok(())
+    }
+
+    pub(super) fn compile_statements_with_result(
+        &mut self,
+        stmts: Vec<Stmt>,
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+    ) -> Result<ReturnValue, VMCompileError> {
+        let mut result = ReturnValue::Normal(0);
+        for stmt in stmts {
+            result = self.compile_statement(stmt, true, true, symbol_table)?;
+        }
+        Ok(result)
     }
 }
 

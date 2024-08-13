@@ -817,17 +817,18 @@ impl Parser {
     ) -> Result<Expr, ParserError> {
         let mut left = self.parse_multiplicative_expr(type_env, root_type_env)?;
 
+        if matches!(
+            self.at().token,
+            TokenType::Operator(Operator::RangeInclusive)
+                | TokenType::Operator(Operator::RangeExclusive)
+        ) {
+            return self.parse_range_expr(type_env, root_type_env, left);
+        }
+
         while matches!(
             self.at().token,
             TokenType::Operator(Operator::Add) | TokenType::Operator(Operator::Subtract)
         ) {
-            if matches!(
-                self.at().token,
-                TokenType::Operator(Operator::RangeInclusive)
-                    | TokenType::Operator(Operator::RangeExclusive)
-            ) {
-                return self.parse_range_expr(type_env, root_type_env, left);
-            }
             let operator_astoken = self.eat();
             let operator: BinaryOp = match operator_astoken.token {
                 TokenType::Operator(op) => op.into(),

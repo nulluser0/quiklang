@@ -12,8 +12,9 @@
 //      - Const count
 //      - Instruction count
 // 4. Constant pool/list                    -- Read only
-// 5. QFFI (extern/foreign) Functions list  -- Read only
-// 5. Instructions (List of OpCodes, 32-bit/OpCode in size)    -- Read only
+// 5. QLang Functions list                  -- Read only
+// 6. QFFI (extern/foreign) Functions list  -- Read only
+// 7. Instructions (List of OpCodes, 32-bit/OpCode in size)    -- Read only
 
 // Low-level overview:
 // 1. Magic Number
@@ -44,6 +45,10 @@
 //                                                  4 - String
 //          -          1 + len * 8          For strings specifically: If identified as a string from (4), it will be treated as a string.
 //                                              String would be from: `(current offset) -> (current offset + len * 8).
+//
+// 5. QLang Functions:
+//      Offset      Size (bytes)        Description
+//          -           8                   8-byte numbers representing u64 number, pointing to the PC of the function.
 //
 // 5. QFFI (extern/foreign) Functions:
 //      Offset      Size (bytes)        Description
@@ -278,6 +283,7 @@ impl ByteCode {
                 }
                 RegisterVal::Null => encoded_bytecode.write_u8(3)?,
                 RegisterVal::Array(_) => todo!(),
+                RegisterVal::Range(_) => todo!(),
                 RegisterVal::HashMap(_) => todo!(),
                 RegisterVal::HashSet(_) => todo!(),
             }

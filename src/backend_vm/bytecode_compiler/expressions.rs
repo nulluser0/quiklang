@@ -5,7 +5,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     backend_vm::{
         instructions::{
-            rk_ask, ABx, ASBx, Abc, OP_ADD, OP_AND, OP_DIV, OP_EQ, OP_GE, OP_GT, OP_JUMP,
+            rk_ask, ABx, ASBx, Abc, OP_ADD, OP_AND, OP_CALL, OP_DIV, OP_EQ, OP_GE, OP_GT, OP_JUMP,
             OP_JUMP_IF_FALSE, OP_LE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LT, OP_MOD,
             OP_MOVE, OP_MUL, OP_NE, OP_NOT, OP_OR, OP_SUB,
         },
@@ -49,7 +49,9 @@ impl Compiler {
                 self.compile_binary_op(op, *left, *right, symbol_table)
             }
             Expr::UnaryOp(op, expr) => self.compile_unary_op(op, *expr, symbol_table),
-            Expr::FunctionCall(_, _) => todo!(),
+            Expr::FunctionCall(args, caller) => {
+                self.compile_function_call(args, *caller, symbol_table)
+            }
             Expr::Member(_, _) => todo!(),
             Expr::IfExpr {
                 condition,
@@ -214,6 +216,36 @@ impl Compiler {
         };
         self.add_instruction(Abc(opcode, reg as i32, b, 0));
         Ok(ReturnValue::Normal(reg as isize))
+    }
+
+    fn compile_function_call(
+        &mut self,
+        args: Vec<(Expr, bool)>,
+        caller: Expr,
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+    ) -> Result<ReturnValue, VMCompileError> {
+        // We assume this is correct
+        let function = self.compile_expression(caller, false, true, symbol_table)?;
+
+        // Function result
+        let result = self.allocate_register();
+
+        // Args lens
+        let arg_lens = args.len() as i32;
+
+        // Allocate and compile arguments
+        for arg in args {
+            let arg_reg = self.allocate_register();
+            let reg = self
+                .compile_expression(arg.0, true, true, symbol_table)?
+                .safe_unwrap();
+            self.add_instruction(Abc(OP_MOVE, arg_reg as i32, reg as i32, 0))
+        }
+
+        // Call function
+        self.add_instruction(Abc(OP_CALL, function.safe_unwrap() as i32, arg_lens, 0));
+
+        Ok(ReturnValue::Normal(result as isize))
     }
 
     fn compile_if_expr(

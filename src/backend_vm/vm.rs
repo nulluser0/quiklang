@@ -23,11 +23,10 @@ use super::{
     },
 };
 
-// struct CallFrame {
-//     function_name: String,
-//     return_address: usize,
-//     base: usize,
-// }
+struct CallFrame {
+    return_pc: usize, // PC to return to
+    base: usize,      // Base register
+}
 
 // TODO: Consider using this:
 //      Replace Rc<T> with *const T
@@ -61,6 +60,7 @@ pub enum RegisterVal {
     Bool(bool),
     Str(Rc<String>),
     Array(Rc<Vec<RegisterVal>>),
+    Range(Rc<(RegisterVal, RegisterVal, bool)>),
     HashMap(Rc<HashMap<RegisterVal, RegisterVal>>),
     HashSet(Rc<HashSet<RegisterVal>>),
     Null,
@@ -74,6 +74,7 @@ impl std::fmt::Display for RegisterVal {
             RegisterVal::Bool(boolean) => write!(f, "{:10}| {}", "bool", boolean),
             RegisterVal::Str(string) => write!(f, "{:10}| {}", "string", string),
             RegisterVal::Array(array) => write!(f, "{:10}| {:?}", "array", array),
+            RegisterVal::Range(range) => write!(f, "{:10}| {:?}", "range", range),
             RegisterVal::HashMap(hashmap) => write!(f, "{:10}| {:?}", "hashmap", hashmap),
             RegisterVal::HashSet(hashset) => write!(f, "{:10}| {:?}", "hashset", hashset),
             RegisterVal::Null => write!(f, "{:10}| null", "null"),
@@ -96,6 +97,7 @@ impl Hash for RegisterVal {
             RegisterVal::Str(val) => val.hash(state),
             RegisterVal::Null => 0_u8.hash(state),
             RegisterVal::Array(val) => val.hash(state),
+            RegisterVal::Range(val) => val.hash(state),
             RegisterVal::HashMap(val) => {
                 // Iterate over the entries and hash them
                 for (key, value) in val.iter() {
@@ -144,6 +146,9 @@ impl PartialOrd for RegisterVal {
             (_, RegisterVal::HashMap(_)) => Some(Ordering::Greater),
             (RegisterVal::HashSet(_), _) => Some(Ordering::Less),
             (_, RegisterVal::HashSet(_)) => Some(Ordering::Greater),
+            (RegisterVal::Range(_), RegisterVal::Range(_)) => Some(Ordering::Equal),
+            (RegisterVal::Range(_), RegisterVal::Null) => Some(Ordering::Greater),
+            (RegisterVal::Null, RegisterVal::Range(_)) => Some(Ordering::Less),
         }
     }
 }
@@ -158,6 +163,7 @@ impl PartialOrd for RegisterVal {
 pub struct VM {
     registers: Vec<RegisterVal>,
     pub constant_pool: Vec<RegisterVal>,
+    // pub function_indexes: Vec<usize>,
     pub program_counter: usize,
     pub instructions: Vec<Instruction>,
     // call_stack: Vec<CallFrame>,

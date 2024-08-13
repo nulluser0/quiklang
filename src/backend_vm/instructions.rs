@@ -306,7 +306,7 @@ pub static OP_NAMES: &[OpProp; OP_NOP as usize + 1] = &[
         is_test: false,
         set_reg_a: true,
         mode_arg_b: OpArgMode::Used,
-        mode_arg_c: OpArgMode::Used,
+        mode_arg_c: OpArgMode::NotUsed,
         typ: OpType::Abc,
     },
     OpProp {
@@ -694,10 +694,7 @@ pub fn to_string(inst: Instruction) -> String {
         OP_JUMP => format!("{} | pc += {}", ops, argsbx),
         OP_JUMP_IF_TRUE => format!("{} | if R({}) is true then pc += {}", ops, arga, argsbx),
         OP_JUMP_IF_FALSE => format!("{} | if R({}) is false then pc += {}", ops, arga, argsbx),
-        OP_CALL => format!(
-            "{} | R({}) ... R({}+{}-2) := R({})(R({}+1) ... R({}+{}-1))",
-            ops, arga, arga, argc, arga, arga, arga, argb
-        ),
+        OP_CALL => format!("{} | R({})(#R({}))", ops, arga, argb),
         OP_TAILCALL => format!(
             "{} | return R({})(R({}+1) ... R({}+{}-1))",
             ops, arga, arga, arga, argb

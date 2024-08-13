@@ -30,7 +30,7 @@ pub fn run_vm_repl(
                 }
             }
         }
-        Err(e) => panic!("{}", e),
+        Err(e) => print_e(e),
     }
 }
 
