@@ -411,11 +411,11 @@ fn tokenize_operator_or_symbol(
             line: chars.line,
             col: chars.col,
         }),
-        '.' => tokens.push(Token {
-            token: TokenType::Symbol(Symbol::Dot),
-            line: chars.line,
-            col: chars.col,
-        }),
+        // '.' => tokens.push(Token {
+        //     token: TokenType::Symbol(Symbol::Dot),
+        //     line: chars.line,
+        //     col: chars.col,
+        // }),
         '~' => tokens.push(Token {
             token: TokenType::Operator(Operator::BitwiseNot),
             line: chars.line,
@@ -436,7 +436,7 @@ fn tokenize_operator_or_symbol(
             line: chars.line,
             col: chars.col,
         }),
-        '!' | '=' | '-' | '>' | '<' | '&' | '|' => {
+        '!' | '=' | '-' | '>' | '<' | '&' | '|' | '.' => {
             chars.next();
             handle_complex_operators(c, chars, tokens)?;
             return Ok(());
@@ -590,6 +590,32 @@ fn handle_complex_operators(
                 });
                 Ok(())
             }
+        }
+        '.' => {
+            if matches!(chars.peek(), Some(&'.')) {
+                chars.next();
+                if matches!(chars.peek(), Some(&'=')) {
+                    tokens.push(Token {
+                        token: TokenType::Operator(Operator::RangeInclusive),
+                        line: chars.line,
+                        col: chars.col,
+                    });
+                    chars.next(); // Consume '='
+                } else {
+                    tokens.push(Token {
+                        token: TokenType::Operator(Operator::RangeExclusive),
+                        line: chars.line,
+                        col: chars.col,
+                    });
+                }
+            } else {
+                tokens.push(Token {
+                    token: TokenType::Symbol(Symbol::Dot),
+                    line: chars.line,
+                    col: chars.col,
+                });
+            }
+            Ok(())
         }
         _ => Err(LexerError::InternalError(format!(
             "handle_complex_operators called with unexpected character: {} @ {} {}",
