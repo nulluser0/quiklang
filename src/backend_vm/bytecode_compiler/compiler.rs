@@ -60,7 +60,7 @@ pub struct Compiler {
     constants: Vec<RegisterVal>,
     constant_map: HashMap<RegisterVal, usize>,
     instructions: Vec<Instruction>,
-    functions: Vec<Vec<Instruction>>,
+    function_insts: Vec<Vec<Instruction>>,
 }
 
 impl Compiler {
@@ -71,7 +71,7 @@ impl Compiler {
             constants: Vec::new(),
             constant_map: HashMap::new(),
             instructions: Vec::new(),
-            functions: Vec::new(),
+            function_insts: Vec::new(),
         }
     }
 
@@ -83,12 +83,12 @@ impl Compiler {
             constants: self.constants.clone(),
             constant_map: self.constant_map.clone(),
             instructions: Vec::new(), // New set of instructions
-            functions: self.functions.clone(),
+            function_insts: self.function_insts.clone(),
         }
     }
 
     pub(super) fn add_function(&mut self, fake_compiler: &mut Compiler) -> usize {
-        let index = self.functions.len();
+        let index = self.function_insts.len();
         self.instructions.append(&mut fake_compiler.instructions);
         index
     }
