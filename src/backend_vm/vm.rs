@@ -54,7 +54,7 @@ struct CallFrame {
 //                  block {
 //                      let a = share b; // Valid, b does not go out of scope when a is alive.
 //                  }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum RegisterVal {
     Int(i64),
     Float(f64),
@@ -64,6 +64,7 @@ pub enum RegisterVal {
     Range(Rc<(RegisterVal, RegisterVal, bool)>),
     HashMap(Rc<HashMap<RegisterVal, RegisterVal>>),
     HashSet(Rc<HashSet<RegisterVal>>),
+    #[default]
     Null,
 }
 
@@ -162,7 +163,7 @@ impl PartialOrd for RegisterVal {
 
 #[derive(Debug)]
 pub struct VM {
-    registers: Vec<RegisterVal>,
+    registers: [RegisterVal; 200],
     pub constant_pool: Vec<RegisterVal>,
     pub function_indexes: Vec<usize>,
     pub program_counter: usize,
@@ -170,20 +171,21 @@ pub struct VM {
     call_stack: Vec<CallFrame>,
 }
 
+const ARRAY_REPEAT_VALUE: RegisterVal = RegisterVal::Null;
 impl VM {
     pub fn new(
         instructions: Vec<Instruction>,
         constant_pool: Vec<RegisterVal>,
         function_indexes: Vec<usize>,
-        num_registers: usize,
+        _num_registers: usize,
     ) -> Self {
         VM {
-            registers: vec![RegisterVal::Null; num_registers],
+            registers: [ARRAY_REPEAT_VALUE; 200],
             constant_pool,
             program_counter: 0,
             instructions,
             function_indexes,
-            call_stack: vec![],
+            call_stack: Vec::with_capacity(1000),
         }
     }
 
@@ -213,15 +215,15 @@ impl VM {
         }
     }
 
-    pub fn set_max_register(&mut self, num_registers: usize) {
-        if num_registers > self.registers.len() {
-            // Extend the registers vector with default values
-            self.registers.resize(num_registers, RegisterVal::Null);
-        } else {
-            // Truncate the registers vector
-            self.registers.truncate(num_registers);
-        }
-    }
+    // pub fn set_max_register(&mut self, num_registers: usize) {
+    //     if num_registers > self.registers.len() {
+    //         // Extend the registers vector with default values
+    //         self.registers.resize(num_registers, RegisterVal::Null);
+    //     } else {
+    //         // Truncate the registers vector
+    //         self.registers.truncate(num_registers);
+    //     }
+    // }
 
     pub fn get_register(&self, index: usize) -> Result<&RegisterVal, VMRuntimeError> {
         self.registers
