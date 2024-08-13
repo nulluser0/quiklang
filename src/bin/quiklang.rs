@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, fs::File, io::Read, process, rc::Rc};
+use std::{cell::RefCell, fs::File, io::Read, process, rc::Rc};
 
 use quiklang::{
     backend_interpreter::environment::Environment,

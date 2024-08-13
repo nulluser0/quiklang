@@ -248,7 +248,6 @@ impl VM {
     }
 
     pub fn execute_instruction(&mut self, inst: Instruction) {
-        println!("Current: {}", self.program_counter);
         let op = get_opcode(inst);
         let arga = get_arga(inst);
         let argb = get_argb(inst);

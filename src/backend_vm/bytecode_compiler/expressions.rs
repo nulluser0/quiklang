@@ -231,7 +231,7 @@ impl Compiler {
         if require_result {
             self.allocate_register();
         }
-        let mut result: isize = 0;
+        // let mut result: isize = 0;
 
         // Save the top register so that we can disregard the registers from the if expr after use.
         let current_reg_top = self.reg_top();
@@ -250,13 +250,19 @@ impl Compiler {
         let child_symbol_table = &Rc::new(RefCell::new(SymbolTable::new_with_parent(
             symbol_table.clone(),
         )));
+
+        // Track the result of the then block
+        let mut result = ReturnValue::Normal(0);
         for stmt in then {
-            result = self
-                .compile_statement(stmt, true, true, child_symbol_table)?
-                .safe_unwrap();
+            result = self.compile_statement(stmt, true, true, child_symbol_table)?;
         }
         if require_result {
-            self.add_instruction(Abc(OP_MOVE, result_register as i32, result as i32, 0));
+            self.add_instruction(Abc(
+                OP_MOVE,
+                result_register as i32,
+                result.safe_unwrap() as i32,
+                0,
+            ));
         }
 
         // Add placeholder jump to endif after then block
@@ -277,7 +283,11 @@ impl Compiler {
                 ),
             );
 
-            return Ok(ReturnValue::Normal(result_register as isize));
+            return match result {
+                ReturnValue::Normal(_) => Ok(ReturnValue::Normal(result_register as isize)),
+                ReturnValue::Break(_) => Ok(ReturnValue::Break(result_register as isize)),
+                ReturnValue::Return(_) => Ok(ReturnValue::Return(result_register as isize)),
+            };
         }
 
         // There is an else stmt.
@@ -290,12 +300,15 @@ impl Compiler {
             symbol_table.clone(),
         )));
         for stmt in else_stmt.unwrap() {
-            result = self
-                .compile_statement(stmt, true, true, child_symbol_table)?
-                .safe_unwrap();
+            result = self.compile_statement(stmt, true, true, child_symbol_table)?;
         }
         if require_result {
-            self.add_instruction(Abc(OP_MOVE, result_register as i32, result as i32, 0));
+            self.add_instruction(Abc(
+                OP_MOVE,
+                result_register as i32,
+                result.safe_unwrap() as i32,
+                0,
+            ));
         }
 
         // Update jumps
@@ -320,7 +333,11 @@ impl Compiler {
         // Reset register count back to normal in preparation for endif
         self.manually_change_register_count(current_reg_top);
 
-        Ok(ReturnValue::Normal(result_register as isize))
+        match result {
+            ReturnValue::Normal(_) => Ok(ReturnValue::Normal(result_register as isize)),
+            ReturnValue::Break(_) => Ok(ReturnValue::Break(result_register as isize)),
+            ReturnValue::Return(_) => Ok(ReturnValue::Return(result_register as isize)),
+        }
     }
 
     fn compile_while_expr(
@@ -422,7 +439,7 @@ impl Compiler {
         if require_result {
             self.allocate_register();
         }
-        let mut result: isize = 0;
+        let mut result = ReturnValue::Normal(0);
         // Save current top register to restore later
         let current_reg_top = self.reg_top();
 
@@ -431,18 +448,25 @@ impl Compiler {
             symbol_table.clone(),
         )));
         for stmt in block {
-            result = self
-                .compile_statement(stmt, true, true, child_symbol_table)?
-                .safe_unwrap();
+            result = self.compile_statement(stmt, true, true, child_symbol_table)?;
         }
         if require_result {
-            self.add_instruction(Abc(OP_MOVE, result_register as i32, result as i32, 0));
+            self.add_instruction(Abc(
+                OP_MOVE,
+                result_register as i32,
+                result.safe_unwrap() as i32,
+                0,
+            ));
         }
 
         // Restore the register count to the state before the loop
         self.manually_change_register_count(current_reg_top);
 
-        Ok(ReturnValue::Normal(result_register as isize))
+        match result {
+            ReturnValue::Normal(_) => Ok(ReturnValue::Normal(result_register as isize)),
+            ReturnValue::Break(_) => Ok(ReturnValue::Break(result_register as isize)),
+            ReturnValue::Return(_) => Ok(ReturnValue::Return(result_register as isize)),
+        }
     }
 
     fn compile_forever_loop_expr(

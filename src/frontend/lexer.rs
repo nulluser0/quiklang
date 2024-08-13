@@ -164,6 +164,8 @@ pub enum Operator {
     Pipe,           // >
     Modulus,        // %
     BitwiseNot,     // ~
+    RangeExclusive, // ..
+    RangeInclusive, // ..=
 }
 
 impl std::fmt::Display for Operator {
@@ -187,6 +189,8 @@ impl std::fmt::Display for Operator {
             Operator::Pipe => write!(f, "Operator Pipe '|'"),
             Operator::Modulus => write!(f, "Operator Modulus '%'"),
             Operator::BitwiseNot => write!(f, "Operator Bitwise Not '~'"),
+            Operator::RangeExclusive => write!(f, "Operator Range Exclusive '..'"),
+            Operator::RangeInclusive => write!(f, "Operator Range Inclusive '..='"),
         }
     }
 }

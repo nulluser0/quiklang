@@ -1,11 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     backend_interpreter::{environment::Environment, interpreter::evaluate},
-    backend_vm::{
-        bytecode_compiler::compiler::Compiler,
-        vm::{RegisterVal, VM},
-    },
+    backend_vm::{bytecode_compiler::compiler::Compiler, vm::VM},
     errors::{self, Error},
     frontend::{parser, type_environment::TypeEnvironment},
 };
