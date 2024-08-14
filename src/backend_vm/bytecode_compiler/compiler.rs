@@ -5,7 +5,7 @@ use std::{cell::RefCell, collections::HashMap, mem::swap, rc::Rc};
 use crate::{
     backend_vm::{
         bytecode::{BCIntegrityInfo, BCMetadata, ByteCode},
-        instructions::{Abc, Instruction, OP_EXIT, OP_NOP},
+        instructions::{ASBx, Abc, Instruction, OP_EXIT, OP_NOP},
         vm::RegisterVal,
     },
     errors::VMCompileError,
@@ -54,6 +54,7 @@ const fn str_to_byte_array(s: &str) -> [u8; 8] {
     bytes
 }
 
+#[derive(Debug)]
 pub struct Compiler {
     max_reg: usize,
     reg_top: usize,
@@ -89,7 +90,8 @@ impl Compiler {
 
     pub(super) fn add_function(&mut self, fake_compiler: &mut Compiler) -> usize {
         let index = self.function_insts.len();
-        self.instructions.append(&mut fake_compiler.instructions);
+        self.function_insts
+            .push(std::mem::take(&mut fake_compiler.instructions));
         index
     }
 
@@ -159,6 +161,18 @@ impl Compiler {
         // Generate bytecode from AST
         self.compile_statements(stmts, symbol_table)?;
 
+        // Append function_insts into main instructions
+        self.add_instruction(Abc(OP_EXIT, 0, 0, 0)); // Prevent unintended execution of functions
+        self.add_instruction(ASBx(OP_NOP, 0, 0)); // Some break to briefly indicate that this is an area for functions. This will not be run since code should
+                                                  // not run anyways
+
+        let mut qlang_functions: Vec<u64> = Vec::new();
+        for fn_inst in &mut self.function_insts {
+            let fn_index = self.instructions.len();
+            self.instructions.append(fn_inst);
+            qlang_functions.push(fn_index as u64);
+        }
+
         let integrity_info = BCIntegrityInfo {
             num_register: self.max_reg as i32,
             num_constants: self.constants.len() as i32,
@@ -167,18 +181,6 @@ impl Compiler {
         };
 
         let mut bytecode = ByteCode::new(metadata, integrity_info);
-
-        // Append function_insts into main instructions
-        self.add_instruction(Abc(OP_EXIT, 0, 0, 0)); // Prevent unintended execution of functions
-        self.add_instruction(Abc(OP_NOP, 0, 0, 0)); // Some break to briefly indicate that this is an area for functions. This will not be run since code should
-                                                    // not run anyways
-
-        let mut qlang_functions: Vec<u64> = Vec::new();
-        for fn_inst in &mut self.function_insts {
-            let fn_index = self.instructions.len();
-            self.instructions.append(fn_inst);
-            qlang_functions.push(fn_index as u64);
-        }
 
         swap(&mut self.constants, &mut bytecode.constants);
         swap(&mut self.instructions, &mut bytecode.instructions);

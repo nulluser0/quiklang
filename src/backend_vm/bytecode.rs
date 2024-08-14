@@ -361,7 +361,7 @@ mod tests {
         // Setup and Integrity Information
         bytecode.write_i32::<LittleEndian>(4).unwrap(); // Register count
         bytecode.write_i32::<LittleEndian>(3).unwrap(); // Constant count
-        bytecode.write_i32::<LittleEndian>(0).unwrap(); // QL Functions count
+        bytecode.write_i32::<LittleEndian>(1).unwrap(); // QL Functions count
         bytecode.write_i32::<LittleEndian>(3).unwrap(); // Instruction count
 
         // Constant Pool
@@ -372,6 +372,9 @@ mod tests {
         bytecode.extend_from_slice(b"foo"); // String constant "foo"
         bytecode.write_u8(2).unwrap(); // Discriminant for Bool
         bytecode.write_u8(1).unwrap(); // Bool constant true
+
+        // QLang Fns
+        bytecode.write_u64::<LittleEndian>(100).unwrap();
 
         // Instructions
         bytecode
@@ -433,12 +436,11 @@ mod tests {
     fn test_valid_bytecode() {
         let valid_bytecode = create_valid_bytecode();
         let result = ByteCode::decode(&valid_bytecode);
-        println!("{:#?}", result);
-        println!("{:#?}", Abc(OP_MOVE, 0, 1, 0));
         assert!(
             result.is_ok(),
             "Valid bytecode should be decoded successfully"
         );
+        println!("{}", result.as_ref().unwrap());
         let bytecode = result.unwrap();
         assert_eq!(bytecode.constants.len(), 3);
         assert_eq!(bytecode.constants[0], RegisterVal::Int(42));
