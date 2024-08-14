@@ -633,11 +633,6 @@ impl VM {
                 // B is the number of args to be pushed into the function's scope
                 // C is the base
 
-                let function_index = match self.registers[arga as usize] {
-                    RegisterVal::Int(index) => index as usize,
-                    _ => panic!("Expected function index in Register R({})", arga),
-                };
-
                 // Save callframe
                 let call_frame = CallFrame {
                     return_pc: self.program_counter,
@@ -648,11 +643,11 @@ impl VM {
                 self.call_stack.push(call_frame);
 
                 // Set the program counter to the function's starting instruction
-                if function_index < self.function_indexes.len() {
-                    self.program_counter = self.function_indexes[function_index];
+                if (arga as usize) < self.function_indexes.len() {
+                    self.program_counter = self.function_indexes[arga as usize];
                     return;
                 } else {
-                    panic!("Invalid function index: {}", function_index);
+                    panic!("Invalid function index: {}", arga);
                 }
             }
             OP_TAILCALL => {

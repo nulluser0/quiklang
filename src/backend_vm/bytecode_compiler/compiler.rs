@@ -58,8 +58,8 @@ const fn str_to_byte_array(s: &str) -> [u8; 8] {
 pub struct Compiler {
     max_reg: usize,
     reg_top: usize,
-    constants: Vec<RegisterVal>,
-    constant_map: HashMap<RegisterVal, usize>,
+    constants: Rc<RefCell<Vec<RegisterVal>>>,
+    constant_map: Rc<RefCell<HashMap<RegisterVal, usize>>>,
     instructions: Vec<Instruction>,
     function_insts: Vec<Vec<Instruction>>,
 }
@@ -69,8 +69,8 @@ impl Compiler {
         Self {
             max_reg: 0,
             reg_top: 0,
-            constants: Vec::new(),
-            constant_map: HashMap::new(),
+            constants: Rc::new(RefCell::new(Vec::new())),
+            constant_map: Rc::new(RefCell::new(HashMap::new())),
             instructions: Vec::new(),
             function_insts: Vec::new(),
         }
@@ -126,12 +126,12 @@ impl Compiler {
     }
 
     pub(super) fn add_constant(&mut self, constant: RegisterVal) -> usize {
-        if let Some(&index) = self.constant_map.get(&constant) {
+        if let Some(&index) = self.constant_map.borrow().get(&constant) {
             return index;
         }
-        let index = self.constants.len();
-        self.constants.push(constant.clone());
-        self.constant_map.insert(constant, index);
+        let index = self.constants.borrow().len();
+        self.constants.borrow_mut().push(constant.clone());
+        self.constant_map.borrow_mut().insert(constant, index);
         index
     }
 
@@ -175,14 +175,14 @@ impl Compiler {
 
         let integrity_info = BCIntegrityInfo {
             num_register: self.max_reg as i32,
-            num_constants: self.constants.len() as i32,
+            num_constants: self.constants.borrow().len() as i32,
             num_inst: self.instructions.len() as i32,
             num_qlang_functions: self.function_insts.len() as i32,
         };
 
         let mut bytecode = ByteCode::new(metadata, integrity_info);
 
-        swap(&mut self.constants, &mut bytecode.constants);
+        bytecode.constants = self.constants.borrow().clone(); // TODO: Find a way to remove the clone pls
         swap(&mut self.instructions, &mut bytecode.instructions);
         bytecode.qlang_functions = qlang_functions;
 
