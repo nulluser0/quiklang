@@ -205,12 +205,12 @@ static DISPATCH_TABLE: [VmHandler; OP_NOP as usize + 1] = create_dispatch_table(
 
 #[derive(Debug)]
 pub struct VM {
-    registers: [RegisterVal; 200],
+    registers: [RegisterVal; 256],
     pub constant_pool: Vec<RegisterVal>,
     pub function_indexes: Vec<usize>,
     pub program_counter: usize,
     pub instructions: Vec<Instruction>,
-    call_stack: [CallFrame; 2048], // Fixed-size array for stack allocation
+    call_stack: [CallFrame; 1024], // Fixed-size array for stack allocation
     stack_pointer: usize,          // Points to the next free slot in the call stack
 }
 
@@ -223,7 +223,7 @@ impl VM {
         _num_registers: usize,
     ) -> Self {
         VM {
-            registers: [ARRAY_REPEAT_VALUE; 200],
+            registers: [ARRAY_REPEAT_VALUE; 256],
             constant_pool,
             program_counter: 0,
             instructions,
@@ -231,7 +231,7 @@ impl VM {
             call_stack: [CallFrame {
                 return_pc: 0,
                 base: 0,
-            }; 2048], // Initialize with default CallFrame
+            }; 1024], // Initialize with default CallFrame
             stack_pointer: 0,
         }
     }
