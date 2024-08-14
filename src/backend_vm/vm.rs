@@ -20,9 +20,9 @@ use super::{
     },
 };
 
-type VmHandler = fn(&mut VM, Instruction);
+type VmHandler = fn(&mut VM, Instruction) -> Result<(), VMRuntimeError>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct CallFrame {
     pub return_pc: usize, // PC to return to
     pub base: usize,      // Base register
@@ -210,7 +210,8 @@ pub struct VM {
     pub function_indexes: Vec<usize>,
     pub program_counter: usize,
     pub instructions: Vec<Instruction>,
-    call_stack: Vec<CallFrame>,
+    call_stack: [CallFrame; 2048], // Fixed-size array for stack allocation
+    stack_pointer: usize,          // Points to the next free slot in the call stack
 }
 
 const ARRAY_REPEAT_VALUE: RegisterVal = RegisterVal::Null;
@@ -227,9 +228,34 @@ impl VM {
             program_counter: 0,
             instructions,
             function_indexes,
-            call_stack: Vec::with_capacity(1000),
+            call_stack: [CallFrame {
+                return_pc: 0,
+                base: 0,
+            }; 2048], // Initialize with default CallFrame
+            stack_pointer: 0,
         }
     }
+
+    fn push_call_frame(&mut self, frame: CallFrame) -> Result<(), VMRuntimeError> {
+        if self.stack_pointer >= self.call_stack.len() {
+            return Err(VMRuntimeError::StackOverflow);
+        }
+        self.call_stack[self.stack_pointer] = frame;
+        self.stack_pointer += 1;
+        Ok(())
+    }
+
+    fn pop_call_frame(&mut self) -> Result<CallFrame, VMRuntimeError> {
+        if self.stack_pointer == 0 {
+            return Err(VMRuntimeError::StackUnderflow);
+        }
+        self.stack_pointer -= 1;
+        Ok(self.call_stack[self.stack_pointer])
+    }
+
+    // fn current_frame(&self) -> &CallFrame {
+    //     &self.call_stack[self.stack_pointer - 1]
+    // }
 
     pub fn from_bytecode(bytecode: ByteCode) -> Self {
         VM::new(
@@ -245,18 +271,6 @@ impl VM {
         )
     }
 
-    pub fn set_register(&mut self, index: usize, value: RegisterVal) -> Result<(), VMRuntimeError> {
-        if index < self.registers.len() {
-            self.registers[index] = value;
-            Ok(())
-        } else {
-            Err(VMRuntimeError::AccessToNonExistentRegister(
-                index,
-                self.registers.len(),
-            ))
-        }
-    }
-
     // pub fn set_max_register(&mut self, num_registers: usize) {
     //     if num_registers > self.registers.len() {
     //         // Extend the registers vector with default values
@@ -267,48 +281,54 @@ impl VM {
     //     }
     // }
 
-    pub fn get_register(&self, index: usize) -> Result<&RegisterVal, VMRuntimeError> {
-        self.registers
-            .get(index)
-            .ok_or(VMRuntimeError::AccessToNonExistentRegister(
-                index,
-                self.registers.len(),
-            ))
-    }
-
-    pub fn set_constant(&mut self, index: usize, value: RegisterVal) -> Result<(), VMRuntimeError> {
-        if index < self.constant_pool.len() {
-            self.constant_pool[index] = value;
-            Ok(())
-        } else {
-            Err(VMRuntimeError::AccessToNonExistentConstant(
-                index,
-                self.constant_pool.len(),
-            ))
-        }
-    }
-
-    pub fn get_constant(&self, index: usize) -> Result<&RegisterVal, VMRuntimeError> {
-        self.constant_pool
-            .get(index)
-            .ok_or(VMRuntimeError::AccessToNonExistentConstant(
-                index,
-                self.constant_pool.len(),
-            ))
-    }
-
-    pub fn fetch_instruction(&self) -> Instruction {
+    fn fetch_instruction(&self) -> Instruction {
         self.instructions[self.program_counter]
     }
 
-    pub fn execute(&mut self) {
+    // This on_err function unwinds the callstack, displaying the user the last 20
+    // calls, and popping all of the frames on the stack.
+    pub fn on_err_unwind_callstack(&mut self) {
+        println!("Unwinding Callstack:");
+        if self.stack_pointer > 20 {
+            println!("Truncating callstack to last 20 calls...");
+        }
+        let mut count: usize = 0;
+        while let Ok(call_frame) = self.pop_call_frame() {
+            count += 1;
+            if count <= 20 {
+                println!(
+                    "Return PC: {:6} | Base: {}",
+                    call_frame.return_pc, call_frame.base
+                )
+            }
+        }
+        println!("END");
+    }
+
+    // This on_err function "bulldoses" (destructs) heap allocated objects to prevent memory leaking.
+    // This is partically useful in cases when Rc is not used, and there are other processes (QLBPM) running.
+    pub fn on_err_bulldoser(&mut self) {
+        println!("Running memory bulldoser; destroying heap objects:");
+        // TODO: This would run a destructor function (either OP_DESTRUCTOR or dedicated function)
+        // to destroy all heap allocated objects.
+        println!("END");
+    }
+
+    pub fn on_error_cleanup(&mut self) {
+        self.on_err_unwind_callstack();
+        println!();
+        self.on_err_bulldoser();
+    }
+
+    pub fn execute(&mut self) -> Result<(), VMRuntimeError> {
         while self.program_counter < self.instructions.len() {
             // self.execute_instruction(self.fetch_instruction());
             let inst = self.fetch_instruction();
             let opcode = get_opcode(inst);
-            DISPATCH_TABLE[opcode as usize](self, inst);
+            DISPATCH_TABLE[opcode as usize](self, inst)?;
             self.program_counter += 1;
         }
+        Ok(())
     }
 
     #[inline]
@@ -832,25 +852,29 @@ impl VM {
     //     self.program_counter += 1;
     // }
 
-    fn op_move(&mut self, inst: Instruction) {
+    fn op_move(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let offset = self.current_offset();
 
         let value = self.registers[argb as usize + offset].clone();
         self.registers[arga as usize + offset] = value;
+
+        Ok(())
     }
 
-    fn op_loadconst(&mut self, inst: Instruction) {
+    fn op_loadconst(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argbx = get_argbx(inst);
         let offset = self.current_offset();
 
         let value = self.constant_pool[argbx as usize + offset].clone();
         self.registers[arga as usize + offset] = value;
+
+        Ok(())
     }
 
-    fn op_loadbool(&mut self, inst: Instruction) {
+    fn op_loadbool(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -865,9 +889,11 @@ impl VM {
         if argc != 0 {
             self.program_counter += 1;
         }
+
+        Ok(())
     }
 
-    fn op_loadnull(&mut self, inst: Instruction) {
+    fn op_loadnull(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let offset = self.current_offset();
@@ -875,9 +901,11 @@ impl VM {
         for i in arga as usize..=argb as usize {
             self.registers[i + offset] = RegisterVal::Null;
         }
+
+        Ok(())
     }
 
-    fn op_add(&mut self, inst: Instruction) {
+    fn op_add(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -909,9 +937,11 @@ impl VM {
             }
             _ => {}
         }
+
+        Ok(())
     }
 
-    fn op_sub(&mut self, inst: Instruction) {
+    fn op_sub(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -943,9 +973,11 @@ impl VM {
             }
             _ => {}
         }
+
+        Ok(())
     }
 
-    fn op_mul(&mut self, inst: Instruction) {
+    fn op_mul(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -977,9 +1009,11 @@ impl VM {
             }
             _ => {}
         }
+
+        Ok(())
     }
 
-    fn op_div(&mut self, inst: Instruction) {
+    fn op_div(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1011,9 +1045,11 @@ impl VM {
             }
             _ => {}
         }
+
+        Ok(())
     }
 
-    fn op_mod(&mut self, inst: Instruction) {
+    fn op_mod(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1045,9 +1081,11 @@ impl VM {
             }
             _ => {}
         }
+
+        Ok(())
     }
 
-    fn op_pow(&mut self, inst: Instruction) {
+    fn op_pow(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1082,9 +1120,11 @@ impl VM {
             }
             _ => {}
         }
+
+        Ok(())
     }
 
-    fn op_not(&mut self, inst: Instruction) {
+    fn op_not(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let offset = self.current_offset();
@@ -1092,9 +1132,11 @@ impl VM {
         if let RegisterVal::Int(value) = self.registers[argb as usize + offset] {
             self.registers[arga as usize + offset] = RegisterVal::Int(!value);
         }
+
+        Ok(())
     }
 
-    fn op_and(&mut self, inst: Instruction) {
+    fn op_and(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1114,9 +1156,11 @@ impl VM {
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
             self.registers[arga as usize + offset] = RegisterVal::Int(left & right);
         }
+
+        Ok(())
     }
 
-    fn op_or(&mut self, inst: Instruction) {
+    fn op_or(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1136,9 +1180,11 @@ impl VM {
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
             self.registers[arga as usize + offset] = RegisterVal::Int(left | right);
         }
+
+        Ok(())
     }
 
-    fn op_eq(&mut self, inst: Instruction) {
+    fn op_eq(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1156,9 +1202,11 @@ impl VM {
         };
 
         self.registers[arga as usize] = RegisterVal::Bool(b_val == c_val);
+
+        Ok(())
     }
 
-    fn op_ne(&mut self, inst: Instruction) {
+    fn op_ne(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1176,9 +1224,11 @@ impl VM {
         };
 
         self.registers[arga as usize] = RegisterVal::Bool(b_val != c_val);
+
+        Ok(())
     }
 
-    fn op_lt(&mut self, inst: Instruction) {
+    fn op_lt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1196,9 +1246,11 @@ impl VM {
         };
 
         self.registers[arga as usize] = RegisterVal::Bool(b_val < c_val);
+
+        Ok(())
     }
 
-    fn op_le(&mut self, inst: Instruction) {
+    fn op_le(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1216,9 +1268,11 @@ impl VM {
         };
 
         self.registers[arga as usize] = RegisterVal::Bool(b_val <= c_val);
+
+        Ok(())
     }
 
-    fn op_gt(&mut self, inst: Instruction) {
+    fn op_gt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1236,9 +1290,11 @@ impl VM {
         };
 
         self.registers[arga as usize] = RegisterVal::Bool(b_val > c_val);
+
+        Ok(())
     }
 
-    fn op_ge(&mut self, inst: Instruction) {
+    fn op_ge(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1256,33 +1312,41 @@ impl VM {
         };
 
         self.registers[arga as usize] = RegisterVal::Bool(b_val >= c_val);
+
+        Ok(())
     }
 
-    fn op_jump(&mut self, inst: Instruction) {
+    fn op_jump(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let argsbx = get_argsbx(inst);
 
         self.program_counter = (self.program_counter as i32 + argsbx) as usize;
+
+        Ok(())
     }
 
-    fn op_jump_if_true(&mut self, inst: Instruction) {
+    fn op_jump_if_true(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argsbx = get_argsbx(inst);
 
         if let RegisterVal::Bool(true) = self.registers[arga as usize] {
             self.program_counter = (self.program_counter as i32 + argsbx) as usize;
         }
+
+        Ok(())
     }
 
-    fn op_jump_if_false(&mut self, inst: Instruction) {
+    fn op_jump_if_false(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argsbx = get_argsbx(inst);
 
         if let RegisterVal::Bool(false) = self.registers[arga as usize] {
             self.program_counter = (self.program_counter as i32 + argsbx) as usize;
         }
+
+        Ok(())
     }
 
-    fn op_call(&mut self, inst: Instruction) {
+    fn op_call(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         // let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1299,7 +1363,7 @@ impl VM {
         };
 
         // push callframe
-        self.call_stack.push(call_frame);
+        self.push_call_frame(call_frame)?;
 
         // Set the program counter to the function's starting instruction
         if (arga as usize) < self.function_indexes.len() {
@@ -1309,38 +1373,42 @@ impl VM {
         } else {
             panic!("Invalid function index: {}", arga);
         }
+
+        Ok(())
     }
 
-    fn op_tailcall(&mut self, _inst: Instruction) {
+    fn op_tailcall(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
         // TODO!
         todo!()
     }
 
-    fn op_return(&mut self, _inst: Instruction) {
-        if let Some(call_frame) = self.call_stack.pop() {
-            self.program_counter = call_frame.return_pc;
-        } else {
-            panic!("STACK UNDERFLOW")
-        }
+    fn op_return(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
+        self.program_counter = self.pop_call_frame()?.return_pc;
+
+        Ok(())
     }
 
-    fn op_inc(&mut self, inst: Instruction) {
+    fn op_inc(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
 
         if let RegisterVal::Int(value) = self.registers[arga as usize] {
             self.registers[arga as usize] = RegisterVal::Int(value.wrapping_add(1));
         }
+
+        Ok(())
     }
 
-    fn op_dec(&mut self, inst: Instruction) {
+    fn op_dec(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
 
         if let RegisterVal::Int(value) = self.registers[arga as usize] {
             self.registers[arga as usize] = RegisterVal::Int(value.wrapping_sub(1));
         }
+
+        Ok(())
     }
 
-    fn op_bitand(&mut self, inst: Instruction) {
+    fn op_bitand(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1360,9 +1428,11 @@ impl VM {
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
             self.registers[arga as usize] = RegisterVal::Int(left & right);
         }
+
+        Ok(())
     }
 
-    fn op_bitor(&mut self, inst: Instruction) {
+    fn op_bitor(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1382,9 +1452,11 @@ impl VM {
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
             self.registers[arga as usize] = RegisterVal::Int(left | right);
         }
+
+        Ok(())
     }
 
-    fn op_bitxor(&mut self, inst: Instruction) {
+    fn op_bitxor(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1404,9 +1476,11 @@ impl VM {
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
             self.registers[arga as usize] = RegisterVal::Int(left ^ right);
         }
+
+        Ok(())
     }
 
-    fn op_shl(&mut self, inst: Instruction) {
+    fn op_shl(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1426,9 +1500,11 @@ impl VM {
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
             self.registers[arga as usize] = RegisterVal::Int(left << right);
         }
+
+        Ok(())
     }
 
-    fn op_shr(&mut self, inst: Instruction) {
+    fn op_shr(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1448,9 +1524,11 @@ impl VM {
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
             self.registers[arga as usize] = RegisterVal::Int(left >> right);
         }
+
+        Ok(())
     }
 
-    fn op_concat(&mut self, inst: Instruction) {
+    fn op_concat(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1471,21 +1549,24 @@ impl VM {
             let concatenated = format!("{}{}", left, right);
             self.registers[arga as usize] = RegisterVal::Str(Rc::new(concatenated));
         }
+
+        Ok(())
     }
 
-    fn op_destructor(&mut self, _inst: Instruction) {
+    fn op_destructor(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
         // destroy heap objs, where A is a pointer to the heap obj flagged for destruction.
         // TODO!
         todo!()
     }
 
-    fn op_exit(&mut self, inst: Instruction) {
+    fn op_exit(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
 
         process::exit(arga)
     }
 
-    fn op_nop(&mut self, _inst: Instruction) {
+    fn op_nop(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
         // here only to waste cycles lol
+        Ok(())
     }
 }

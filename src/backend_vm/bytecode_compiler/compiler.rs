@@ -30,9 +30,9 @@ impl ReturnValue {
         }
     }
 
-    pub(super) fn is_break(&self) -> bool {
-        matches!(self, ReturnValue::Break(_))
-    }
+    // pub(super) fn is_break(&self) -> bool {
+    //     matches!(self, ReturnValue::Break(_))
+    // }
 
     pub(super) fn is_return(&self) -> bool {
         matches!(self, ReturnValue::Return(_))
@@ -121,9 +121,9 @@ impl Compiler {
         reg
     }
 
-    pub(super) fn deallocate_register(&mut self) {
-        self.reg_top -= 1;
-    }
+    // pub(super) fn deallocate_register(&mut self) {
+    //     self.reg_top -= 1;
+    // }
 
     pub(super) fn add_constant(&mut self, constant: RegisterVal) -> usize {
         if let Some(&index) = self.constant_map.borrow().get(&constant) {
@@ -147,9 +147,9 @@ impl Compiler {
         self.instructions[len] = instruction
     }
 
-    pub(super) fn pop_instruction(&mut self) -> Option<Instruction> {
-        self.instructions.pop()
-    }
+    // pub(super) fn pop_instruction(&mut self) -> Option<Instruction> {
+    //     self.instructions.pop()
+    // }
 
     pub fn compile(&mut self, stmts: Vec<Stmt>) -> Result<ByteCode, VMCompileError> {
         let metadata = BCMetadata {
