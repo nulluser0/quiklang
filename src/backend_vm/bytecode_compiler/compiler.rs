@@ -182,7 +182,7 @@ impl Compiler {
 
         let mut bytecode = ByteCode::new(metadata, integrity_info);
 
-        bytecode.constants = self.constants.borrow().clone(); // TODO: Find a way to remove the clone pls
+        bytecode.constants.clone_from(&self.constants.borrow()); // TODO: Find a way to remove the clone pls
         swap(&mut self.instructions, &mut bytecode.instructions);
         bytecode.qlang_functions = qlang_functions;
 
