@@ -851,6 +851,7 @@ impl VM {
     //     self.program_counter += 1;
     // }
 
+    #[inline(always)]
     fn op_move(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -862,6 +863,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_loadconst(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argbx = get_argbx(inst);
@@ -873,6 +875,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_loadbool(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -892,6 +895,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_loadnull(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -904,6 +908,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_add(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -940,6 +945,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_sub(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -976,6 +982,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_mul(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1012,6 +1019,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_div(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1048,6 +1056,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_mod(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1084,6 +1093,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_pow(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1123,6 +1133,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_not(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1135,6 +1146,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_and(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1159,6 +1171,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_or(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1183,6 +1196,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_eq(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1205,6 +1219,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_ne(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1227,6 +1242,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_lt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1249,6 +1265,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_le(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1271,6 +1288,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_gt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1293,6 +1311,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_ge(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1315,6 +1334,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_jump(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let argsbx = get_argsbx(inst);
 
@@ -1323,6 +1343,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_jump_if_true(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argsbx = get_argsbx(inst);
@@ -1334,6 +1355,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_jump_if_false(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argsbx = get_argsbx(inst);
@@ -1345,6 +1367,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_call(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         // let argb = get_argb(inst);
@@ -1376,17 +1399,20 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_tailcall(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
         // TODO!
         todo!()
     }
 
+    #[inline(always)]
     fn op_return(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
         self.program_counter = self.pop_call_frame()?.return_pc;
 
         Ok(())
     }
 
+    #[inline(always)]
     fn op_inc(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
 
@@ -1397,6 +1423,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_dec(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
 
@@ -1407,6 +1434,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_bitand(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1431,6 +1459,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_bitor(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1455,6 +1484,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_bitxor(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1479,6 +1509,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_shl(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1503,6 +1534,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_shr(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1527,6 +1559,7 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_concat(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -1552,18 +1585,21 @@ impl VM {
         Ok(())
     }
 
+    #[inline(always)]
     fn op_destructor(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
         // destroy heap objs, where A is a pointer to the heap obj flagged for destruction.
         // TODO!
         todo!()
     }
 
+    #[inline(always)]
     fn op_exit(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
 
         process::exit(arga)
     }
 
+    #[inline(always)]
     fn op_nop(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
         // here only to waste cycles lol
         Ok(())
