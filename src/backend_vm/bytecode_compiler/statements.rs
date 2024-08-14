@@ -131,8 +131,6 @@ impl Compiler {
         // Add function to symbol table
         symbol_table.borrow_mut().declare_var(name, index);
 
-        println!("{:#?}", self);
-
         Ok(ReturnValue::Normal(0))
     }
 
