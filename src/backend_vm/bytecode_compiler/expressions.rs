@@ -26,6 +26,7 @@ impl Compiler {
         expr: Expr,
         require_constant_as_register: bool, // true = allocates register to a constant.
         require_result: bool, // true = certain exprs will return a result, like ifs, loops, fors, whiles, blocks.
+        fn_return: Option<usize>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         match expr {
@@ -57,18 +58,27 @@ impl Compiler {
                 condition,
                 then,
                 else_stmt,
-            } => self.compile_if_expr(*condition, then, else_stmt, require_result, symbol_table),
+            } => self.compile_if_expr(
+                *condition,
+                then,
+                else_stmt,
+                require_result,
+                fn_return,
+                symbol_table,
+            ),
             Expr::ForExpr {
                 identifier,
                 iterable,
                 then,
             } => todo!(),
             Expr::WhileExpr { condition, then } => {
-                self.compile_while_expr(*condition, then, require_result, symbol_table)
+                self.compile_while_expr(*condition, then, require_result, fn_return, symbol_table)
             }
-            Expr::BlockExpr(block) => self.compile_block_expr(block, require_result, symbol_table),
+            Expr::BlockExpr(block) => {
+                self.compile_block_expr(block, require_result, fn_return, symbol_table)
+            }
             Expr::ForeverLoopExpr(block) => {
-                self.compile_forever_loop_expr(block, require_result, symbol_table)
+                self.compile_forever_loop_expr(block, require_result, fn_return, symbol_table)
             }
             Expr::SpecialNull => self.compile_identifier(
                 "null".to_string(),
@@ -156,10 +166,10 @@ impl Compiler {
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         let reg = self
-            .compile_expression(assignee, true, true, symbol_table)?
+            .compile_expression(assignee, true, true, None, symbol_table)?
             .safe_unwrap();
         let reassigned = self
-            .compile_expression(expr, true, true, symbol_table)?
+            .compile_expression(expr, true, true, None, symbol_table)?
             .safe_unwrap();
         self.add_instruction(Abc(OP_MOVE, reg as i32, reassigned as i32, 0)); // NOTE: Move is a glorified "clone". Move may be replcaed by a real move, and a clone OP might be added.
         Ok(ReturnValue::Normal(reg))
@@ -174,10 +184,10 @@ impl Compiler {
     ) -> Result<ReturnValue, VMCompileError> {
         let reg = self.allocate_register();
         let b = self
-            .compile_expression(left, false, true, symbol_table)?
+            .compile_expression(left, false, true, None, symbol_table)?
             .safe_unwrap() as i32;
         let c = self
-            .compile_expression(right, false, true, symbol_table)?
+            .compile_expression(right, false, true, None, symbol_table)?
             .safe_unwrap() as i32;
         let opcode = match op {
             BinaryOp::Add => OP_ADD,
@@ -206,7 +216,7 @@ impl Compiler {
     ) -> Result<ReturnValue, VMCompileError> {
         let reg = self.allocate_register();
         let b = self
-            .compile_expression(expr, false, true, symbol_table)?
+            .compile_expression(expr, false, true, None, symbol_table)?
             .safe_unwrap() as i32;
         let opcode = match op {
             UnaryOp::LogicalNot => OP_NOT,
@@ -225,7 +235,7 @@ impl Compiler {
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         // We assume this is correct
-        let function = self.compile_expression(caller, false, true, symbol_table)?;
+        let function = self.compile_expression(caller, false, true, None, symbol_table)?;
 
         // Function result (and function run base)
         let result = self.allocate_register();
@@ -237,7 +247,7 @@ impl Compiler {
         for arg in args {
             let arg_reg = self.allocate_register();
             let reg = self
-                .compile_expression(arg.0, true, true, symbol_table)?
+                .compile_expression(arg.0, true, true, None, symbol_table)?
                 .safe_unwrap();
             self.add_instruction(Abc(OP_MOVE, arg_reg as i32, reg as i32, 0))
         }
@@ -259,6 +269,7 @@ impl Compiler {
         then: Vec<Stmt>,
         else_stmt: Option<Vec<Stmt>>,
         require_result: bool,
+        fn_return: Option<usize>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         // Typical bytecode representation of if expr:
@@ -281,7 +292,7 @@ impl Compiler {
 
         // First, get the condition's result and store its register.
         let condition_result = self
-            .compile_expression(condition, true, true, symbol_table)?
+            .compile_expression(condition, true, true, None, symbol_table)?
             .safe_unwrap();
 
         // Add instruction to jump to else/endif if false
@@ -297,7 +308,7 @@ impl Compiler {
         // Track the result of the then block
         let mut result = ReturnValue::Normal(0);
         for stmt in then {
-            result = self.compile_statement(stmt, true, true, child_symbol_table)?;
+            result = self.compile_statement(stmt, true, true, fn_return, child_symbol_table)?;
         }
         if require_result {
             self.add_instruction(Abc(
@@ -343,7 +354,7 @@ impl Compiler {
             symbol_table.clone(),
         )));
         for stmt in else_stmt.unwrap() {
-            result = self.compile_statement(stmt, true, true, child_symbol_table)?;
+            result = self.compile_statement(stmt, true, true, fn_return, child_symbol_table)?;
         }
         if require_result {
             self.add_instruction(Abc(
@@ -388,6 +399,7 @@ impl Compiler {
         condition: Expr,
         then: Vec<Stmt>,
         require_result: bool,
+        fn_return: Option<usize>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         // Store the while expr result if required
@@ -404,7 +416,7 @@ impl Compiler {
 
         // Compile condition expr
         let condition_result = self
-            .compile_expression(condition, true, true, symbol_table)?
+            .compile_expression(condition, true, true, None, symbol_table)?
             .safe_unwrap();
 
         // Add instruction to jump to end if condition is false
@@ -419,7 +431,7 @@ impl Compiler {
             symbol_table.clone(),
         )));
         for stmt in then {
-            result = self.compile_statement(stmt, true, true, child_symbol_table)?;
+            result = self.compile_statement(stmt, true, true, fn_return, child_symbol_table)?;
             if let ReturnValue::Break(inner) = result {
                 if require_result {
                     self.add_instruction(Abc(OP_MOVE, result_register as i32, inner as i32, 0));
@@ -475,6 +487,7 @@ impl Compiler {
         &mut self,
         block: Vec<Stmt>,
         require_result: bool,
+        fn_return: Option<usize>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         // Store the block expr result if required
@@ -491,7 +504,7 @@ impl Compiler {
             symbol_table.clone(),
         )));
         for stmt in block {
-            result = self.compile_statement(stmt, true, true, child_symbol_table)?;
+            result = self.compile_statement(stmt, true, true, fn_return, child_symbol_table)?;
         }
         if require_result {
             self.add_instruction(Abc(
@@ -516,6 +529,7 @@ impl Compiler {
         &mut self,
         block: Vec<Stmt>,
         require_result: bool,
+        fn_return: Option<usize>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         // Store the forever loop expr result if required
@@ -537,7 +551,7 @@ impl Compiler {
             symbol_table.clone(),
         )));
         for stmt in block {
-            let result = self.compile_statement(stmt, true, true, child_symbol_table)?;
+            let result = self.compile_statement(stmt, true, true, fn_return, child_symbol_table)?;
             if let ReturnValue::Break(inner) = result {
                 if require_result {
                     self.add_instruction(Abc(OP_MOVE, result_register as i32, inner as i32, 0));

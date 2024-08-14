@@ -195,22 +195,22 @@ impl Compiler {
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<(), VMCompileError> {
         for stmt in stmts {
-            self.compile_statement(stmt, true, false, symbol_table)?;
+            self.compile_statement(stmt, true, false, None, symbol_table)?;
         }
         Ok(())
     }
 
-    pub(super) fn compile_statements_with_result(
-        &mut self,
-        stmts: Vec<Stmt>,
-        symbol_table: &Rc<RefCell<SymbolTable>>,
-    ) -> Result<ReturnValue, VMCompileError> {
-        let mut result = ReturnValue::Normal(0);
-        for stmt in stmts {
-            result = self.compile_statement(stmt, true, true, symbol_table)?;
-        }
-        Ok(result)
-    }
+    // pub(super) fn compile_statements_with_result(
+    //     &mut self,
+    //     stmts: Vec<Stmt>,
+    //     symbol_table: &Rc<RefCell<SymbolTable>>,
+    // ) -> Result<ReturnValue, VMCompileError> {
+    //     let mut result = ReturnValue::Normal(0);
+    //     for stmt in stmts {
+    //         result = self.compile_statement(stmt, true, true, symbol_table)?;
+    //     }
+    //     Ok(result)
+    // }
 }
 
 impl Default for Compiler {

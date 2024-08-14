@@ -19,6 +19,7 @@ impl Compiler {
         stmt: Stmt,
         require_constant_as_register: bool,
         require_result: bool,
+        fn_return: Option<usize>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         match stmt {
@@ -26,6 +27,7 @@ impl Compiler {
                 expr,
                 require_constant_as_register,
                 require_result,
+                fn_return,
                 symbol_table,
             ),
             Stmt::DeclareStmt {
@@ -35,7 +37,7 @@ impl Compiler {
                 var_type,
                 expr,
             } => self.compile_declare_stmt(name, is_global, expr, symbol_table),
-            Stmt::ReturnStmt(expr) => self.compile_return_stmt(expr, symbol_table),
+            Stmt::ReturnStmt(expr) => self.compile_return_stmt(expr, fn_return, symbol_table),
             Stmt::BreakStmt(expr) => self.compile_break_stmt(expr, symbol_table),
             Stmt::FunctionDeclaration {
                 parameters,
@@ -75,7 +77,7 @@ impl Compiler {
         let reg;
         if let Some(inner) = expr {
             reg = self
-                .compile_expression(inner, true, true, symbol_table)?
+                .compile_expression(inner, true, true, None, symbol_table)?
                 .safe_unwrap();
         } else {
             reg = self.allocate_register() as isize;
@@ -109,20 +111,31 @@ impl Compiler {
             function_symbol_table.borrow_mut().declare_var(param.0, reg);
         }
 
+        let mut result = ReturnValue::Normal(0);
+
         // Compile body
-        let result =
-            function_compiler.compile_statements_with_result(body, function_symbol_table)?;
+        for stmt in body {
+            result = function_compiler.compile_statement(
+                stmt,
+                true,
+                true,
+                Some(result_register),
+                function_symbol_table,
+            )?;
+        }
 
-        // Move body result into function result
-        function_compiler.add_instruction(Abc(
-            OP_MOVE,
-            result_register as i32,
-            result.safe_unwrap() as i32,
-            0,
-        ));
+        if !result.is_return() {
+            // Move body result into function result
+            function_compiler.add_instruction(Abc(
+                OP_MOVE,
+                result_register as i32,
+                result.safe_unwrap() as i32,
+                0,
+            ));
 
-        // Add return opcode to prevent running into other code outside of function
-        function_compiler.add_instruction(Abc(OP_RETURN, 0, 0, 0));
+            // Add return opcode to prevent running into other code outside of function
+            function_compiler.add_instruction(Abc(OP_RETURN, 0, 0, 0));
+        }
 
         // We have finished compiling the function itself. We can now transfer the instructions into the real compiler's function vec.
         // Also get the index of the function to save into the symbol table.
@@ -137,12 +150,19 @@ impl Compiler {
     fn compile_return_stmt(
         &mut self,
         expr: Option<Expr>,
+        fn_return: Option<usize>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         if let Some(inner) = expr {
             let reg = self
-                .compile_expression(inner, true, true, symbol_table)?
+                .compile_expression(inner, true, true, None, symbol_table)?
                 .safe_unwrap();
+            if let Some(fn_reg) = fn_return {
+                self.add_instruction(Abc(OP_MOVE, fn_reg as i32, reg as i32, 0));
+                self.add_instruction(Abc(OP_RETURN, 0, 0, 0));
+                return Ok(ReturnValue::Return(fn_reg as isize));
+            }
+            // Return when fn return not required???
             return Ok(ReturnValue::Return(reg));
         }
         Ok(ReturnValue::Return(0))
@@ -155,7 +175,7 @@ impl Compiler {
     ) -> Result<ReturnValue, VMCompileError> {
         if let Some(inner) = expr {
             let reg = self
-                .compile_expression(inner, true, true, symbol_table)?
+                .compile_expression(inner, true, true, None, symbol_table)?
                 .safe_unwrap();
             return Ok(ReturnValue::Break(reg));
         }

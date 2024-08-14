@@ -636,7 +636,7 @@ impl VM {
                 // Save callframe
                 let call_frame = CallFrame {
                     return_pc: self.program_counter,
-                    base: argc as usize,
+                    base: (argc as usize) + offset,
                 };
 
                 // push callframe
