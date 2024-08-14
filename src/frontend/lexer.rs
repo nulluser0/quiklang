@@ -213,6 +213,7 @@ pub enum Symbol {
     Colon,        // :
     Dot,          // .
     Arrow,        // ->
+    At,           // @
 }
 
 impl std::fmt::Display for Symbol {
@@ -230,6 +231,7 @@ impl std::fmt::Display for Symbol {
             Symbol::Colon => write!(f, "Symbol Colon ':'"),
             Symbol::Dot => write!(f, "Symbol Dot '.'"),
             Symbol::Arrow => write!(f, "Symbol Arrow '->'"),
+            Symbol::At => write!(f, "Symbol At '@'"),
         }
     }
 }
@@ -287,7 +289,7 @@ pub fn tokenize(source_code: &str) -> Result<Vec<Token>, LexerError> {
 
         match c {
             '(' | ')' | '{' | '}' | '[' | ']' | ',' | ';' | ':' | '.' | '~' | '+' | '*' | '%'
-            | '!' | '=' | '-' | '>' | '<' | '&' | '|' => {
+            | '!' | '=' | '-' | '>' | '<' | '&' | '|' | '@' => {
                 tokenize_operator_or_symbol(c, &mut chars, &mut tokens)?;
             }
             '"' => {
@@ -436,6 +438,11 @@ fn tokenize_operator_or_symbol(
         }),
         '%' => tokens.push(Token {
             token: TokenType::Operator(Operator::Modulus),
+            line: chars.line,
+            col: chars.col,
+        }),
+        '@' => tokens.push(Token {
+            token: TokenType::Symbol(Symbol::At),
             line: chars.line,
             col: chars.col,
         }),
