@@ -16,13 +16,11 @@ use super::{
     bytecode::ByteCode,
     instructions::{
         get_arga, get_argb, get_argbx, get_argc, get_argsbx, get_opcode, is_k, rk_to_k,
-        Instruction, OP_ADD, OP_AND, OP_BITAND, OP_BITOR, OP_BITXOR, OP_CALL, OP_CONCAT, OP_DEC,
-        OP_DESTRUCTOR, OP_DIV, OP_EQ, OP_EXIT, OP_GE, OP_GT, OP_INC, OP_JUMP, OP_JUMP_IF_FALSE,
-        OP_JUMP_IF_TRUE, OP_LE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LT, OP_MOD, OP_MOVE,
-        OP_MUL, OP_NE, OP_NOP, OP_NOT, OP_OR, OP_POW, OP_RETURN, OP_SHL, OP_SHR, OP_SUB,
-        OP_TAILCALL,
+        Instruction, OP_NOP,
     },
 };
+
+type VmHandler = fn(&mut VM, Instruction);
 
 #[derive(Debug)]
 struct CallFrame {
@@ -162,6 +160,49 @@ impl PartialOrd for RegisterVal {
 //      - Be added to the string pool, and
 //      - Its pointer (either an index to a vec, or its raw pointer to the memory) added to the constant pool with the index as identified in the bytecode's constant pool.
 
+const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
+    [
+        VM::op_move,
+        VM::op_loadconst,
+        VM::op_loadbool,
+        VM::op_loadnull,
+        VM::op_add,
+        VM::op_sub,
+        VM::op_mul,
+        VM::op_div,
+        VM::op_mod,
+        VM::op_pow,
+        VM::op_not,
+        VM::op_and,
+        VM::op_or,
+        VM::op_eq,
+        VM::op_ne,
+        VM::op_lt,
+        VM::op_le,
+        VM::op_gt,
+        VM::op_ge,
+        VM::op_jump,
+        VM::op_jump_if_true,
+        VM::op_jump_if_false,
+        VM::op_call,
+        VM::op_tailcall,
+        VM::op_return,
+        VM::op_inc,
+        VM::op_dec,
+        VM::op_bitand,
+        VM::op_bitor,
+        VM::op_bitxor,
+        VM::op_shl,
+        VM::op_shr,
+        VM::op_concat,
+        VM::op_destructor,
+        VM::op_exit,
+        VM::op_nop,
+    ]
+}
+
+static DISPATCH_TABLE: [VmHandler; OP_NOP as usize + 1] = create_dispatch_table();
+
 #[derive(Debug)]
 pub struct VM {
     registers: [RegisterVal; 200],
@@ -262,554 +303,1189 @@ impl VM {
 
     pub fn execute(&mut self) {
         while self.program_counter < self.instructions.len() {
-            self.execute_instruction(self.fetch_instruction());
+            // self.execute_instruction(self.fetch_instruction());
+            let inst = self.fetch_instruction();
+            let opcode = get_opcode(inst);
+            DISPATCH_TABLE[opcode as usize](self, inst);
+            self.program_counter += 1;
         }
     }
 
-    pub fn execute_instruction(&mut self, inst: Instruction) {
-        let offset = self
-            .call_stack
+    #[inline]
+    fn current_offset(&mut self) -> usize {
+        self.call_stack
             .last()
             .unwrap_or(&CallFrame {
                 return_pc: 0,
                 base: 0,
             })
-            .base;
+            .base
+    }
 
-        let op = get_opcode(inst);
+    // pub fn execute_instruction(&mut self, inst: Instruction) {
+    //     let offset = self.current_offset();
+
+    //     let op = get_opcode(inst);
+    //     let arga = get_arga(inst);
+    //     let argb = get_argb(inst);
+    //     let argc = get_argc(inst);
+    //     let argbx = get_argbx(inst);
+    //     let argsbx = get_argsbx(inst);
+    //     match op {
+    //         OP_MOVE => {
+    //             //
+    //             let value = self.registers[argb as usize + offset].clone();
+    //             self.registers[arga as usize + offset] = value;
+    //         }
+    //         OP_LOADCONST => {
+    //             //
+    //             let value = self.constant_pool[argbx as usize + offset].clone();
+    //             self.registers[arga as usize + offset] = value;
+    //         }
+    //         OP_LOADBOOL => {
+    //             //
+    //             let value = if argb != 0 {
+    //                 RegisterVal::Bool(true)
+    //             } else {
+    //                 RegisterVal::Bool(false)
+    //             };
+    //             self.registers[arga as usize + offset] = value;
+    //             if argc != 0 {
+    //                 self.program_counter += 1;
+    //             }
+    //         }
+    //         OP_LOADNULL => {
+    //             //
+    //             for i in arga as usize..=argb as usize {
+    //                 self.registers[i + offset] = RegisterVal::Null;
+    //             }
+    //         }
+    //         OP_ADD => {
+    //             //
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize + offset].clone()
+    //             };
+
+    //             match (b_val, c_val) {
+    //                 (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Int(left.wrapping_add(right));
+    //                 }
+    //                 (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+    //                     self.registers[arga as usize + offset] = RegisterVal::Float(left + right);
+    //                 }
+    //                 (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Float(left as f64 + right);
+    //                 }
+    //                 (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Float(left + right as f64);
+    //                 }
+    //                 _ => {}
+    //             }
+    //         }
+    //         OP_SUB => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize + offset].clone()
+    //             };
+
+    //             match (b_val, c_val) {
+    //                 (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Int(left.wrapping_sub(right));
+    //                 }
+    //                 (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+    //                     self.registers[arga as usize + offset] = RegisterVal::Float(left - right);
+    //                 }
+    //                 (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Float(left as f64 - right);
+    //                 }
+    //                 (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Float(left - right as f64);
+    //                 }
+    //                 _ => {}
+    //             }
+    //         }
+    //         OP_MUL => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize + offset].clone()
+    //             };
+
+    //             match (b_val, c_val) {
+    //                 (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Int(left.wrapping_mul(right));
+    //                 }
+    //                 (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+    //                     self.registers[arga as usize + offset] = RegisterVal::Float(left * right);
+    //                 }
+    //                 (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Float(left as f64 * right);
+    //                 }
+    //                 (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Float(left * right as f64);
+    //                 }
+    //                 _ => {}
+    //             }
+    //         }
+    //         OP_DIV => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize + offset].clone()
+    //             };
+
+    //             match (b_val, c_val) {
+    //                 (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Int(left.wrapping_div(right));
+    //                 }
+    //                 (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+    //                     self.registers[arga as usize + offset] = RegisterVal::Float(left / right);
+    //                 }
+    //                 (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Float(left as f64 / right);
+    //                 }
+    //                 (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Float(left / right as f64);
+    //                 }
+    //                 _ => {}
+    //             }
+    //         }
+    //         OP_MOD => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize + offset].clone()
+    //             };
+
+    //             match (b_val, c_val) {
+    //                 (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Int(left.wrapping_rem(right));
+    //                 }
+    //                 (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+    //                     self.registers[arga as usize + offset] = RegisterVal::Float(left % right);
+    //                 }
+    //                 (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Float(left as f64 % right);
+    //                 }
+    //                 (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Float(left % right as f64);
+    //                 }
+    //                 _ => {}
+    //             }
+    //         }
+    //         OP_POW => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize + offset].clone()
+    //             };
+
+    //             match (b_val, c_val) {
+    //                 (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Int(left.wrapping_pow(right as u32));
+    //                 }
+    //                 (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Float(left.powf(right));
+    //                 }
+    //                 (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Float((left as f64).powf(right));
+    //                 }
+    //                 (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+    //                     self.registers[arga as usize + offset] =
+    //                         RegisterVal::Float(left.powf(right as f64));
+    //                 }
+    //                 _ => {}
+    //             }
+    //         }
+    //         OP_NOT => {
+    //             if let RegisterVal::Int(value) = self.registers[argb as usize + offset] {
+    //                 self.registers[arga as usize + offset] = RegisterVal::Int(!value);
+    //             }
+    //         }
+    //         OP_AND => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize + offset].clone()
+    //             };
+
+    //             if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
+    //                 self.registers[arga as usize + offset] = RegisterVal::Int(left & right);
+    //             }
+    //         }
+    //         OP_OR => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize + offset].clone()
+    //             };
+
+    //             if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
+    //                 self.registers[arga as usize + offset] = RegisterVal::Int(left | right);
+    //             }
+    //         }
+    //         OP_EQ => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize + offset].clone()
+    //             };
+
+    //             self.registers[arga as usize] = RegisterVal::Bool(b_val == c_val);
+    //         }
+    //         OP_NE => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize + offset].clone()
+    //             };
+
+    //             self.registers[arga as usize] = RegisterVal::Bool(b_val != c_val);
+    //         }
+    //         OP_LT => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize + offset].clone()
+    //             };
+
+    //             self.registers[arga as usize] = RegisterVal::Bool(b_val < c_val);
+    //         }
+    //         OP_LE => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize + offset].clone()
+    //             };
+
+    //             self.registers[arga as usize] = RegisterVal::Bool(b_val <= c_val);
+    //         }
+    //         OP_GT => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize + offset].clone()
+    //             };
+
+    //             self.registers[arga as usize] = RegisterVal::Bool(b_val > c_val);
+    //         }
+    //         OP_GE => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize + offset].clone()
+    //             };
+
+    //             self.registers[arga as usize] = RegisterVal::Bool(b_val >= c_val);
+    //         }
+    //         OP_JUMP => {
+    //             self.program_counter = (self.program_counter as i32 + argsbx) as usize;
+    //         }
+    //         OP_JUMP_IF_TRUE => {
+    //             if let RegisterVal::Bool(true) = self.registers[arga as usize] {
+    //                 self.program_counter = (self.program_counter as i32 + argsbx) as usize;
+    //             }
+    //         }
+    //         OP_JUMP_IF_FALSE => {
+    //             if let RegisterVal::Bool(false) = self.registers[arga as usize] {
+    //                 self.program_counter = (self.program_counter as i32 + argsbx) as usize;
+    //             }
+    //         }
+    //         OP_CALL => {
+    //             // A is the pointer to a function on function_indexes
+    //             // B is the number of args to be pushed into the function's scope
+    //             // C is the base
+
+    //             // Save callframe
+    //             let call_frame = CallFrame {
+    //                 return_pc: self.program_counter,
+    //                 base: (argc as usize) + offset,
+    //             };
+
+    //             // push callframe
+    //             self.call_stack.push(call_frame);
+
+    //             // Set the program counter to the function's starting instruction
+    //             if (arga as usize) < self.function_indexes.len() {
+    //                 self.program_counter = self.function_indexes[arga as usize];
+    //                 return;
+    //             } else {
+    //                 panic!("Invalid function index: {}", arga);
+    //             }
+    //         }
+    //         OP_TAILCALL => {
+    //             // Implement tail call optimization
+    //         }
+    //         OP_RETURN => {
+    //             if let Some(call_frame) = self.call_stack.pop() {
+    //                 self.program_counter = call_frame.return_pc;
+    //             } else {
+    //                 panic!("STACK UNDERFLOW")
+    //             }
+    //         }
+    //         OP_INC => {
+    //             if let RegisterVal::Int(value) = self.registers[arga as usize] {
+    //                 self.registers[arga as usize] = RegisterVal::Int(value.wrapping_add(1));
+    //             }
+    //         }
+    //         OP_DEC => {
+    //             if let RegisterVal::Int(value) = self.registers[arga as usize] {
+    //                 self.registers[arga as usize] = RegisterVal::Int(value.wrapping_sub(1));
+    //             }
+    //         }
+    //         OP_BITAND => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize].clone()
+    //             };
+
+    //             if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
+    //                 self.registers[arga as usize] = RegisterVal::Int(left & right);
+    //             }
+    //         }
+    //         OP_BITOR => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize].clone()
+    //             };
+
+    //             if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
+    //                 self.registers[arga as usize] = RegisterVal::Int(left | right);
+    //             }
+    //         }
+    //         OP_BITXOR => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize].clone()
+    //             };
+
+    //             if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
+    //                 self.registers[arga as usize] = RegisterVal::Int(left ^ right);
+    //             }
+    //         }
+    //         OP_SHL => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize].clone()
+    //             };
+
+    //             if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
+    //                 self.registers[arga as usize] = RegisterVal::Int(left << right);
+    //             }
+    //         }
+    //         OP_SHR => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize].clone()
+    //             };
+
+    //             if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
+    //                 self.registers[arga as usize] = RegisterVal::Int(left >> right);
+    //             }
+    //         }
+    //         OP_CONCAT => {
+    //             let b_val = if is_k(argb) {
+    //                 self.constant_pool[rk_to_k(argb) as usize].clone()
+    //             } else {
+    //                 self.registers[argb as usize + offset].clone()
+    //             };
+    //             let c_val = if is_k(argc) {
+    //                 self.constant_pool[rk_to_k(argc) as usize].clone()
+    //             } else {
+    //                 self.registers[argc as usize].clone()
+    //             };
+
+    //             if let (RegisterVal::Str(left), RegisterVal::Str(right)) = (b_val, c_val) {
+    //                 let concatenated = format!("{}{}", left, right);
+    //                 self.registers[arga as usize] = RegisterVal::Str(Rc::new(concatenated));
+    //             }
+    //         }
+    //         OP_DESTRUCTOR => {
+    //             // destroy heap objs, where A is a pointer to the heap obj flagged for destruction.
+    //             todo!()
+    //         }
+    //         OP_EXIT => process::exit(arga),
+    //         OP_NOP => {}
+    //         _ => unreachable!(),
+    //     }
+    //     self.program_counter += 1;
+    // }
+
+    fn op_move(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let offset = self.current_offset();
+
+        let value = self.registers[argb as usize + offset].clone();
+        self.registers[arga as usize + offset] = value;
+    }
+
+    fn op_loadconst(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argbx = get_argbx(inst);
+        let offset = self.current_offset();
+
+        let value = self.constant_pool[argbx as usize + offset].clone();
+        self.registers[arga as usize + offset] = value;
+    }
+
+    fn op_loadbool(&mut self, inst: Instruction) {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
-        let argbx = get_argbx(inst);
+        let offset = self.current_offset();
+
+        let value = if argb != 0 {
+            RegisterVal::Bool(true)
+        } else {
+            RegisterVal::Bool(false)
+        };
+        self.registers[arga as usize + offset] = value;
+        if argc != 0 {
+            self.program_counter += 1;
+        }
+    }
+
+    fn op_loadnull(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let offset = self.current_offset();
+
+        for i in arga as usize..=argb as usize {
+            self.registers[i + offset] = RegisterVal::Null;
+        }
+    }
+
+    fn op_add(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize + offset].clone()
+        };
+
+        match (b_val, c_val) {
+            (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Int(left.wrapping_add(right));
+            }
+            (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left + right);
+            }
+            (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left as f64 + right);
+            }
+            (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left + right as f64);
+            }
+            _ => {}
+        }
+    }
+
+    fn op_sub(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize + offset].clone()
+        };
+
+        match (b_val, c_val) {
+            (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Int(left.wrapping_sub(right));
+            }
+            (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left - right);
+            }
+            (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left as f64 - right);
+            }
+            (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left - right as f64);
+            }
+            _ => {}
+        }
+    }
+
+    fn op_mul(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize + offset].clone()
+        };
+
+        match (b_val, c_val) {
+            (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Int(left.wrapping_mul(right));
+            }
+            (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left * right);
+            }
+            (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left as f64 * right);
+            }
+            (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left * right as f64);
+            }
+            _ => {}
+        }
+    }
+
+    fn op_div(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize + offset].clone()
+        };
+
+        match (b_val, c_val) {
+            (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Int(left.wrapping_div(right));
+            }
+            (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left / right);
+            }
+            (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left as f64 / right);
+            }
+            (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left / right as f64);
+            }
+            _ => {}
+        }
+    }
+
+    fn op_mod(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize + offset].clone()
+        };
+
+        match (b_val, c_val) {
+            (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Int(left.wrapping_rem(right));
+            }
+            (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left % right);
+            }
+            (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left as f64 % right);
+            }
+            (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left % right as f64);
+            }
+            _ => {}
+        }
+    }
+
+    fn op_pow(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize + offset].clone()
+        };
+
+        match (b_val, c_val) {
+            (RegisterVal::Int(left), RegisterVal::Int(right)) => {
+                self.registers[arga as usize + offset] =
+                    RegisterVal::Int(left.wrapping_pow(right as u32));
+            }
+            (RegisterVal::Float(left), RegisterVal::Float(right)) => {
+                self.registers[arga as usize + offset] = RegisterVal::Float(left.powf(right));
+            }
+            (RegisterVal::Int(left), RegisterVal::Float(right)) => {
+                self.registers[arga as usize + offset] =
+                    RegisterVal::Float((left as f64).powf(right));
+            }
+            (RegisterVal::Float(left), RegisterVal::Int(right)) => {
+                self.registers[arga as usize + offset] =
+                    RegisterVal::Float(left.powf(right as f64));
+            }
+            _ => {}
+        }
+    }
+
+    fn op_not(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let offset = self.current_offset();
+
+        if let RegisterVal::Int(value) = self.registers[argb as usize + offset] {
+            self.registers[arga as usize + offset] = RegisterVal::Int(!value);
+        }
+    }
+
+    fn op_and(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize + offset].clone()
+        };
+
+        if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
+            self.registers[arga as usize + offset] = RegisterVal::Int(left & right);
+        }
+    }
+
+    fn op_or(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize + offset].clone()
+        };
+
+        if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
+            self.registers[arga as usize + offset] = RegisterVal::Int(left | right);
+        }
+    }
+
+    fn op_eq(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize + offset].clone()
+        };
+
+        self.registers[arga as usize] = RegisterVal::Bool(b_val == c_val);
+    }
+
+    fn op_ne(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize + offset].clone()
+        };
+
+        self.registers[arga as usize] = RegisterVal::Bool(b_val != c_val);
+    }
+
+    fn op_lt(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize + offset].clone()
+        };
+
+        self.registers[arga as usize] = RegisterVal::Bool(b_val < c_val);
+    }
+
+    fn op_le(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize + offset].clone()
+        };
+
+        self.registers[arga as usize] = RegisterVal::Bool(b_val <= c_val);
+    }
+
+    fn op_gt(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize + offset].clone()
+        };
+
+        self.registers[arga as usize] = RegisterVal::Bool(b_val > c_val);
+    }
+
+    fn op_ge(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize + offset].clone()
+        };
+
+        self.registers[arga as usize] = RegisterVal::Bool(b_val >= c_val);
+    }
+
+    fn op_jump(&mut self, inst: Instruction) {
         let argsbx = get_argsbx(inst);
-        match op {
-            OP_MOVE => {
-                let value = self.registers[argb as usize + offset].clone();
-                self.registers[arga as usize + offset] = value;
-            }
-            OP_LOADCONST => {
-                let value = self.constant_pool[argbx as usize + offset].clone();
-                self.registers[arga as usize + offset] = value;
-            }
-            OP_LOADBOOL => {
-                let value = if argb != 0 {
-                    RegisterVal::Bool(true)
-                } else {
-                    RegisterVal::Bool(false)
-                };
-                self.registers[arga as usize + offset] = value;
-                if argc != 0 {
-                    self.program_counter += 1;
-                }
-            }
-            OP_LOADNULL => {
-                for i in arga as usize..=argb as usize {
-                    self.registers[i + offset] = RegisterVal::Null;
-                }
-            }
-            OP_ADD => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize + offset].clone()
-                };
 
-                match (b_val, c_val) {
-                    (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Int(left.wrapping_add(right));
-                    }
-                    (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize + offset] = RegisterVal::Float(left + right);
-                    }
-                    (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Float(left as f64 + right);
-                    }
-                    (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Float(left + right as f64);
-                    }
-                    _ => {}
-                }
-            }
-            OP_SUB => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize + offset].clone()
-                };
-
-                match (b_val, c_val) {
-                    (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Int(left.wrapping_sub(right));
-                    }
-                    (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize + offset] = RegisterVal::Float(left - right);
-                    }
-                    (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Float(left as f64 - right);
-                    }
-                    (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Float(left - right as f64);
-                    }
-                    _ => {}
-                }
-            }
-            OP_MUL => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize + offset].clone()
-                };
-
-                match (b_val, c_val) {
-                    (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Int(left.wrapping_mul(right));
-                    }
-                    (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize + offset] = RegisterVal::Float(left * right);
-                    }
-                    (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Float(left as f64 * right);
-                    }
-                    (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Float(left * right as f64);
-                    }
-                    _ => {}
-                }
-            }
-            OP_DIV => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize + offset].clone()
-                };
-
-                match (b_val, c_val) {
-                    (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Int(left.wrapping_div(right));
-                    }
-                    (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize + offset] = RegisterVal::Float(left / right);
-                    }
-                    (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Float(left as f64 / right);
-                    }
-                    (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Float(left / right as f64);
-                    }
-                    _ => {}
-                }
-            }
-            OP_MOD => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize + offset].clone()
-                };
-
-                match (b_val, c_val) {
-                    (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Int(left.wrapping_rem(right));
-                    }
-                    (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize + offset] = RegisterVal::Float(left % right);
-                    }
-                    (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Float(left as f64 % right);
-                    }
-                    (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Float(left % right as f64);
-                    }
-                    _ => {}
-                }
-            }
-            OP_POW => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize + offset].clone()
-                };
-
-                match (b_val, c_val) {
-                    (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Int(left.wrapping_pow(right as u32));
-                    }
-                    (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Float(left.powf(right));
-                    }
-                    (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Float((left as f64).powf(right));
-                    }
-                    (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                        self.registers[arga as usize + offset] =
-                            RegisterVal::Float(left.powf(right as f64));
-                    }
-                    _ => {}
-                }
-            }
-            OP_NOT => {
-                if let RegisterVal::Int(value) = self.registers[argb as usize + offset] {
-                    self.registers[arga as usize + offset] = RegisterVal::Int(!value);
-                }
-            }
-            OP_AND => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize + offset].clone()
-                };
-
-                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-                    self.registers[arga as usize + offset] = RegisterVal::Int(left & right);
-                }
-            }
-            OP_OR => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize + offset].clone()
-                };
-
-                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-                    self.registers[arga as usize + offset] = RegisterVal::Int(left | right);
-                }
-            }
-            OP_EQ => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize + offset].clone()
-                };
-
-                self.registers[arga as usize] = RegisterVal::Bool(b_val == c_val);
-            }
-            OP_NE => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize + offset].clone()
-                };
-
-                self.registers[arga as usize] = RegisterVal::Bool(b_val != c_val);
-            }
-            OP_LT => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize + offset].clone()
-                };
-
-                self.registers[arga as usize] = RegisterVal::Bool(b_val < c_val);
-            }
-            OP_LE => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize + offset].clone()
-                };
-
-                self.registers[arga as usize] = RegisterVal::Bool(b_val <= c_val);
-            }
-            OP_GT => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize + offset].clone()
-                };
-
-                self.registers[arga as usize] = RegisterVal::Bool(b_val > c_val);
-            }
-            OP_GE => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize + offset].clone()
-                };
-
-                self.registers[arga as usize] = RegisterVal::Bool(b_val >= c_val);
-            }
-            OP_JUMP => {
-                self.program_counter = (self.program_counter as i32 + argsbx) as usize;
-            }
-            OP_JUMP_IF_TRUE => {
-                if let RegisterVal::Bool(true) = self.registers[arga as usize] {
-                    self.program_counter = (self.program_counter as i32 + argsbx) as usize;
-                }
-            }
-            OP_JUMP_IF_FALSE => {
-                if let RegisterVal::Bool(false) = self.registers[arga as usize] {
-                    self.program_counter = (self.program_counter as i32 + argsbx) as usize;
-                }
-            }
-            OP_CALL => {
-                // A is the pointer to a function on function_indexes
-                // B is the number of args to be pushed into the function's scope
-                // C is the base
-
-                // Save callframe
-                let call_frame = CallFrame {
-                    return_pc: self.program_counter,
-                    base: (argc as usize) + offset,
-                };
-
-                // push callframe
-                self.call_stack.push(call_frame);
-
-                // Set the program counter to the function's starting instruction
-                if (arga as usize) < self.function_indexes.len() {
-                    self.program_counter = self.function_indexes[arga as usize];
-                    return;
-                } else {
-                    panic!("Invalid function index: {}", arga);
-                }
-            }
-            OP_TAILCALL => {
-                // Implement tail call optimization
-            }
-            OP_RETURN => {
-                if let Some(call_frame) = self.call_stack.pop() {
-                    self.program_counter = call_frame.return_pc;
-                } else {
-                    panic!("STACK UNDERFLOW")
-                }
-            }
-            OP_INC => {
-                if let RegisterVal::Int(value) = self.registers[arga as usize] {
-                    self.registers[arga as usize] = RegisterVal::Int(value.wrapping_add(1));
-                }
-            }
-            OP_DEC => {
-                if let RegisterVal::Int(value) = self.registers[arga as usize] {
-                    self.registers[arga as usize] = RegisterVal::Int(value.wrapping_sub(1));
-                }
-            }
-            OP_BITAND => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize].clone()
-                };
-
-                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-                    self.registers[arga as usize] = RegisterVal::Int(left & right);
-                }
-            }
-            OP_BITOR => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize].clone()
-                };
-
-                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-                    self.registers[arga as usize] = RegisterVal::Int(left | right);
-                }
-            }
-            OP_BITXOR => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize].clone()
-                };
-
-                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-                    self.registers[arga as usize] = RegisterVal::Int(left ^ right);
-                }
-            }
-            OP_SHL => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize].clone()
-                };
-
-                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-                    self.registers[arga as usize] = RegisterVal::Int(left << right);
-                }
-            }
-            OP_SHR => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize].clone()
-                };
-
-                if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-                    self.registers[arga as usize] = RegisterVal::Int(left >> right);
-                }
-            }
-            OP_CONCAT => {
-                let b_val = if is_k(argb) {
-                    self.constant_pool[rk_to_k(argb) as usize].clone()
-                } else {
-                    self.registers[argb as usize + offset].clone()
-                };
-                let c_val = if is_k(argc) {
-                    self.constant_pool[rk_to_k(argc) as usize].clone()
-                } else {
-                    self.registers[argc as usize].clone()
-                };
-
-                if let (RegisterVal::Str(left), RegisterVal::Str(right)) = (b_val, c_val) {
-                    let concatenated = format!("{}{}", left, right);
-                    self.registers[arga as usize] = RegisterVal::Str(Rc::new(concatenated));
-                }
-            }
-            OP_DESTRUCTOR => {
-                // destroy heap objs, where A is a pointer to the heap obj flagged for destruction.
-                todo!()
-            }
-            OP_EXIT => process::exit(arga),
-            OP_NOP => {}
-            _ => unreachable!(),
-        }
-        self.program_counter += 1;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::backend_vm::instructions::{to_string, ABx, ASBx};
-
-    use super::*;
-
-    fn potential_leaky_vm_create() -> VM {
-        VM::new(
-            vec![
-                ABx(OP_LOADCONST, 0, 0), // Load constant K(0) into register R(0)
-                ASBx(OP_JUMP, 0, 1),     // Jump to the next instruction (to create a loop)
-                ABx(OP_LOADCONST, 1, 0), // Load constant K(0) into register R(1)
-                ASBx(OP_JUMP, 0, -2),    // Jump back to the first instruction
-            ],
-            vec![RegisterVal::Int(10)], // Constant pool
-            vec![],
-            2, // Number of registers
-        )
+        self.program_counter = (self.program_counter as i32 + argsbx) as usize;
     }
 
-    #[test]
-    fn test_if_leaking() {
-        let mut vm: VM = potential_leaky_vm_create();
-        println!("{:#?}", vm);
-        for inst in &vm.instructions {
-            println!("{}", to_string(*inst))
-        }
-        for _ in 0..1000 {
-            vm.execute_instruction(vm.fetch_instruction());
-        }
+    fn op_jump_if_true(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argsbx = get_argsbx(inst);
 
-        // If we reach here, test passes B)
+        if let RegisterVal::Bool(true) = self.registers[arga as usize] {
+            self.program_counter = (self.program_counter as i32 + argsbx) as usize;
+        }
+    }
+
+    fn op_jump_if_false(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argsbx = get_argsbx(inst);
+
+        if let RegisterVal::Bool(false) = self.registers[arga as usize] {
+            self.program_counter = (self.program_counter as i32 + argsbx) as usize;
+        }
+    }
+
+    fn op_call(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        // let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        // A is the pointer to a function on function_indexes
+        // B is the number of args to be pushed into the function's scope
+        // C is the base
+
+        // Save callframe
+        let call_frame = CallFrame {
+            return_pc: self.program_counter,
+            base: (argc as usize) + offset,
+        };
+
+        // push callframe
+        self.call_stack.push(call_frame);
+
+        // Set the program counter to the function's starting instruction
+        if (arga as usize) < self.function_indexes.len() {
+            self.program_counter = self.function_indexes[arga as usize];
+            // return; TODO: Fix to possibly avoid pc --1
+            self.program_counter -= 1;
+        } else {
+            panic!("Invalid function index: {}", arga);
+        }
+    }
+
+    fn op_tailcall(&mut self, _inst: Instruction) {
+        // TODO!
+        todo!()
+    }
+
+    fn op_return(&mut self, _inst: Instruction) {
+        if let Some(call_frame) = self.call_stack.pop() {
+            self.program_counter = call_frame.return_pc;
+        } else {
+            panic!("STACK UNDERFLOW")
+        }
+    }
+
+    fn op_inc(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+
+        if let RegisterVal::Int(value) = self.registers[arga as usize] {
+            self.registers[arga as usize] = RegisterVal::Int(value.wrapping_add(1));
+        }
+    }
+
+    fn op_dec(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+
+        if let RegisterVal::Int(value) = self.registers[arga as usize] {
+            self.registers[arga as usize] = RegisterVal::Int(value.wrapping_sub(1));
+        }
+    }
+
+    fn op_bitand(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize].clone()
+        };
+
+        if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
+            self.registers[arga as usize] = RegisterVal::Int(left & right);
+        }
+    }
+
+    fn op_bitor(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize].clone()
+        };
+
+        if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
+            self.registers[arga as usize] = RegisterVal::Int(left | right);
+        }
+    }
+
+    fn op_bitxor(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize].clone()
+        };
+
+        if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
+            self.registers[arga as usize] = RegisterVal::Int(left ^ right);
+        }
+    }
+
+    fn op_shl(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize].clone()
+        };
+
+        if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
+            self.registers[arga as usize] = RegisterVal::Int(left << right);
+        }
+    }
+
+    fn op_shr(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize].clone()
+        };
+
+        if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
+            self.registers[arga as usize] = RegisterVal::Int(left >> right);
+        }
+    }
+
+    fn op_concat(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let b_val = if is_k(argb) {
+            self.constant_pool[rk_to_k(argb) as usize].clone()
+        } else {
+            self.registers[argb as usize + offset].clone()
+        };
+        let c_val = if is_k(argc) {
+            self.constant_pool[rk_to_k(argc) as usize].clone()
+        } else {
+            self.registers[argc as usize].clone()
+        };
+
+        if let (RegisterVal::Str(left), RegisterVal::Str(right)) = (b_val, c_val) {
+            let concatenated = format!("{}{}", left, right);
+            self.registers[arga as usize] = RegisterVal::Str(Rc::new(concatenated));
+        }
+    }
+
+    fn op_destructor(&mut self, _inst: Instruction) {
+        // destroy heap objs, where A is a pointer to the heap obj flagged for destruction.
+        // TODO!
+        todo!()
+    }
+
+    fn op_exit(&mut self, inst: Instruction) {
+        let arga = get_arga(inst);
+
+        process::exit(arga)
+    }
+
+    fn op_nop(&mut self, _inst: Instruction) {
+        // here only to waste cycles lol
     }
 }
