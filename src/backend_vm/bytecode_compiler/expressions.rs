@@ -310,7 +310,7 @@ impl Compiler {
         for stmt in then {
             result = self.compile_statement(stmt, true, true, fn_return, child_symbol_table)?;
         }
-        if require_result {
+        if require_result && !result.is_return() {
             self.add_instruction(Abc(
                 OP_MOVE,
                 result_register as i32,
@@ -356,7 +356,7 @@ impl Compiler {
         for stmt in else_stmt.unwrap() {
             result = self.compile_statement(stmt, true, true, fn_return, child_symbol_table)?;
         }
-        if require_result {
+        if require_result && !result.is_return() {
             self.add_instruction(Abc(
                 OP_MOVE,
                 result_register as i32,

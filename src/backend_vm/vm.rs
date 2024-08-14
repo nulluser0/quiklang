@@ -253,6 +253,14 @@ impl VM {
         Ok(self.call_stack[self.stack_pointer])
     }
 
+    #[inline]
+    fn current_offset(&mut self) -> usize {
+        if self.stack_pointer == 0 {
+            return 0;
+        }
+        self.call_stack[self.stack_pointer - 1].base
+    }
+
     // fn current_frame(&self) -> &CallFrame {
     //     &self.call_stack[self.stack_pointer - 1]
     // }
@@ -289,6 +297,7 @@ impl VM {
     // calls, and popping all of the frames on the stack.
     pub fn on_err_unwind_callstack(&mut self) {
         println!("Unwinding Callstack:");
+        println!("Stack pointer is at: {}", self.stack_pointer);
         if self.stack_pointer > 20 {
             println!("Truncating callstack to last 20 calls...");
         }
@@ -322,6 +331,7 @@ impl VM {
 
     pub fn execute(&mut self) -> Result<(), VMRuntimeError> {
         while self.program_counter < self.instructions.len() {
+            // println!("{}", self.program_counter);
             // self.execute_instruction(self.fetch_instruction());
             let inst = self.fetch_instruction();
             let opcode = get_opcode(inst);
@@ -329,17 +339,6 @@ impl VM {
             self.program_counter += 1;
         }
         Ok(())
-    }
-
-    #[inline]
-    fn current_offset(&mut self) -> usize {
-        self.call_stack
-            .last()
-            .unwrap_or(&CallFrame {
-                return_pc: 0,
-                base: 0,
-            })
-            .base
     }
 
     // pub fn execute_instruction(&mut self, inst: Instruction) {
