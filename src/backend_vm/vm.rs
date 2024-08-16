@@ -289,6 +289,7 @@ impl VM {
     //     }
     // }
 
+    #[inline(always)]
     fn fetch_instruction(&self) -> Instruction {
         self.instructions[self.program_counter]
     }
