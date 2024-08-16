@@ -359,7 +359,7 @@ impl VM {
         let argbx = get_argbx(inst);
         let offset = self.current_offset();
 
-        let value = self.constant_pool[argbx as usize + offset].clone();
+        let value = self.constant_pool[argbx as usize].clone();
         self.registers[arga as usize + offset] = value;
 
         Ok(())
