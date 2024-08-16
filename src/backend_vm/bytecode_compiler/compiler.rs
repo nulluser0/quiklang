@@ -157,7 +157,12 @@ impl Compiler {
             ql_vm_ver: env!("QUIKLANG_VM_VERSION").parse().unwrap(),
             flags: 0,
         };
-        let symbol_table: &Rc<RefCell<SymbolTable>> = &Rc::new(RefCell::new(SymbolTable::new()));
+
+        let root_symbol_table: &Rc<RefCell<SymbolTable>> =
+            &Rc::new(RefCell::new(SymbolTable::new()));
+        let symbol_table: &Rc<RefCell<SymbolTable>> = &Rc::new(RefCell::new(
+            SymbolTable::new_with_parent(root_symbol_table.clone()),
+        ));
         // Generate bytecode from AST
         self.compile_statements(stmts, symbol_table)?;
 

@@ -5,7 +5,9 @@
 // sBx     : isize = Signed Displacement
 // PC      : usize = Program
 
-use std::fmt::{format, Display};
+use std::fmt::Display;
+
+use super::qffi::native_fn::NATIVE_FUNCTION_TABLE;
 
 /// instruction = 32bit(fixed length)
 ///
@@ -64,20 +66,21 @@ pub const OP_JUMP: OpCode = 19; // A  PC += A
 pub const OP_JUMP_IF_TRUE: OpCode = 20;
 pub const OP_JUMP_IF_FALSE: OpCode = 21; // A B  if (!R(A)) PC += B
 pub const OP_CALL: OpCode = 22; // A B  Call function at R(A) with B arguments
-pub const OP_QFFI_CALL: OpCode = 23; // A B  Call FFI (extern) function at R(A) with B arguments. TODO: A is index to FFI registry, then called by QFFI.
-pub const OP_TAILCALL: OpCode = 23;
-pub const OP_RETURN: OpCode = 24; // A  Return with R(A)
-pub const OP_INC: OpCode = 25; // A  R(A)++
-pub const OP_DEC: OpCode = 26; // A  R(A)--
-pub const OP_BITAND: OpCode = 27; // A B C  R(A) := R(B) & R(C)
-pub const OP_BITOR: OpCode = 28; // A B C  R(A) := R(B) | R(C)
-pub const OP_BITXOR: OpCode = 29; // A B C  R(A) := R(B) ^ R(C)
-pub const OP_SHL: OpCode = 30; // A B C  R(A) := R(B) << R(C)
-pub const OP_SHR: OpCode = 31; // A B C  R(A) := R(B) >> R(C)
-pub const OP_CONCAT: OpCode = 32; // A B C  R(A) := RK(B) & RK(C)
-pub const OP_DESTRUCTOR: OpCode = 33; // A B C  R(A) where A is a pointer to heap obj, heap obj is destroyed.
-pub const OP_EXIT: OpCode = 34; // A B C  A is exit code, default 0.
-pub const OP_CLONE: OpCode = 35; // A B  R(A) := R(B).clone()
+pub const OP_NATIVE_CALL: OpCode = 23; // A B  Call VM-Native function at R(A) with B arguments. TODO: A is index to Native Fn registry, then called by QFFI.
+pub const OP_QFFI_CALL: OpCode = 24; // A B  Call FFI (extern) function at R(A) with B arguments. TODO: A is index to FFI registry, then called by QFFI.
+pub const OP_TAILCALL: OpCode = 25;
+pub const OP_RETURN: OpCode = 26; // A  Return with R(A)
+pub const OP_INC: OpCode = 27; // A  R(A)++
+pub const OP_DEC: OpCode = 28; // A  R(A)--
+pub const OP_BITAND: OpCode = 29; // A B C  R(A) := R(B) & R(C)
+pub const OP_BITOR: OpCode = 30; // A B C  R(A) := R(B) | R(C)
+pub const OP_BITXOR: OpCode = 31; // A B C  R(A) := R(B) ^ R(C)
+pub const OP_SHL: OpCode = 32; // A B C  R(A) := R(B) << R(C)
+pub const OP_SHR: OpCode = 33; // A B C  R(A) := R(B) >> R(C)
+pub const OP_CONCAT: OpCode = 34; // A B C  R(A) := RK(B) & RK(C)
+pub const OP_DESTRUCTOR: OpCode = 35; // A B C  R(A) where A is a pointer to heap obj, heap obj is destroyed.
+pub const OP_EXIT: OpCode = 36; // A B C  A is exit code, default 0.
+pub const OP_CLONE: OpCode = 37; // A B  R(A) := R(B).clone()
                                  // TODO: Add both array, string, hashmap, etc. (Heap-allocated objects) instructions
 pub const OP_ARRAY_ALLOCATE: OpCode = 34; // A B C  R(A) := allocate_array(b - size)
 pub const OP_HASHMAP_ALLOCATE: OpCode = 35; // A B C  R(A) := allocate_hashmap(b - size)
@@ -89,7 +92,7 @@ pub const OP_GROWABLE_SET: OpCode = 39; // A B C  growable(A)[R(B)].set(C)
 pub const OP_GROWABLE_GET: OpCode = 40; // A B C  R(A) := growable(B)[R(C)]
 pub const OP_HASHMAP_OR_HASHSET_CONTAINS: OpCode = 41; // A B C  R(A) := hashmap/hashset(B).contains(C)
 pub const OP_GROWABLE_REMOVE: OpCode = 42; // A B C  R(A) := growable(B).remove(R(C))
-pub const OP_NOP: OpCode = 36; // NOP
+pub const OP_NOP: OpCode = 38; // NOP
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum OpArgMode {
@@ -309,6 +312,22 @@ pub static OP_NAMES: &[OpProp; OP_NOP as usize + 1] = &[
         set_reg_a: true,
         mode_arg_b: OpArgMode::Used,
         mode_arg_c: OpArgMode::Used,
+        typ: OpType::Abc,
+    },
+    OpProp {
+        name: "NATIVE_CALL",
+        is_test: false,
+        set_reg_a: true,
+        mode_arg_b: OpArgMode::Used,
+        mode_arg_c: OpArgMode::NotUsed,
+        typ: OpType::Abc,
+    },
+    OpProp {
+        name: "OP_QFFI_CALL",
+        is_test: false,
+        set_reg_a: true,
+        mode_arg_b: OpArgMode::Used,
+        mode_arg_c: OpArgMode::NotUsed,
         typ: OpType::Abc,
     },
     OpProp {
@@ -713,6 +732,20 @@ pub fn to_string(inst: Instruction) -> String {
         OP_JUMP_IF_TRUE => format!("{} | if R({}) is true then pc += {}", ops, arga, argsbx),
         OP_JUMP_IF_FALSE => format!("{} | if R({}) is false then pc += {}", ops, arga, argsbx),
         OP_CALL => format!("{} | R({})(#R({})), base {}", ops, arga, argb, argc),
+        OP_NATIVE_CALL => format!(
+            "{} | R({})(#R({})), base {}, NATIVE: {}",
+            ops,
+            arga,
+            argb,
+            argc,
+            {
+                match NATIVE_FUNCTION_TABLE.clone().get(arga as usize) {
+                    Some(native_fn) => native_fn.name,
+                    None => "UNABLE TO GET FUNCTION!",
+                }
+            }
+        ),
+        OP_QFFI_CALL => format!("{} | R({})(#R({})), base {}, QFFI", ops, arga, argb, argc),
         OP_TAILCALL => format!(
             "{} | return R({})(R({}+1) ... R({}+{}-1))",
             ops, arga, arga, arga, argb

@@ -82,7 +82,7 @@ impl Compiler {
         } else {
             reg = self.allocate_register() as isize;
         }
-        symbol_table.borrow_mut().declare_var(name, reg as usize);
+        symbol_table.borrow_mut().declare_var(name, reg as isize);
         Ok(ReturnValue::Normal(reg))
     }
 
@@ -100,7 +100,7 @@ impl Compiler {
 
         function_symbol_table
             .borrow_mut()
-            .declare_var(name.clone(), self.function_len());
+            .declare_var(name.clone(), self.function_len() as isize);
 
         // Allocate result register
         let result_register = function_compiler.allocate_register();
@@ -108,7 +108,9 @@ impl Compiler {
         // Allocate registers for the parameters in the function's symbol table
         for param in parameters {
             let reg = function_compiler.allocate_register();
-            function_symbol_table.borrow_mut().declare_var(param.0, reg);
+            function_symbol_table
+                .borrow_mut()
+                .declare_var(param.0, reg as isize);
         }
 
         let mut result = ReturnValue::Normal(0);
@@ -142,7 +144,7 @@ impl Compiler {
         let index = self.add_function(&mut function_compiler);
 
         // Add function to symbol table
-        symbol_table.borrow_mut().declare_var(name, index);
+        symbol_table.borrow_mut().declare_var(name, index as isize);
 
         Ok(ReturnValue::Normal(0))
     }

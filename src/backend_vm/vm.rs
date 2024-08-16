@@ -17,6 +17,7 @@ use super::{
         get_arga, get_argb, get_argbx, get_argc, get_argsbx, get_opcode, is_k, rk_to_k,
         Instruction, OP_NOP,
     },
+    qffi::QFFI,
 };
 
 type VmHandler = fn(&mut VM, Instruction) -> Result<(), VMRuntimeError>;
@@ -69,16 +70,30 @@ pub enum RegisterVal {
 impl std::fmt::Display for RegisterVal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RegisterVal::Int(int) => write!(f, "{:10}| {}", "integer", int),
-            RegisterVal::Float(float) => write!(f, "{:10}| {}", "float", float),
-            RegisterVal::Bool(boolean) => write!(f, "{:10}| {}", "bool", boolean),
-            RegisterVal::Str(string) => write!(f, "{:10}| {}", "string", string),
-            RegisterVal::Array(array) => write!(f, "{:10}| {:?}", "array", array),
-            RegisterVal::Range(range) => write!(f, "{:10}| {:?}", "range", range),
-            RegisterVal::HashMap(hashmap) => write!(f, "{:10}| {:?}", "hashmap", hashmap),
-            RegisterVal::HashSet(hashset) => write!(f, "{:10}| {:?}", "hashset", hashset),
-            RegisterVal::Null => write!(f, "{:10}| null", "null"),
+            RegisterVal::Int(int) => write!(f, "{}", int),
+            RegisterVal::Float(float) => write!(f, "{}", float),
+            RegisterVal::Bool(boolean) => write!(f, "{}", boolean),
+            RegisterVal::Str(string) => write!(f, "{}", string),
+            RegisterVal::Array(array) => write!(f, "{:?}", array),
+            RegisterVal::Range(range) => write!(f, "{:?}", range),
+            RegisterVal::HashMap(hashmap) => write!(f, "{:?}", hashmap),
+            RegisterVal::HashSet(hashset) => write!(f, "{:?}", hashset),
+            RegisterVal::Null => write!(f, "null"),
         }
+    }
+}
+
+pub fn to_quiklangc_strings(inner: &RegisterVal) -> String {
+    match inner {
+        RegisterVal::Int(int) => format!("{:10}| {}", "integer", int),
+        RegisterVal::Float(float) => format!("{:10}| {}", "float", float),
+        RegisterVal::Bool(boolean) => format!("{:10}| {}", "bool", boolean),
+        RegisterVal::Str(string) => format!("{:10}| {}", "string", string),
+        RegisterVal::Array(array) => format!("{:10}| {:?}", "array", array),
+        RegisterVal::Range(range) => format!("{:10}| {:?}", "range", range),
+        RegisterVal::HashMap(hashmap) => format!("{:10}| {:?}", "hashmap", hashmap),
+        RegisterVal::HashSet(hashset) => format!("{:10}| {:?}", "hashset", hashset),
+        RegisterVal::Null => format!("{:10}| null", "null"),
     }
 }
 
@@ -184,6 +199,8 @@ const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
         VM::op_jump_if_true,
         VM::op_jump_if_false,
         VM::op_call,
+        VM::op_native_call,
+        VM::op_qffi_call,
         VM::op_tailcall,
         VM::op_return,
         VM::op_inc,
@@ -212,6 +229,7 @@ pub struct VM {
     pub instructions: Vec<Instruction>,
     call_stack: [CallFrame; 1024], // Fixed-size array for stack allocation
     stack_pointer: usize,          // Points to the next free slot in the call stack
+    qffi: QFFI,
 }
 
 const ARRAY_REPEAT_VALUE: RegisterVal = RegisterVal::Null;
@@ -233,6 +251,7 @@ impl VM {
                 base: 0,
             }; 1024], // Initialize with default CallFrame
             stack_pointer: 0,
+            qffi: QFFI::new(),
         }
     }
 
@@ -705,6 +724,29 @@ impl VM {
         }
 
         Ok(())
+    }
+
+    #[inline(always)]
+    fn op_native_call(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        // Native calls rely on the QFFI module.
+        // Args = (offset + argc + 1) to (offset + argb + argc)
+        let mut args = Vec::with_capacity(argc as usize + 1);
+        for i in ((argc as usize) + offset + 1)..=(((argc + argb) as usize) + offset) {
+            args.push(self.registers[i].clone());
+        }
+
+        self.qffi.call_native_function(arga as usize, &args)?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn op_qffi_call(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!()
     }
 
     #[inline(always)]

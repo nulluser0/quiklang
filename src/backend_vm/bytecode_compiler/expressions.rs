@@ -7,7 +7,7 @@ use crate::{
         instructions::{
             rk_ask, ABx, ASBx, Abc, OP_ADD, OP_AND, OP_CALL, OP_CLONE, OP_DIV, OP_EQ, OP_GE, OP_GT,
             OP_JUMP, OP_JUMP_IF_FALSE, OP_LE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LT,
-            OP_MOD, OP_MOVE, OP_MUL, OP_NE, OP_NOT, OP_OR, OP_SUB,
+            OP_MOD, OP_MOVE, OP_MUL, OP_NATIVE_CALL, OP_NE, OP_NOT, OP_OR, OP_SUB,
         },
         vm::RegisterVal,
     },
@@ -153,8 +153,7 @@ impl Compiler {
                     symbol_table
                         .borrow()
                         .lookup_var(other)
-                        .ok_or(VMCompileError::UndefinedVariable(other.to_string()))?
-                        as isize,
+                        .ok_or(VMCompileError::UndefinedVariable(other.to_string()))?,
                 ))
             }
         }
@@ -238,6 +237,12 @@ impl Compiler {
         // We assume this is correct
         let function = self.compile_expression(caller, false, true, None, symbol_table)?;
 
+        let mut native_fn = -1;
+
+        if function.safe_unwrap() < 0 {
+            native_fn = -1 - function.safe_unwrap()
+        }
+
         // Function result (and function run base)
         let result = self.allocate_register();
 
@@ -254,6 +259,16 @@ impl Compiler {
         }
 
         // Call function
+        if native_fn != -1 {
+            self.add_instruction(Abc(
+                OP_NATIVE_CALL,
+                native_fn as i32,
+                arg_lens,
+                result as i32,
+            ));
+            return Ok(ReturnValue::Normal(result as isize));
+        }
+
         self.add_instruction(Abc(
             OP_CALL,
             function.safe_unwrap() as i32,

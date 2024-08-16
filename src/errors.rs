@@ -232,4 +232,13 @@ pub enum VMRuntimeError {
 
     #[error("STACK UNDERFLOW")]
     StackUnderflow,
+
+    #[error("Native Function not found at index {0}.")]
+    UndefinedNativeFn(usize),
+
+    #[error("QFFI Function not found at index {0}.")]
+    UndefinedQFFIFn(usize),
+
+    #[error("QFFI/Native Function Error: {0}")]
+    QFFINativeFnError(String),
 }

@@ -69,7 +69,10 @@ use std::{
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
-use crate::{backend_vm::instructions::to_string, errors::VMBytecodeError};
+use crate::{
+    backend_vm::{instructions::to_string, vm::to_quiklangc_strings},
+    errors::VMBytecodeError,
+};
 
 use super::{instructions::Instruction, vm::RegisterVal};
 
@@ -105,7 +108,7 @@ impl Display for ByteCode {
         };
         let mut constants_fragments: Vec<String> = Vec::new();
         for (i, constant) in self.constants.iter().enumerate() {
-            constants_fragments.push(format!("{:10}| {}", i, constant));
+            constants_fragments.push(format!("{:10}| {}", i, to_quiklangc_strings(constant)));
         }
         let constants_string = constants_fragments.join("\n");
         let qlang_functions_string: String = self

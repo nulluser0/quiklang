@@ -2,31 +2,42 @@ use std::time::SystemTime;
 
 use lazy_static::lazy_static;
 
-use crate::backend_vm::vm::RegisterVal;
+use crate::{backend_vm::vm::RegisterVal, errors::VMRuntimeError};
 
 use super::NativeFunction;
 
+#[derive(Debug, Clone)]
+pub struct NativeFunctionEntry {
+    pub name: &'static str,
+    pub function: NativeFunction,
+}
+
 lazy_static! {
-    pub(super) static ref NATIVE_FUNCTION_TABLE: Vec<NativeFunction> = {
+    pub(crate) static ref NATIVE_FUNCTION_TABLE: Vec<NativeFunctionEntry> = {
         // Register all native functions here
         let table = vec![
-            println as NativeFunction,
-            time as NativeFunction,
+            NativeFunctionEntry { name: "println", function: println as NativeFunction },
+            NativeFunctionEntry { name: "time", function: time as NativeFunction },
         ];
 
         table
     };
 }
 
-pub(super) fn println(args: &[RegisterVal]) -> Result<RegisterVal, String> {
+pub(super) fn println(args: &[RegisterVal]) -> Result<RegisterVal, VMRuntimeError> {
     println!("{}", args[0]);
     Ok(RegisterVal::Null)
 }
 
-pub(super) fn time(_args: &[RegisterVal]) -> Result<RegisterVal, String> {
+pub(super) fn time(_args: &[RegisterVal]) -> Result<RegisterVal, VMRuntimeError> {
     let time = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_secs() as i64,
-        Err(e) => panic!("SystemTime before UNIX EPOCH! {}", e),
+        Err(e) => {
+            return Err(VMRuntimeError::QFFINativeFnError(format!(
+                "SystemTime before UNIX EPOCH! {}",
+                e
+            )))
+        }
     };
     Ok(RegisterVal::Int(time))
 }

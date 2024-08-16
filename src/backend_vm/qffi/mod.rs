@@ -7,15 +7,18 @@ pub mod native_fn;
 
 use std::collections::HashMap;
 
-use native_fn::NATIVE_FUNCTION_TABLE;
+use native_fn::{NativeFunctionEntry, NATIVE_FUNCTION_TABLE};
+
+use crate::errors::VMRuntimeError;
 
 use super::vm::RegisterVal;
 
-pub type NativeFunction = fn(&[RegisterVal]) -> Result<RegisterVal, String>;
-pub type ExternFunction = extern "C" fn(&[RegisterVal]) -> Result<RegisterVal, String>;
+pub type NativeFunction = fn(&[RegisterVal]) -> Result<RegisterVal, VMRuntimeError>;
+pub type ExternFunction = extern "C" fn(&[RegisterVal]) -> Result<RegisterVal, VMRuntimeError>;
 
+#[derive(Debug)]
 pub struct QFFI {
-    native_function_table: Vec<NativeFunction>,
+    native_function_table: Vec<NativeFunctionEntry>,
     extern_function_table: Vec<ExternFunction>,
     extern_libraries: HashMap<String, libloading::Library>,
 }
@@ -59,11 +62,11 @@ impl QFFI {
         &self,
         index: usize,
         args: &[RegisterVal],
-    ) -> Result<RegisterVal, String> {
+    ) -> Result<RegisterVal, VMRuntimeError> {
         if let Some(func) = self.extern_function_table.get(index) {
             func(args)
         } else {
-            Err(format!("Extern function at index {} not found", index))
+            Err(VMRuntimeError::UndefinedQFFIFn(index))
         }
     }
 
@@ -71,11 +74,11 @@ impl QFFI {
         &self,
         index: usize,
         args: &[RegisterVal],
-    ) -> Result<RegisterVal, String> {
+    ) -> Result<RegisterVal, VMRuntimeError> {
         if let Some(func) = self.native_function_table.get(index) {
-            func(args)
+            (func.function)(args)
         } else {
-            Err(format!("Native function at index {} not found", index))
+            Err(VMRuntimeError::UndefinedNativeFn(index))
         }
     }
 }
