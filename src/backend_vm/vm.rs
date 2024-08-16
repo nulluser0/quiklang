@@ -909,226 +909,109 @@ impl VM {
     }
 
     #[inline(always)]
-    fn op_add(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        let arga = get_arga(inst);
-        let argb = get_argb(inst);
-        let argc = get_argc(inst);
-        let offset = self.current_offset();
-
+    fn fetch_values(&self, argb: i32, argc: i32, offset: usize) -> (&RegisterVal, &RegisterVal) {
         let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
+            &self.constant_pool[rk_to_k(argb) as usize]
         } else {
-            self.registers[argb as usize + offset].clone()
+            &self.registers[argb as usize + offset]
         };
         let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
+            &self.constant_pool[rk_to_k(argc) as usize]
         } else {
-            self.registers[argc as usize + offset].clone()
+            &self.registers[argc as usize + offset]
         };
+        (b_val, c_val)
+    }
 
-        match (b_val, c_val) {
-            (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Int(left.wrapping_add(right));
-            }
-            (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left + right);
-            }
-            (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left as f64 + right);
-            }
-            (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left + right as f64);
-            }
-            _ => {}
-        }
-
-        Ok(())
+    #[inline(always)]
+    fn op_add(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        self.perform_op(
+            inst,
+            |left, right| left.wrapping_add(right),
+            |left, right| left + right,
+        )
     }
 
     #[inline(always)]
     fn op_sub(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        let arga = get_arga(inst);
-        let argb = get_argb(inst);
-        let argc = get_argc(inst);
-        let offset = self.current_offset();
-
-        let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
-        } else {
-            self.registers[argb as usize + offset].clone()
-        };
-        let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
-        } else {
-            self.registers[argc as usize + offset].clone()
-        };
-
-        match (b_val, c_val) {
-            (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Int(left.wrapping_sub(right));
-            }
-            (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left - right);
-            }
-            (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left as f64 - right);
-            }
-            (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left - right as f64);
-            }
-            _ => {}
-        }
-
-        Ok(())
+        self.perform_op(
+            inst,
+            |left, right| left.wrapping_sub(right),
+            |left, right| left - right,
+        )
     }
 
     #[inline(always)]
     fn op_mul(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        let arga = get_arga(inst);
-        let argb = get_argb(inst);
-        let argc = get_argc(inst);
-        let offset = self.current_offset();
-
-        let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
-        } else {
-            self.registers[argb as usize + offset].clone()
-        };
-        let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
-        } else {
-            self.registers[argc as usize + offset].clone()
-        };
-
-        match (b_val, c_val) {
-            (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Int(left.wrapping_mul(right));
-            }
-            (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left * right);
-            }
-            (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left as f64 * right);
-            }
-            (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left * right as f64);
-            }
-            _ => {}
-        }
-
-        Ok(())
+        self.perform_op(
+            inst,
+            |left, right| left.wrapping_mul(right),
+            |left, right| left * right,
+        )
     }
 
     #[inline(always)]
     fn op_div(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        let arga = get_arga(inst);
-        let argb = get_argb(inst);
-        let argc = get_argc(inst);
-        let offset = self.current_offset();
-
-        let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
-        } else {
-            self.registers[argb as usize + offset + offset].clone()
-        };
-        let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
-        } else {
-            self.registers[argc as usize + offset].clone()
-        };
-
-        match (b_val, c_val) {
-            (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Int(left.wrapping_div(right));
-            }
-            (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left / right);
-            }
-            (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left as f64 / right);
-            }
-            (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left / right as f64);
-            }
-            _ => {}
-        }
-
-        Ok(())
+        self.perform_op(
+            inst,
+            |left, right| left.wrapping_div(right),
+            |left, right| left / right,
+        )
     }
 
     #[inline(always)]
     fn op_mod(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        let arga = get_arga(inst);
-        let argb = get_argb(inst);
-        let argc = get_argc(inst);
-        let offset = self.current_offset();
-
-        let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
-        } else {
-            self.registers[argb as usize + offset].clone()
-        };
-        let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
-        } else {
-            self.registers[argc as usize + offset].clone()
-        };
-
-        match (b_val, c_val) {
-            (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Int(left.wrapping_rem(right));
-            }
-            (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left % right);
-            }
-            (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left as f64 % right);
-            }
-            (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left % right as f64);
-            }
-            _ => {}
-        }
-
-        Ok(())
+        self.perform_op(
+            inst,
+            |left, right| left.wrapping_rem(right),
+            |left, right| left % right,
+        )
     }
 
     #[inline(always)]
     fn op_pow(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        self.perform_op(
+            inst,
+            |left, right| left.wrapping_pow(right as u32),
+            |left, right| left.powf(right),
+        )
+    }
+
+    #[inline(always)]
+    fn perform_op<FInt, FFloat>(
+        &mut self,
+        inst: Instruction,
+        int_op: FInt,
+        float_op: FFloat,
+    ) -> Result<(), VMRuntimeError>
+    where
+        FInt: FnOnce(i64, i64) -> i64,
+        FFloat: FnOnce(f64, f64) -> f64,
+    {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
         let offset = self.current_offset();
 
-        let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
-        } else {
-            self.registers[argb as usize + offset].clone()
-        };
-        let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
-        } else {
-            self.registers[argc as usize + offset].clone()
-        };
+        let (b_val, c_val) = self.fetch_values(argb, argc, offset);
 
-        match (b_val, c_val) {
+        let result = match (b_val, c_val) {
             (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                self.registers[arga as usize + offset] =
-                    RegisterVal::Int(left.wrapping_pow(right as u32));
+                RegisterVal::Int(int_op(*left, *right))
             }
             (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                self.registers[arga as usize + offset] = RegisterVal::Float(left.powf(right));
+                RegisterVal::Float(float_op(*left, *right))
             }
             (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                self.registers[arga as usize + offset] =
-                    RegisterVal::Float((left as f64).powf(right));
+                RegisterVal::Float(float_op(*left as f64, *right))
             }
             (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                self.registers[arga as usize + offset] =
-                    RegisterVal::Float(left.powf(right as f64));
+                RegisterVal::Float(float_op(*left, *right as f64))
             }
-            _ => {}
-        }
+            _ => return Ok(()), // no-op for unsupported types
+        };
+
+        self.registers[arga as usize + offset] = result;
 
         Ok(())
     }
