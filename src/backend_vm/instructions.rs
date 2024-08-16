@@ -5,7 +5,7 @@
 // sBx     : isize = Signed Displacement
 // PC      : usize = Program
 
-use std::fmt::Display;
+use std::fmt::{format, Display};
 
 /// instruction = 32bit(fixed length)
 ///
@@ -77,7 +77,8 @@ pub const OP_SHR: OpCode = 31; // A B C  R(A) := R(B) >> R(C)
 pub const OP_CONCAT: OpCode = 32; // A B C  R(A) := RK(B) & RK(C)
 pub const OP_DESTRUCTOR: OpCode = 33; // A B C  R(A) where A is a pointer to heap obj, heap obj is destroyed.
 pub const OP_EXIT: OpCode = 34; // A B C  A is exit code, default 0.
-                                // TODO: Add both array, string, hashmap, etc. (Heap-allocated objects) instructions
+pub const OP_CLONE: OpCode = 35; // A B  R(A) := R(B).clone()
+                                 // TODO: Add both array, string, hashmap, etc. (Heap-allocated objects) instructions
 pub const OP_ARRAY_ALLOCATE: OpCode = 34; // A B C  R(A) := allocate_array(b - size)
 pub const OP_HASHMAP_ALLOCATE: OpCode = 35; // A B C  R(A) := allocate_hashmap(b - size)
 pub const OP_HASHSET_ALLOCATE: OpCode = 36; // A B C  R(A) := allocate_hashset(b - size)
@@ -88,7 +89,7 @@ pub const OP_GROWABLE_SET: OpCode = 39; // A B C  growable(A)[R(B)].set(C)
 pub const OP_GROWABLE_GET: OpCode = 40; // A B C  R(A) := growable(B)[R(C)]
 pub const OP_HASHMAP_OR_HASHSET_CONTAINS: OpCode = 41; // A B C  R(A) := hashmap/hashset(B).contains(C)
 pub const OP_GROWABLE_REMOVE: OpCode = 42; // A B C  R(A) := growable(B).remove(R(C))
-pub const OP_NOP: OpCode = 35; // NOP
+pub const OP_NOP: OpCode = 36; // NOP
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum OpArgMode {
@@ -407,6 +408,14 @@ pub static OP_NAMES: &[OpProp; OP_NOP as usize + 1] = &[
         typ: OpType::Abc,
     },
     OpProp {
+        name: "CLONE",
+        is_test: false,
+        set_reg_a: true,
+        mode_arg_b: OpArgMode::RegisterOrJumpOffset,
+        mode_arg_c: OpArgMode::NotUsed,
+        typ: OpType::Abc,
+    },
+    OpProp {
         name: "NOP",
         is_test: false,
         set_reg_a: true,
@@ -594,7 +603,7 @@ pub fn to_string(inst: Instruction) -> String {
     };
 
     match op {
-        OP_MOVE => format!("{} | R({}) := R({}), argb => arga", ops, arga, argb),
+        OP_MOVE => format!("{} | R({}) := R({})", ops, arga, argb),
         OP_LOADCONST => format!("{} | R({}) := Kst({})", ops, arga, argbx),
         OP_LOADBOOL => format!(
             "{} | R({}) := (Bool){}; if ({}) pc++",
@@ -728,6 +737,7 @@ pub fn to_string(inst: Instruction) -> String {
         OP_CONCAT => format!("{} | R({}) := R({}) & R({})", ops, arga, argb, argc),
         OP_DESTRUCTOR => format!("{} | R({}) -> destructor", ops, arga),
         OP_EXIT => format!("{} | std::process::exit({})", ops, arga),
+        OP_CLONE => format!("{} | R({}) := R({}).clone()", ops, arga, argb),
         OP_NOP => ops.to_string(),
         _ => unreachable!(),
     }

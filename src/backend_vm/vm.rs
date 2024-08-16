@@ -1,7 +1,6 @@
 // VM (Register-based)
 
 use std::{
-    cmp::Ordering,
     collections::{HashMap, HashSet},
     hash::Hasher,
     process,
@@ -116,43 +115,43 @@ impl Hash for RegisterVal {
     }
 }
 
-impl PartialOrd for RegisterVal {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (RegisterVal::Int(a), RegisterVal::Int(b)) => a.partial_cmp(b),
-            (RegisterVal::Float(a), RegisterVal::Float(b)) => a.partial_cmp(b),
-            (RegisterVal::Bool(a), RegisterVal::Bool(b)) => a.partial_cmp(b),
-            (RegisterVal::Str(a), RegisterVal::Str(b)) => a.partial_cmp(b),
-            (RegisterVal::Array(a), RegisterVal::Array(b)) => a.partial_cmp(b),
-            (RegisterVal::HashMap(a), RegisterVal::HashMap(b)) => a.len().partial_cmp(&b.len()),
-            (RegisterVal::HashSet(a), RegisterVal::HashSet(b)) => a.len().partial_cmp(&b.len()),
-            (RegisterVal::Null, RegisterVal::Null) => Some(Ordering::Equal),
+// impl PartialOrd for RegisterVal {
+//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+//         match (self, other) {
+//             (RegisterVal::Int(a), RegisterVal::Int(b)) => a.partial_cmp(b),
+//             (RegisterVal::Float(a), RegisterVal::Float(b)) => a.partial_cmp(b),
+//             (RegisterVal::Bool(a), RegisterVal::Bool(b)) => a.partial_cmp(b),
+//             (RegisterVal::Str(a), RegisterVal::Str(b)) => a.partial_cmp(b),
+//             (RegisterVal::Array(a), RegisterVal::Array(b)) => a.partial_cmp(b),
+//             (RegisterVal::HashMap(a), RegisterVal::HashMap(b)) => a.len().partial_cmp(&b.len()),
+//             (RegisterVal::HashSet(a), RegisterVal::HashSet(b)) => a.len().partial_cmp(&b.len()),
+//             (RegisterVal::Null, RegisterVal::Null) => Some(Ordering::Equal),
 
-            // Comparisons between Int and Float
-            (RegisterVal::Int(a), RegisterVal::Float(b)) => (*a as f64).partial_cmp(b),
-            (RegisterVal::Float(a), RegisterVal::Int(b)) => a.partial_cmp(&(*b as f64)),
+//             // Comparisons between Int and Float
+//             (RegisterVal::Int(a), RegisterVal::Float(b)) => (*a as f64).partial_cmp(b),
+//             (RegisterVal::Float(a), RegisterVal::Int(b)) => a.partial_cmp(&(*b as f64)),
 
-            // Define the ordering between different types
-            (RegisterVal::Int(_), _) => Some(Ordering::Less),
-            (_, RegisterVal::Int(_)) => Some(Ordering::Greater),
-            (RegisterVal::Float(_), _) => Some(Ordering::Less),
-            (_, RegisterVal::Float(_)) => Some(Ordering::Greater),
-            (RegisterVal::Bool(_), _) => Some(Ordering::Less),
-            (_, RegisterVal::Bool(_)) => Some(Ordering::Greater),
-            (RegisterVal::Str(_), _) => Some(Ordering::Less),
-            (_, RegisterVal::Str(_)) => Some(Ordering::Greater),
-            (RegisterVal::Array(_), _) => Some(Ordering::Less),
-            (_, RegisterVal::Array(_)) => Some(Ordering::Greater),
-            (RegisterVal::HashMap(_), _) => Some(Ordering::Less),
-            (_, RegisterVal::HashMap(_)) => Some(Ordering::Greater),
-            (RegisterVal::HashSet(_), _) => Some(Ordering::Less),
-            (_, RegisterVal::HashSet(_)) => Some(Ordering::Greater),
-            (RegisterVal::Range(_), RegisterVal::Range(_)) => Some(Ordering::Equal),
-            (RegisterVal::Range(_), RegisterVal::Null) => Some(Ordering::Greater),
-            (RegisterVal::Null, RegisterVal::Range(_)) => Some(Ordering::Less),
-        }
-    }
-}
+//             // Define the ordering between different types
+//             (RegisterVal::Int(_), _) => Some(Ordering::Less),
+//             (_, RegisterVal::Int(_)) => Some(Ordering::Greater),
+//             (RegisterVal::Float(_), _) => Some(Ordering::Less),
+//             (_, RegisterVal::Float(_)) => Some(Ordering::Greater),
+//             (RegisterVal::Bool(_), _) => Some(Ordering::Less),
+//             (_, RegisterVal::Bool(_)) => Some(Ordering::Greater),
+//             (RegisterVal::Str(_), _) => Some(Ordering::Less),
+//             (_, RegisterVal::Str(_)) => Some(Ordering::Greater),
+//             (RegisterVal::Array(_), _) => Some(Ordering::Less),
+//             (_, RegisterVal::Array(_)) => Some(Ordering::Greater),
+//             (RegisterVal::HashMap(_), _) => Some(Ordering::Less),
+//             (_, RegisterVal::HashMap(_)) => Some(Ordering::Greater),
+//             (RegisterVal::HashSet(_), _) => Some(Ordering::Less),
+//             (_, RegisterVal::HashSet(_)) => Some(Ordering::Greater),
+//             (RegisterVal::Range(_), RegisterVal::Range(_)) => Some(Ordering::Equal),
+//             (RegisterVal::Range(_), RegisterVal::Null) => Some(Ordering::Greater),
+//             (RegisterVal::Null, RegisterVal::Range(_)) => Some(Ordering::Less),
+//         }
+//     }
+// }
 
 // A note about converting from bytecode to vm for strings specifically:
 // A constant entry with a string has information we know: its lens and string content.
@@ -197,6 +196,7 @@ const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
         VM::op_concat,
         VM::op_destructor,
         VM::op_exit,
+        VM::op_clone,
         VM::op_nop,
     ]
 }
@@ -348,7 +348,7 @@ impl VM {
         let argb = get_argb(inst);
         let offset = self.current_offset();
 
-        let value = self.registers[argb as usize + offset].clone();
+        let value = std::mem::take(&mut self.registers[argb as usize + offset]);
         self.registers[arga as usize + offset] = value;
 
         Ok(())
@@ -571,141 +571,74 @@ impl VM {
     }
 
     #[inline(always)]
-    fn op_eq(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn perform_comparison<F>(&mut self, inst: Instruction, comp: F) -> Result<(), VMRuntimeError>
+    where
+        F: FnOnce(&RegisterVal, &RegisterVal) -> bool,
+    {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
         let offset = self.current_offset();
 
-        let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
-        } else {
-            self.registers[argb as usize + offset].clone()
-        };
-        let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
-        } else {
-            self.registers[argc as usize + offset].clone()
-        };
+        let (b_val, c_val) = self.fetch_values(argb, argc, offset);
 
-        self.registers[arga as usize] = RegisterVal::Bool(b_val == c_val);
+        self.registers[arga as usize + offset] = RegisterVal::Bool(comp(b_val, c_val));
 
         Ok(())
+    }
+
+    #[inline(always)]
+    fn op_eq(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        self.perform_comparison(inst, |b, c| b == c)
     }
 
     #[inline(always)]
     fn op_ne(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        let arga = get_arga(inst);
-        let argb = get_argb(inst);
-        let argc = get_argc(inst);
-        let offset = self.current_offset();
-
-        let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
-        } else {
-            self.registers[argb as usize + offset].clone()
-        };
-        let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
-        } else {
-            self.registers[argc as usize + offset].clone()
-        };
-
-        self.registers[arga as usize] = RegisterVal::Bool(b_val != c_val);
-
-        Ok(())
+        self.perform_comparison(inst, |b, c| b != c)
     }
 
     #[inline(always)]
     fn op_lt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        let arga = get_arga(inst);
-        let argb = get_argb(inst);
-        let argc = get_argc(inst);
-        let offset = self.current_offset();
-
-        let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
-        } else {
-            self.registers[argb as usize + offset].clone()
-        };
-        let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
-        } else {
-            self.registers[argc as usize + offset].clone()
-        };
-
-        self.registers[arga as usize] = RegisterVal::Bool(b_val < c_val);
-
-        Ok(())
+        self.perform_comparison(inst, |b, c| match (b, c) {
+            (RegisterVal::Int(b), RegisterVal::Int(c)) => b < c,
+            (RegisterVal::Float(b), RegisterVal::Float(c)) => b < c,
+            (RegisterVal::Int(b), RegisterVal::Float(c)) => (*b as f64) < *c,
+            (RegisterVal::Float(b), RegisterVal::Int(c)) => b < &(*c as f64),
+            _ => false,
+        })
     }
 
     #[inline(always)]
     fn op_le(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        let arga = get_arga(inst);
-        let argb = get_argb(inst);
-        let argc = get_argc(inst);
-        let offset = self.current_offset();
-
-        let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
-        } else {
-            self.registers[argb as usize + offset].clone()
-        };
-        let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
-        } else {
-            self.registers[argc as usize + offset].clone()
-        };
-
-        self.registers[arga as usize] = RegisterVal::Bool(b_val <= c_val);
-
-        Ok(())
+        self.perform_comparison(inst, |b, c| match (b, c) {
+            (RegisterVal::Int(b), RegisterVal::Int(c)) => b <= c,
+            (RegisterVal::Float(b), RegisterVal::Float(c)) => b <= c,
+            (RegisterVal::Int(b), RegisterVal::Float(c)) => (*b as f64) <= *c,
+            (RegisterVal::Float(b), RegisterVal::Int(c)) => b <= &(*c as f64),
+            _ => false,
+        })
     }
 
     #[inline(always)]
     fn op_gt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        let arga = get_arga(inst);
-        let argb = get_argb(inst);
-        let argc = get_argc(inst);
-        let offset = self.current_offset();
-
-        let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
-        } else {
-            self.registers[argb as usize + offset].clone()
-        };
-        let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
-        } else {
-            self.registers[argc as usize + offset].clone()
-        };
-
-        self.registers[arga as usize] = RegisterVal::Bool(b_val > c_val);
-
-        Ok(())
+        self.perform_comparison(inst, |b, c| match (b, c) {
+            (RegisterVal::Int(b), RegisterVal::Int(c)) => b > c,
+            (RegisterVal::Float(b), RegisterVal::Float(c)) => b > c,
+            (RegisterVal::Int(b), RegisterVal::Float(c)) => (*b as f64) > *c,
+            (RegisterVal::Float(b), RegisterVal::Int(c)) => b > &(*c as f64),
+            _ => false,
+        })
     }
 
     #[inline(always)]
     fn op_ge(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        let arga = get_arga(inst);
-        let argb = get_argb(inst);
-        let argc = get_argc(inst);
-        let offset = self.current_offset();
-
-        let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
-        } else {
-            self.registers[argb as usize + offset].clone()
-        };
-        let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
-        } else {
-            self.registers[argc as usize + offset].clone()
-        };
-
-        self.registers[arga as usize] = RegisterVal::Bool(b_val >= c_val);
-
-        Ok(())
+        self.perform_comparison(inst, |b, c| match (b, c) {
+            (RegisterVal::Int(b), RegisterVal::Int(c)) => b >= c,
+            (RegisterVal::Float(b), RegisterVal::Float(c)) => b >= c,
+            (RegisterVal::Int(b), RegisterVal::Float(c)) => (*b as f64) >= *c,
+            (RegisterVal::Float(b), RegisterVal::Int(c)) => b >= &(*c as f64),
+            _ => false,
+        })
     }
 
     #[inline(always)]
@@ -733,8 +666,9 @@ impl VM {
     fn op_jump_if_false(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argsbx = get_argsbx(inst);
+        let offset = self.current_offset();
 
-        if let RegisterVal::Bool(false) = self.registers[arga as usize] {
+        if let RegisterVal::Bool(false) = self.registers[arga as usize + offset] {
             self.program_counter = (self.program_counter as i32 + argsbx) as usize;
         }
 
@@ -971,6 +905,18 @@ impl VM {
         let arga = get_arga(inst);
 
         process::exit(arga)
+    }
+
+    #[inline(always)]
+    fn op_clone(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let offset = self.current_offset();
+
+        let value = self.registers[argb as usize + offset].clone();
+        self.registers[arga as usize + offset] = value;
+
+        Ok(())
     }
 
     #[inline(always)]

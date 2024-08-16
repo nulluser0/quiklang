@@ -5,9 +5,9 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     backend_vm::{
         instructions::{
-            rk_ask, ABx, ASBx, Abc, OP_ADD, OP_AND, OP_CALL, OP_DIV, OP_EQ, OP_GE, OP_GT, OP_JUMP,
-            OP_JUMP_IF_FALSE, OP_LE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LT, OP_MOD,
-            OP_MOVE, OP_MUL, OP_NE, OP_NOT, OP_OR, OP_SUB,
+            rk_ask, ABx, ASBx, Abc, OP_ADD, OP_AND, OP_CALL, OP_CLONE, OP_DIV, OP_EQ, OP_GE, OP_GT,
+            OP_JUMP, OP_JUMP_IF_FALSE, OP_LE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LT,
+            OP_MOD, OP_MOVE, OP_MUL, OP_NE, OP_NOT, OP_OR, OP_SUB,
         },
         vm::RegisterVal,
     },
@@ -148,6 +148,7 @@ impl Compiler {
             }
             other => {
                 // No special ident_keyword. Instead, match symbol table.
+                // TODO: manage whether to clone or give a reference.
                 Ok(ReturnValue::Normal(
                     symbol_table
                         .borrow()
@@ -171,7 +172,7 @@ impl Compiler {
         let reassigned = self
             .compile_expression(expr, true, true, None, symbol_table)?
             .safe_unwrap();
-        self.add_instruction(Abc(OP_MOVE, reg as i32, reassigned as i32, 0)); // NOTE: Move is a glorified "clone". Move may be replcaed by a real move, and a clone OP might be added.
+        self.add_instruction(Abc(OP_CLONE, reg as i32, reassigned as i32, 0));
         Ok(ReturnValue::Normal(reg))
     }
 
@@ -249,7 +250,7 @@ impl Compiler {
             let reg = self
                 .compile_expression(arg.0, true, true, None, symbol_table)?
                 .safe_unwrap();
-            self.add_instruction(Abc(OP_MOVE, arg_reg as i32, reg as i32, 0))
+            self.add_instruction(Abc(OP_CLONE, arg_reg as i32, reg as i32, 0))
         }
 
         // Call function
