@@ -241,4 +241,7 @@ pub enum VMRuntimeError {
 
     #[error("QFFI/Native Function Error: {0}")]
     QFFINativeFnError(String),
+
+    #[error("{0}")]
+    Exit(i32),
 }

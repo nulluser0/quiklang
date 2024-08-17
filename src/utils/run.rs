@@ -1,9 +1,9 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, process, rc::Rc};
 
 use crate::{
     backend_interpreter::{environment::Environment, interpreter::evaluate},
     backend_vm::{bytecode_compiler::compiler::Compiler, vm::VM},
-    errors::{self, Error},
+    errors::{self, Error, VMRuntimeError},
     frontend::{parser, type_environment::TypeEnvironment},
 };
 
@@ -20,10 +20,14 @@ pub fn run_vm_repl(
             Ok(bytecode) => {
                 vm.constant_pool = bytecode.constants;
                 vm.instructions = bytecode.instructions;
-                if let Err(e) = vm.execute() {
-                    print_e(errors::Error::VMRuntimeError(e));
-                    vm.on_error_cleanup();
-                    println!("Please use 'drain' to reset VM, parser, and compiler.")
+                match vm.execute() {
+                    Ok(_) => {}
+                    Err(VMRuntimeError::Exit(code)) => println!("Exited with code: {}", code),
+                    Err(e) => {
+                        print_e(errors::Error::VMRuntimeError(e));
+                        vm.on_error_cleanup();
+                        println!("Please use 'drain' to reset VM, parser, and compiler.")
+                    }
                 }
             }
             Err(e) => {
@@ -46,9 +50,13 @@ pub fn run_vm(
             match compiler.compile(program.statements) {
                 Ok(bytecode) => {
                     let mut vm = VM::from_bytecode(bytecode);
-                    if let Err(e) = vm.execute() {
-                        print_e(errors::Error::VMRuntimeError(e));
-                        vm.on_error_cleanup();
+                    match vm.execute() {
+                        Ok(_) => {}
+                        Err(VMRuntimeError::Exit(code)) => process::exit(code),
+                        Err(e) => {
+                            print_e(errors::Error::VMRuntimeError(e));
+                            vm.on_error_cleanup();
+                        }
                     }
                 }
                 Err(e) => {

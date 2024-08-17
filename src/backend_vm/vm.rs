@@ -898,7 +898,7 @@ impl VM {
     fn op_exit(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
 
-        process::exit(arga)
+        Err(VMRuntimeError::Exit(arga))
     }
 
     #[inline(always)]
