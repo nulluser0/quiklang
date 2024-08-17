@@ -186,7 +186,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let target_dir = format!("{}/target/{}", quiklang_name, target);
             let new_target_dir = format!("target/{}", target);
             fs::create_dir_all(&new_target_dir).expect("Failed to create target directory");
-            fs::rename(target_dir, new_target_dir).expect("Failed to move target directory");
+            fs::copy(&target_dir, new_target_dir).expect("Failed to copy target directory");
+            fs::remove_dir_all(target_dir).expect("Failed to remove target directory");
         }
     }
 
