@@ -130,44 +130,6 @@ impl Hash for RegisterVal {
     }
 }
 
-// impl PartialOrd for RegisterVal {
-//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-//         match (self, other) {
-//             (RegisterVal::Int(a), RegisterVal::Int(b)) => a.partial_cmp(b),
-//             (RegisterVal::Float(a), RegisterVal::Float(b)) => a.partial_cmp(b),
-//             (RegisterVal::Bool(a), RegisterVal::Bool(b)) => a.partial_cmp(b),
-//             (RegisterVal::Str(a), RegisterVal::Str(b)) => a.partial_cmp(b),
-//             (RegisterVal::Array(a), RegisterVal::Array(b)) => a.partial_cmp(b),
-//             (RegisterVal::HashMap(a), RegisterVal::HashMap(b)) => a.len().partial_cmp(&b.len()),
-//             (RegisterVal::HashSet(a), RegisterVal::HashSet(b)) => a.len().partial_cmp(&b.len()),
-//             (RegisterVal::Null, RegisterVal::Null) => Some(Ordering::Equal),
-
-//             // Comparisons between Int and Float
-//             (RegisterVal::Int(a), RegisterVal::Float(b)) => (*a as f64).partial_cmp(b),
-//             (RegisterVal::Float(a), RegisterVal::Int(b)) => a.partial_cmp(&(*b as f64)),
-
-//             // Define the ordering between different types
-//             (RegisterVal::Int(_), _) => Some(Ordering::Less),
-//             (_, RegisterVal::Int(_)) => Some(Ordering::Greater),
-//             (RegisterVal::Float(_), _) => Some(Ordering::Less),
-//             (_, RegisterVal::Float(_)) => Some(Ordering::Greater),
-//             (RegisterVal::Bool(_), _) => Some(Ordering::Less),
-//             (_, RegisterVal::Bool(_)) => Some(Ordering::Greater),
-//             (RegisterVal::Str(_), _) => Some(Ordering::Less),
-//             (_, RegisterVal::Str(_)) => Some(Ordering::Greater),
-//             (RegisterVal::Array(_), _) => Some(Ordering::Less),
-//             (_, RegisterVal::Array(_)) => Some(Ordering::Greater),
-//             (RegisterVal::HashMap(_), _) => Some(Ordering::Less),
-//             (_, RegisterVal::HashMap(_)) => Some(Ordering::Greater),
-//             (RegisterVal::HashSet(_), _) => Some(Ordering::Less),
-//             (_, RegisterVal::HashSet(_)) => Some(Ordering::Greater),
-//             (RegisterVal::Range(_), RegisterVal::Range(_)) => Some(Ordering::Equal),
-//             (RegisterVal::Range(_), RegisterVal::Null) => Some(Ordering::Greater),
-//             (RegisterVal::Null, RegisterVal::Range(_)) => Some(Ordering::Less),
-//         }
-//     }
-// }
-
 // A note about converting from bytecode to vm for strings specifically:
 // A constant entry with a string has information we know: its lens and string content.
 // Since the VM has a String pool for strings, the string would:
@@ -297,16 +259,6 @@ impl VM {
             *bytecode.register_count() as usize,
         )
     }
-
-    // pub fn set_max_register(&mut self, num_registers: usize) {
-    //     if num_registers > self.registers.len() {
-    //         // Extend the registers vector with default values
-    //         self.registers.resize(num_registers, RegisterVal::Null);
-    //     } else {
-    //         // Truncate the registers vector
-    //         self.registers.truncate(num_registers);
-    //     }
-    // }
 
     #[inline(always)]
     fn fetch_instruction(&self) -> Instruction {
