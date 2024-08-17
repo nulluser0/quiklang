@@ -251,11 +251,14 @@ impl Compiler {
 
         // Allocate and compile arguments
         for arg in args {
-            let arg_reg = self.allocate_register();
+            let arg_reg = self.reg_top();
             let reg = self
                 .compile_expression(arg.0, true, true, None, symbol_table)?
                 .safe_unwrap();
-            self.add_instruction(Abc(OP_CLONE, arg_reg as i32, reg as i32, 0))
+            if arg_reg as isize != reg {
+                self.add_instruction(Abc(OP_CLONE, arg_reg as i32, reg as i32, 0))
+            }
+            self.allocate_register();
         }
 
         // Call function
