@@ -40,11 +40,16 @@ fn run() {
 
     let targets = vec![
         "x86_64-unknown-linux-gnu",
-        "aarch64-unknown-linux-gnu",
         "x86_64-apple-darwin",
-        "aarch64-apple-darwin",
         "x86_64-pc-windows-msvc",
+        "x86_64-pc-windows-gnu",
+        "aarch64-unknown-linux-gnu",
+        "aarch64-apple-darwin",
         "aarch64-pc-windows-msvc",
+        "aarch64-pc-windows-gnu",
+        "i686-unknown-linux-gnu",
+        "i686-pc-windows-msvc",
+        "i686-pc-windows-gnu",
     ];
 
     // Select targets
@@ -180,14 +185,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // 6. Move target directory out of the project and delete the project
-    println!("\n{}", "Moving executables...".yellow().bold());
-    for (target, success) in build_results {
-        if success {
-            let target_dir = format!("{}/target/{}", quiklang_name, target);
-            let new_target_dir = format!("target/{}", target);
-            fs::create_dir_all(&new_target_dir).expect("Failed to create target directory");
-            fs::copy(&target_dir, new_target_dir).expect("Failed to copy target directory");
-            fs::remove_dir_all(target_dir).expect("Failed to remove target directory");
+    #[cfg(not(windows))]
+    {
+        println!("\n{}", "Moving executables...".yellow().bold());
+        for (target, success) in build_results {
+            if success {
+                let target_dir = format!("{}/target/{}", quiklang_name, target);
+                let new_target_dir = format!("target/{}", target);
+                fs::create_dir_all(&new_target_dir).expect("Failed to create target directory");
+                fs::rename(&target_dir, new_target_dir).expect("Failed to move target directory");
+            }
         }
     }
 
@@ -195,10 +202,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n{}", "Cleaning up...".yellow().bold());
     fs::remove_file(rust_path).expect("Failed to remove temporary main.rs");
     fs::remove_file(qlbc_temp_path).expect("Failed to remove temporary qbin file");
-    fs::remove_dir_all(quiklang_name).expect("Failed to remove temporary rust project directory");
+    #[cfg(not(windows))]
+    {
+        fs::remove_dir_all(quiklang_name)
+            .expect("Failed to remove temporary rust project directory");
+    }
 
     println!("{}", "Done!".green().bold());
-    println!("You can find the executables in the current directory at ./target");
+    #[cfg(windows)]
+    {
+        println!(
+            "You can find the executables in the current directory at ./{}/target",
+            quiklang_name
+        );
+    }
+    #[cfg(not(windows))]
+    {
+        println!("You can find the executables in the current directory at ./target");
+    }
 }
 
 fn check_rust_and_cargo_versions() {
