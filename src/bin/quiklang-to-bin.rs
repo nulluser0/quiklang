@@ -104,6 +104,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let qlbc_temp_path = "temp_qlbc_file.qlbc";
     fs::write(qlbc_temp_path, qlbc_data).expect("Failed to write temporary qbin file.");
 
+    // If dir exists, request user to either delete/rename dir to make way for dir, or abort operation
+    if fs::metadata(quiklang_name).is_ok() {
+        let response: String = Input::new()
+            .with_prompt(format!(
+                "Directory {} already exists. Do you want to delete it? (y/n)",
+                quiklang_name
+            ))
+            .interact_text()
+            .expect("Failed to read input");
+
+        if response.to_lowercase() == "y" {
+            fs::remove_dir_all(quiklang_name).expect("Failed to remove existing directory");
+        } else {
+            println!("Aborting operation.");
+            return;
+        }
+    }
+
     // 2. Create new rust project
     Command::new("cargo")
         .args(["new", "--bin", quiklang_name])
