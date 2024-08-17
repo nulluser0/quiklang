@@ -82,7 +82,7 @@ impl Compiler {
         } else {
             reg = self.allocate_register() as isize;
         }
-        symbol_table.borrow_mut().declare_var(name, reg as isize);
+        symbol_table.borrow_mut().declare_var(name, reg);
         Ok(ReturnValue::Normal(reg))
     }
 
