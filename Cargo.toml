@@ -8,7 +8,9 @@ quiklang-vm-version = 1
 
 [dependencies]
 byteorder = "1.5.0"
+colored = "2.1.0"
 criterion = "0.5.1"
+dialoguer = "0.11.0"
 lazy_static = "1.5.0"
 libloading = "0.8.5"
 rustyline = "9.0.0"
@@ -28,6 +30,10 @@ path = "src/bin/quiklang.rs"
 [[bin]]
 name = "quiklangc"
 path = "src/bin/quiklangc.rs"
+
+[[bin]]
+name = "quiklang-to-bin"
+path = "src/bin/quiklang-to-bin.rs"
 
 [profile.release]
 lto = "fat"
