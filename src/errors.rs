@@ -193,8 +193,11 @@ pub enum ParserError {
     #[error("at position {0}:{1}: Cannot resolve non-existent function '{2}'")]
     UndefinedFunction(usize, usize, String),
 
-    #[error("at position {0}:{1}: Function call on non-identifier.")]
-    InvalidFunctionCall(usize, usize),
+    #[error("at position {0}:{1}: Function call on non-identifier")]
+    FunctionCallOnNonIdent(usize, usize),
+
+    #[error("at position {0}:{1}: Function call on non-function identifier '{2}'")]
+    FunctionCallOnNonFunction(usize, usize, String),
 }
 
 // Interpreter-specific Errors

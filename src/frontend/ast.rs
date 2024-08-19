@@ -269,7 +269,7 @@ impl ParsetimeType for Expr {
                         ))
                     }
                 } else {
-                    Err(ParserError::InvalidFunctionCall(line, col))
+                    Err(ParserError::FunctionCallOnNonIdent(line, col))
                 }
             }
             Expr::Member(_, _) => todo!("IMPLEMENT MEMBER RETURN TYPES!"), // flagged for removal sometime after new impl of datatypes

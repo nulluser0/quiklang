@@ -1031,7 +1031,7 @@ impl Parser {
                     }
                 }
             } else {
-                return Err(ParserError::UndefinedFunction(
+                return Err(ParserError::FunctionCallOnNonFunction(
                     self.at().line,
                     self.at().col,
                     fn_name.clone(),
