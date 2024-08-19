@@ -1,3 +1,38 @@
+//! This module contains the error types used in the application.
+//!
+//! The error types are organized into different enums based on their usage:
+//! - `Error`: Universal errors used by functions like `produce_ast()`.
+//! - `LexerError`: Lexer-specific errors.
+//! - `ParserError`: Parser-specific errors.
+//! - `InterpreterError`: Interpreter-specific errors.
+//! - `VMCompileError`: VM compile-specific errors.
+//! - `VMBytecodeError`: VM bytecode-specific errors.
+//! - `VMRuntimeError`: VM runtime-specific errors.
+//!
+//! Each error enum provides detailed error messages for different scenarios.
+//! The error messages include information such as the position of the error,
+//! expected and found values, and specific error descriptions.
+//!
+//! The error types are implemented using the `thiserror` crate, which allows
+//! for easy generation of error types with custom error messages.
+//!
+//! Example usage:
+//!
+//! ```rust
+//! use crate::errors::{Error, LexerError};
+//!
+//! fn tokenize(input: &str) -> Result<Vec<Token>, Error> {
+//!     // Tokenize the input
+//!     // ...
+//!     // If an error occurs during tokenization, return a LexerError
+//!     Err(Error::LexerError(LexerError::UnrecognizedCharacter {
+//!         character: '!',
+//!         line: 1,
+//!         col: 5,
+//!     }))
+//! }
+//! ```
+
 use thiserror::Error;
 
 use crate::{
