@@ -77,6 +77,16 @@ fn setup_type_env(type_env: &mut TypeEnvironment) -> Result<(), ParserError> {
     )?;
 
     type_env.declare_fn(
+        "panic",
+        Type::Function(vec![(Type::Any, false)], Box::new(Type::Null)),
+        &Token {
+            token: TokenType::EOF,
+            line: 0,
+            col: 0,
+        },
+    )?;
+
+    type_env.declare_fn(
         "forget",
         Type::Function(vec![(Type::Any, false)], Box::new(Type::Null)),
         &Token {

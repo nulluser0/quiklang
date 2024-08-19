@@ -271,8 +271,8 @@ pub enum VMRuntimeError {
     #[error("STACK UNDERFLOW")]
     StackUnderflow,
 
-    #[error("Invalid Opcode: {0}")]
-    InvalidOpcode(i32),
+    #[error("Invalid Opcode '{0} ({0:#x})' at program counter {1}. Indicative of: \nVM bug, \nCorrupted Bytecode, \nInvalid Bytecode, \nInvalid VM state, \nIncompatible bytecode. \nTry recompiling the source code, or report this issue.")]
+    InvalidOpcode(i32, usize),
 
     #[error("Native Function not found at index {0}.")]
     UndefinedNativeFn(usize),
@@ -282,6 +282,9 @@ pub enum VMRuntimeError {
 
     #[error("QFFI/Native Function Error: {0}")]
     QFFINativeFnError(String),
+
+    #[error("Panic: {0}")]
+    Panic(String),
 
     #[error("{0}")]
     Exit(i32),

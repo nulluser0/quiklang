@@ -18,6 +18,7 @@ lazy_static! {
         let table = vec![
             NativeFunctionEntry { name: "println", function: println as NativeFunction },
             NativeFunctionEntry { name: "time", function: time as NativeFunction },
+            NativeFunctionEntry { name: "panic", function: panic as NativeFunction },
         ];
 
         table
@@ -40,4 +41,11 @@ pub(super) fn time(_args: &[RegisterVal]) -> Result<RegisterVal, VMRuntimeError>
         }
     };
     Ok(RegisterVal::Int(time))
+}
+
+pub(super) fn panic(args: &[RegisterVal]) -> Result<RegisterVal, VMRuntimeError> {
+    Err(VMRuntimeError::QFFINativeFnError(format!(
+        "Panic: {}",
+        args[0]
+    )))
 }

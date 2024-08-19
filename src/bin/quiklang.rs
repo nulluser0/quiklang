@@ -2,9 +2,10 @@ use std::{cell::RefCell, fs::File, io::Read, process, rc::Rc};
 
 use quiklang::{
     backend_interpreter::environment::Environment,
-    backend_vm::{bytecode_compiler::compiler::Compiler, vm::VM},
+    backend_vm::{bytecode::ByteCode, bytecode_compiler::compiler::Compiler, vm::VM},
+    errors::{self, VMRuntimeError},
     frontend::type_environment::TypeEnvironment,
-    utils::run::{run_interpreter, run_vm, run_vm_repl},
+    utils::run::{print_e, run_interpreter, run_vm, run_vm_repl},
 };
 use rustyline::{error::ReadlineError, Config, Editor};
 
@@ -73,18 +74,44 @@ fn run_file_vm(file_path: &str) {
         }
     };
 
-    let mut content = String::new();
-    if let Err(e) = file.read_to_string(&mut content) {
-        println!("Error reading file {}: {}", file_path, e);
-        process::exit(1);
+    if file_path.ends_with(".qlbc") {
+        // Read the file as binary data
+        let mut content = Vec::new();
+        if let Err(e) = file.read_to_end(&mut content) {
+            println!("Error reading file {}: {}", file_path, e);
+            process::exit(1);
+        }
+
+        // Decode and run bytecode
+        let bytecode = ByteCode::decode(&content).unwrap_or_else(|e| {
+            println!("Bytecode decode error: {}", e);
+            process::exit(1);
+        });
+
+        let mut vm = VM::from_bytecode(bytecode);
+        match vm.execute() {
+            Ok(_) => {}
+            Err(VMRuntimeError::Exit(code)) => process::exit(code),
+            Err(e) => {
+                print_e(errors::Error::VMRuntimeError(e));
+                vm.on_error_cleanup();
+            }
+        }
+    } else {
+        // Read the file as a UTF-8 string
+        let mut content = String::new();
+        if let Err(e) = file.read_to_string(&mut content) {
+            println!("Error reading file {}: {}", file_path, e);
+            process::exit(1);
+        }
+
+        let root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
+        let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+            root_type_env.clone(),
+        )));
+
+        run_vm(content, &type_env, &root_type_env);
     }
-
-    let root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
-    let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
-        root_type_env.clone(),
-    )));
-
-    run_vm(content, &type_env, &root_type_env);
 }
 
 fn repl_vm() {

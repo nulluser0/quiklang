@@ -97,6 +97,6 @@ pub fn run_interpreter(
     }
 }
 
-fn print_e(e: Error) {
+pub fn print_e(e: Error) {
     println!("E: {}", e);
 }
