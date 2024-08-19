@@ -576,7 +576,7 @@ pub fn rk_to_k(v: i32) -> i32 {
 pub fn to_string(inst: Instruction) -> String {
     let op = get_opcode(inst);
     if op > OP_NOP {
-        return String::new();
+        return "##### !INVALID OPCODE!".to_string();
     }
 
     let prop = OP_NAMES[op as usize];

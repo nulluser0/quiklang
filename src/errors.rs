@@ -271,6 +271,9 @@ pub enum VMRuntimeError {
     #[error("STACK UNDERFLOW")]
     StackUnderflow,
 
+    #[error("Invalid Opcode: {0}")]
+    InvalidOpcode(i32),
+
     #[error("Native Function not found at index {0}.")]
     UndefinedNativeFn(usize),
 

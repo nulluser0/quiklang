@@ -306,6 +306,9 @@ impl VM {
             // self.execute_instruction(self.fetch_instruction());
             let inst = self.fetch_instruction();
             let opcode = get_opcode(inst);
+            if opcode as usize >= DISPATCH_TABLE.len() {
+                return Err(VMRuntimeError::InvalidOpcode(opcode));
+            }
             DISPATCH_TABLE[opcode as usize](self, inst)?;
             self.program_counter += 1;
         }
