@@ -1,5 +1,5 @@
-might as well make this public idk
+# Quiklang
 
-cool programming language made in rust
+A fast, simple, strongly-typed, and easy-to-use programming language.
 
-is interpreted, but planning on making it source code -> bytecode -> stuff
+Quiklang is an universal programming language that is designed to be fast, simple, and easy to use.
