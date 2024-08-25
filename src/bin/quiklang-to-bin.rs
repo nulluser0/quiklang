@@ -35,6 +35,13 @@ fn run() {
 
     let quiklang_name: String = Input::new()
         .with_prompt("Enter the name of executables")
+        .validate_with(|input: &String| -> Result<(), &str> {
+            if input.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+                Ok(())
+            } else {
+                Err("Invalid package name. Only alphanumeric characters and hyphens are allowed.")
+            }
+        })
         .interact_text()
         .expect("Failed to read input");
 
