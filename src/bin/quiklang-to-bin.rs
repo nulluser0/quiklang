@@ -34,7 +34,7 @@ fn run() {
         .expect("Failed to read input");
 
     let quiklang_name: String = Input::new()
-        .with_prompt("Enter the name of executables:")
+        .with_prompt("Enter the name of executables")
         .interact_text()
         .expect("Failed to read input");
 
@@ -56,7 +56,7 @@ fn run() {
     let selected_targets = MultiSelect::new()
         .with_prompt(format!(
             "Select the target Rust platforms. {}",
-            "[SPACE] to select. [ENTER] to submit".bright_black()
+            "[SPACE] to select. [ENTER] to submit. The next prompt allows input for additional targets.".bright_black()
         ))
         .items(&targets)
         .interact()
@@ -64,7 +64,24 @@ fn run() {
 
     let selected_targets: Vec<&str> = selected_targets.iter().map(|&i| targets[i]).collect();
 
-    check_and_install_targets(&selected_targets);
+    let custom_targets: Vec<String> = Input::<String>::new()
+        .with_prompt(format!(
+            "Enter custom target platforms (separated by commas). {}",
+            "Example: 'wasm32-unknown-unknown'. Leave blank if none".bright_black()
+        ))
+        .interact_text()
+        .expect("Failed to read input")
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .collect();
+
+    let all_targets: Vec<&str> = selected_targets
+        .iter()
+        .copied()
+        .chain(custom_targets.iter().map(|s| s.as_str()))
+        .collect();
+
+    check_and_install_targets(&all_targets);
 
     println!();
 
@@ -72,10 +89,14 @@ fn run() {
     println!("Executable name: {}", quiklang_name.bold().yellow());
     println!(
         "Selected targets: {}",
-        selected_targets.join(", ").bold().yellow()
+        all_targets.join(", ").bold().yellow()
     );
 
-    compile_quiklang_code(&quiklang_name, &file_name, &selected_targets);
+    if all_targets.is_empty() {
+        println!("{}", "No targets selected. Aborting operation.".red());
+        return;
+    }
+    compile_quiklang_code(&quiklang_name, &file_name, &all_targets);
 }
 
 fn compile_quiklang_code(quiklang_name: &str, file_name: &str, selected_targets: &[&str]) {
