@@ -272,7 +272,7 @@ fn check_and_install_targets(targets: &[&str]) {
     let installed_targets = String::from_utf8_lossy(&installed_targets_output.stdout);
 
     for target in targets {
-        if !installed_targets.contains(target) {
+        if !installed_targets.contains(target) && !target.trim().is_empty() {
             println!(
                 "Target {} is not installed. Installing...",
                 target.bright_red()
