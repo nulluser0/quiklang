@@ -36,10 +36,10 @@ fn run() {
     let quiklang_name: String = Input::new()
         .with_prompt("Enter the name of executables")
         .validate_with(|input: &String| -> Result<(), &str> {
-            if input.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+            if input.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
                 Ok(())
             } else {
-                Err("Invalid package name. Only alphanumeric characters and hyphens are allowed.")
+                Err("Invalid package name. Only alphanumeric characters, hyphens, and underscores are allowed.")
             }
         })
         .interact_text()
@@ -74,13 +74,14 @@ fn run() {
     let custom_targets: Vec<String> = Input::<String>::new()
         .with_prompt(format!(
             "Enter custom target platforms (separated by commas). {}",
-            "Example: 'wasm32-unknown-unknown'. Leave blank if none".bright_black()
+            "Example: 'wasm32-unknown-unknown'. Leave empty for none".bright_black()
         ))
         .allow_empty(true)
         .interact_text()
         .expect("Failed to read input")
         .split(',')
         .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
         .collect();
 
     let all_targets: Vec<&str> = selected_targets
