@@ -69,6 +69,7 @@ fn run() {
             "Enter custom target platforms (separated by commas). {}",
             "Example: 'wasm32-unknown-unknown'. Leave blank if none".bright_black()
         ))
+        .allow_empty(true)
         .interact_text()
         .expect("Failed to read input")
         .split(',')
