@@ -166,6 +166,13 @@ fn repl_vm() {
                     continue;
                 }
 
+                if trimmed_line == "debug" {
+                    println!("VM: {:?}", vm);
+                    println!("Compiler: {:?}", compiler);
+                    println!("Symbol Table: {:?}", symbol_table);
+                    continue;
+                }
+
                 run_vm_repl(
                     trimmed_line.to_string(),
                     &type_env,

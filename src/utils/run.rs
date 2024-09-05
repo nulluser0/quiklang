@@ -23,19 +23,20 @@ pub fn run_vm_repl(
     match parser.produce_ast(input, type_env, root_type_env) {
         Ok(program) => {
             match compiler.compile(program.statements, symbol_table, root_symbol_table) {
-                Ok(bytecode) => {
+                Ok(mut bytecode) => {
                     vm.constant_pool = bytecode.constants;
-                    vm.instructions = bytecode.instructions;
+                    vm.program_counter = if !bytecode.instructions.is_empty() {
+                        vm.instructions.len()
+                    } else {
+                        vm.program_counter
+                    };
+                    vm.instructions.append(&mut bytecode.instructions);
                     vm.function_indexes = bytecode
                         .qlang_functions
                         .iter()
                         .map(|f| *f as usize)
                         .collect::<Vec<usize>>()
                         .clone();
-                    // Program counter is set to the end since new instructions are added to the end.
-                    if vm.program_counter < vm.instructions.len() && vm.program_counter != 0 {
-                        vm.program_counter = vm.instructions.len();
-                    }
                     match vm.execute() {
                         Ok(_) => {}
                         Err(VMRuntimeError::Exit(code)) => println!("Exited with code: {}", code),

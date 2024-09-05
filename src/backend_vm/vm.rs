@@ -302,7 +302,6 @@ impl VM {
 
     pub fn execute(&mut self) -> Result<(), VMRuntimeError> {
         while self.program_counter < self.instructions.len() {
-            // println!("{}", self.program_counter);
             // self.execute_instruction(self.fetch_instruction());
             let inst = self.fetch_instruction();
             let opcode = get_opcode(inst);
