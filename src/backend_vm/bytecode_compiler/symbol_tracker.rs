@@ -5,7 +5,7 @@ use std::{borrow::BorrowMut, cell::RefCell, collections::HashMap, rc::Rc};
 use crate::backend_vm::qffi::native_fn::NATIVE_FUNCTION_TABLE;
 
 #[derive(Debug, Clone)]
-pub(super) struct SymbolTable {
+pub struct SymbolTable {
     vars: HashMap<String, isize>, // Symbol name, register location. -ve values indicate QFFI function.
     parent: Option<Rc<RefCell<SymbolTable>>>,
 }

@@ -126,6 +126,11 @@ fn repl_vm() {
         root_type_env.clone(),
     )));
 
+    let root_symbol_table: &Rc<RefCell<SymbolTable>> = &Rc::new(RefCell::new(SymbolTable::new()));
+    let symbol_table: &Rc<RefCell<SymbolTable>> = &Rc::new(RefCell::new(
+        SymbolTable::new_with_parent(root_symbol_table.clone()),
+    ));
+
     let config = Config::builder().build();
     let mut rl = Editor::<()>::with_config(config);
 
@@ -163,6 +168,8 @@ fn repl_vm() {
                     &root_type_env,
                     &mut compiler,
                     &mut vm,
+                    symbol_table,
+                    root_symbol_table,
                 );
             }
             Err(ReadlineError::Interrupted) => {

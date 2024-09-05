@@ -96,7 +96,7 @@ fn compile(file_path: &str) -> ByteCode {
     };
 
     let mut compiler = Compiler::new();
-    match compiler.compile(program.statements) {
+    match compiler.compile_no_symbol_table_input(program.statements) {
         Ok(result) => result,
         Err(e) => {
             println!("{}", e);

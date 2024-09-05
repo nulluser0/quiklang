@@ -151,18 +151,30 @@ impl Compiler {
     //     self.instructions.pop()
     // }
 
-    pub fn compile(&mut self, stmts: Vec<Stmt>) -> Result<ByteCode, VMCompileError> {
+    pub fn compile_no_symbol_table_input(
+        &mut self,
+        stmts: Vec<Stmt>,
+    ) -> Result<ByteCode, VMCompileError> {
+        let root_symbol_table: &Rc<RefCell<SymbolTable>> =
+            &Rc::new(RefCell::new(SymbolTable::new()));
+        let symbol_table: &Rc<RefCell<SymbolTable>> = &Rc::new(RefCell::new(
+            SymbolTable::new_with_parent(root_symbol_table.clone()),
+        ));
+        self.compile(stmts, symbol_table, root_symbol_table)
+    }
+
+    pub fn compile(
+        &mut self,
+        stmts: Vec<Stmt>,
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+        _root_symbol_table: &Rc<RefCell<SymbolTable>>,
+    ) -> Result<ByteCode, VMCompileError> {
         let metadata = BCMetadata {
             ql_version: str_to_byte_array(env!("CARGO_PKG_VERSION")),
             ql_vm_ver: env!("QUIKLANG_VM_VERSION").parse().unwrap(),
             flags: 0,
         };
 
-        let root_symbol_table: &Rc<RefCell<SymbolTable>> =
-            &Rc::new(RefCell::new(SymbolTable::new()));
-        let symbol_table: &Rc<RefCell<SymbolTable>> = &Rc::new(RefCell::new(
-            SymbolTable::new_with_parent(root_symbol_table.clone()),
-        ));
         // Generate bytecode from AST
         self.compile_statements(stmts, symbol_table)?;
 
@@ -271,7 +283,9 @@ mod tests {
             .produce_ast(source_code, &type_env, &root_type_env)
             .expect("fail");
         let mut compiler = Compiler::new();
-        let bytecode = compiler.compile(ast.statements).expect("fail parse");
+        let bytecode = compiler
+            .compile_no_symbol_table_input(ast.statements)
+            .expect("fail parse");
         println!("{}", bytecode);
 
         println!("ENCoded: {}", bytecode);
@@ -296,7 +310,7 @@ mod tests {
     fn simple_compile_test() {
         let mut compiler = Compiler::new();
         compiler
-            .compile(vec![
+            .compile_no_symbol_table_input(vec![
                 // Stmt::ExprStmt(Expr::Literal(Literal::Integer(209309))),
                 Stmt::ExprStmt(Expr::BinaryOp {
                     op: BinaryOp::Add,
