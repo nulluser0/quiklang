@@ -11,7 +11,7 @@ pub struct SymbolTable {
 }
 
 impl SymbolTable {
-    pub(super) fn new() -> Self {
+    pub fn new() -> Self {
         let mut symbol_table = SymbolTable {
             vars: HashMap::new(),
             parent: None,
@@ -25,7 +25,7 @@ impl SymbolTable {
         symbol_table
     }
 
-    pub(super) fn new_with_parent(parent: Rc<RefCell<SymbolTable>>) -> Self {
+    pub fn new_with_parent(parent: Rc<RefCell<SymbolTable>>) -> Self {
         SymbolTable {
             vars: HashMap::new(),
             parent: Some(parent),

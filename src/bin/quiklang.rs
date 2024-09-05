@@ -2,7 +2,11 @@ use std::{cell::RefCell, fs::File, io::Read, process, rc::Rc};
 
 use quiklang::{
     backend_interpreter::environment::Environment,
-    backend_vm::{bytecode::ByteCode, bytecode_compiler::compiler::Compiler, vm::VM},
+    backend_vm::{
+        bytecode::ByteCode,
+        bytecode_compiler::{compiler::Compiler, symbol_tracker::SymbolTable},
+        vm::VM,
+    },
     errors::{self, VMRuntimeError},
     frontend::type_environment::TypeEnvironment,
     utils::run::{print_e, run_interpreter, run_vm, run_vm_repl},
