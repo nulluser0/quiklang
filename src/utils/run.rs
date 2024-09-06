@@ -35,8 +35,7 @@ pub fn run_vm_repl(
                         .qlang_functions
                         .iter()
                         .map(|f| *f as usize)
-                        .collect::<Vec<usize>>()
-                        .clone();
+                        .collect::<Vec<usize>>();
                     match vm.execute() {
                         Ok(_) => {}
                         Err(VMRuntimeError::Exit(code)) => println!("Exited with code: {}", code),
