@@ -300,6 +300,37 @@ impl VM {
         self.on_err_bulldoser();
     }
 
+    #[inline(always)]
+    fn set_register(&mut self, register: usize, value: RegisterVal) {
+        // When tinyvec is used, this will allocate memory for the register.
+        self.registers[register + self.current_offset()] = value;
+    }
+
+    #[inline(always)]
+    fn get_register_mutref(&mut self, register: usize) -> &mut RegisterVal {
+        &mut self.registers[register + self.current_offset()]
+    }
+
+    #[inline(always)]
+    fn get_register_ref(&self, register: usize, offset: usize) -> &RegisterVal {
+        &self.registers[register + offset]
+    }
+
+    #[inline(always)]
+    fn get_register_clone(&mut self, register: usize) -> RegisterVal {
+        self.registers[register + self.current_offset()].clone()
+    }
+
+    #[inline(always)]
+    fn get_constant_clone(&mut self, index: usize) -> RegisterVal {
+        self.constant_pool[index].clone()
+    }
+
+    #[inline(always)]
+    fn get_constant_ref(&self, index: usize) -> &RegisterVal {
+        &self.constant_pool[index]
+    }
+
     pub fn execute(&mut self) -> Result<(), VMRuntimeError> {
         while self.program_counter < self.instructions.len() {
             // self.execute_instruction(self.fetch_instruction());
@@ -318,10 +349,9 @@ impl VM {
     fn op_move(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
-        let offset = self.current_offset();
 
-        let value = std::mem::take(&mut self.registers[argb as usize + offset]);
-        self.registers[arga as usize + offset] = value;
+        let value = std::mem::take(self.get_register_mutref(argb as usize));
+        self.set_register(arga as usize, value);
 
         Ok(())
     }
@@ -330,10 +360,9 @@ impl VM {
     fn op_loadconst(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argbx = get_argbx(inst);
-        let offset = self.current_offset();
 
-        let value = self.constant_pool[argbx as usize].clone();
-        self.registers[arga as usize + offset] = value;
+        let value = self.get_constant_clone(argbx as usize);
+        self.set_register(arga as usize, value);
 
         Ok(())
     }
@@ -343,14 +372,13 @@ impl VM {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
-        let offset = self.current_offset();
 
         let value = if argb != 0 {
             RegisterVal::Bool(true)
         } else {
             RegisterVal::Bool(false)
         };
-        self.registers[arga as usize + offset] = value;
+        self.set_register(arga as usize, value);
         if argc != 0 {
             self.program_counter += 1;
         }
@@ -362,10 +390,9 @@ impl VM {
     fn op_loadnull(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
-        let offset = self.current_offset();
 
         for i in arga as usize..=argb as usize {
-            self.registers[i + offset] = RegisterVal::Null;
+            self.set_register(i, RegisterVal::Null);
         }
 
         Ok(())
@@ -374,14 +401,14 @@ impl VM {
     #[inline(always)]
     fn fetch_values(&self, argb: i32, argc: i32, offset: usize) -> (&RegisterVal, &RegisterVal) {
         let b_val = if is_k(argb) {
-            &self.constant_pool[rk_to_k(argb) as usize]
+            self.get_constant_ref(rk_to_k(argb) as usize)
         } else {
-            &self.registers[argb as usize + offset]
+            self.get_register_ref(argb as usize, offset)
         };
         let c_val = if is_k(argc) {
-            &self.constant_pool[rk_to_k(argc) as usize]
+            self.get_constant_ref(rk_to_k(argc) as usize)
         } else {
-            &self.registers[argc as usize + offset]
+            self.get_register_ref(argc as usize, offset)
         };
         (b_val, c_val)
     }
@@ -474,7 +501,7 @@ impl VM {
             _ => return Ok(()), // no-op for unsupported types
         };
 
-        self.registers[arga as usize + offset] = result;
+        self.set_register(arga as usize, result);
 
         Ok(())
     }
@@ -487,6 +514,7 @@ impl VM {
 
         if let RegisterVal::Int(value) = self.registers[argb as usize + offset] {
             self.registers[arga as usize + offset] = RegisterVal::Int(!value);
+            self.set_register(arga as usize, RegisterVal::Int(!value));
         }
 
         Ok(())
@@ -497,21 +525,20 @@ impl VM {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
-        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
+            self.get_constant_clone(rk_to_k(argb) as usize)
         } else {
-            self.registers[argb as usize + offset].clone()
+            self.get_register_clone(argb as usize)
         };
         let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
+            self.get_constant_clone(rk_to_k(argc) as usize)
         } else {
-            self.registers[argc as usize + offset].clone()
+            self.get_register_clone(argc as usize)
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.registers[arga as usize + offset] = RegisterVal::Int(left & right);
+            self.set_register(arga as usize, RegisterVal::Int(left & right));
         }
 
         Ok(())
@@ -522,21 +549,20 @@ impl VM {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
-        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
+            self.get_constant_clone(rk_to_k(argb) as usize)
         } else {
-            self.registers[argb as usize + offset].clone()
+            self.get_register_clone(argb as usize)
         };
         let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
+            self.get_constant_clone(rk_to_k(argc) as usize)
         } else {
-            self.registers[argc as usize + offset].clone()
+            self.get_register_clone(argc as usize)
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.registers[arga as usize + offset] = RegisterVal::Int(left | right);
+            self.set_register(arga as usize, RegisterVal::Int(left | right));
         }
 
         Ok(())
@@ -554,7 +580,7 @@ impl VM {
 
         let (b_val, c_val) = self.fetch_values(argb, argc, offset);
 
-        self.registers[arga as usize + offset] = RegisterVal::Bool(comp(b_val, c_val));
+        self.set_register(arga as usize, RegisterVal::Bool(comp(b_val, c_val)));
 
         Ok(())
     }
@@ -638,9 +664,8 @@ impl VM {
     fn op_jump_if_false(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argsbx = get_argsbx(inst);
-        let offset = self.current_offset();
 
-        if let RegisterVal::Bool(false) = self.registers[arga as usize + offset] {
+        if let RegisterVal::Bool(false) = self.get_register_mutref(arga as usize) {
             self.program_counter = (self.program_counter as i32 + argsbx) as usize;
         }
 
@@ -718,9 +743,10 @@ impl VM {
     #[inline(always)]
     fn op_inc(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
+        let offset = self.current_offset();
 
-        if let RegisterVal::Int(value) = self.registers[arga as usize] {
-            self.registers[arga as usize] = RegisterVal::Int(value.wrapping_add(1));
+        if let RegisterVal::Int(value) = self.get_register_ref(arga as usize, offset) {
+            self.set_register(arga as usize, RegisterVal::Int(value.wrapping_add(1)));
         }
 
         Ok(())
@@ -729,9 +755,10 @@ impl VM {
     #[inline(always)]
     fn op_dec(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
+        let offset = self.current_offset();
 
-        if let RegisterVal::Int(value) = self.registers[arga as usize] {
-            self.registers[arga as usize] = RegisterVal::Int(value.wrapping_sub(1));
+        if let RegisterVal::Int(value) = self.get_register_ref(arga as usize, offset) {
+            self.set_register(arga as usize, RegisterVal::Int(value.wrapping_sub(1)));
         }
 
         Ok(())
@@ -742,21 +769,20 @@ impl VM {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
-        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
+            self.get_constant_clone(rk_to_k(argb) as usize)
         } else {
-            self.registers[argb as usize + offset].clone()
+            self.get_register_clone(argb as usize)
         };
         let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
+            self.get_constant_clone(rk_to_k(argc) as usize)
         } else {
-            self.registers[argc as usize].clone()
+            self.get_register_clone(argc as usize)
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.registers[arga as usize] = RegisterVal::Int(left & right);
+            self.set_register(arga as usize, RegisterVal::Int(left & right))
         }
 
         Ok(())
@@ -767,21 +793,20 @@ impl VM {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
-        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
+            self.get_constant_clone(rk_to_k(argb) as usize)
         } else {
-            self.registers[argb as usize + offset].clone()
+            self.get_register_clone(argb as usize)
         };
         let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
+            self.get_constant_clone(rk_to_k(argc) as usize)
         } else {
-            self.registers[argc as usize].clone()
+            self.get_register_clone(argc as usize)
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.registers[arga as usize] = RegisterVal::Int(left | right);
+            self.set_register(arga as usize, RegisterVal::Int(left | right))
         }
 
         Ok(())
@@ -792,21 +817,20 @@ impl VM {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
-        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
+            self.get_constant_clone(rk_to_k(argb) as usize)
         } else {
-            self.registers[argb as usize + offset].clone()
+            self.get_register_clone(argb as usize)
         };
         let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
+            self.get_constant_clone(rk_to_k(argc) as usize)
         } else {
-            self.registers[argc as usize].clone()
+            self.get_register_clone(argc as usize)
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.registers[arga as usize] = RegisterVal::Int(left ^ right);
+            self.set_register(arga as usize, RegisterVal::Int(left ^ right))
         }
 
         Ok(())
@@ -817,21 +841,20 @@ impl VM {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
-        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
+            self.get_constant_clone(rk_to_k(argb) as usize)
         } else {
-            self.registers[argb as usize + offset].clone()
+            self.get_register_clone(argb as usize)
         };
         let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
+            self.get_constant_clone(rk_to_k(argc) as usize)
         } else {
-            self.registers[argc as usize].clone()
+            self.get_register_clone(argc as usize)
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.registers[arga as usize] = RegisterVal::Int(left << right);
+            self.set_register(arga as usize, RegisterVal::Int(left << right))
         }
 
         Ok(())
@@ -842,21 +865,20 @@ impl VM {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
-        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
+            self.get_constant_clone(rk_to_k(argb) as usize)
         } else {
-            self.registers[argb as usize + offset].clone()
+            self.get_register_clone(argb as usize)
         };
         let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
+            self.get_constant_clone(rk_to_k(argc) as usize)
         } else {
-            self.registers[argc as usize].clone()
+            self.get_register_clone(argc as usize)
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.registers[arga as usize] = RegisterVal::Int(left >> right);
+            self.set_register(arga as usize, RegisterVal::Int(left >> right))
         }
 
         Ok(())
@@ -867,22 +889,21 @@ impl VM {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
-        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.constant_pool[rk_to_k(argb) as usize].clone()
+            self.get_constant_clone(rk_to_k(argb) as usize)
         } else {
-            self.registers[argb as usize + offset].clone()
+            self.get_register_clone(argb as usize)
         };
         let c_val = if is_k(argc) {
-            self.constant_pool[rk_to_k(argc) as usize].clone()
+            self.get_constant_clone(rk_to_k(argc) as usize)
         } else {
-            self.registers[argc as usize].clone()
+            self.get_register_clone(argc as usize)
         };
 
         if let (RegisterVal::Str(left), RegisterVal::Str(right)) = (b_val, c_val) {
             let concatenated = format!("{}{}", left, right);
-            self.registers[arga as usize] = RegisterVal::Str(Rc::new(concatenated));
+            self.set_register(arga as usize, RegisterVal::Str(Rc::new(concatenated)));
         }
 
         Ok(())
@@ -906,10 +927,9 @@ impl VM {
     fn op_clone(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
-        let offset = self.current_offset();
 
-        let value = self.registers[argb as usize + offset].clone();
-        self.registers[arga as usize + offset] = value;
+        let value = self.get_register_clone(argb as usize);
+        self.set_register(arga as usize, value);
 
         Ok(())
     }
