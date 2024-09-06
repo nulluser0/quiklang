@@ -61,7 +61,7 @@ pub struct Compiler {
     constants: Rc<RefCell<Vec<RegisterVal>>>,
     constant_map: Rc<RefCell<HashMap<RegisterVal, usize>>>,
     instructions: Vec<Instruction>,
-    function_insts: Vec<(Vec<Instruction>, usize)>, // (Instructions, Register count)
+    function_insts: Vec<Vec<Instruction>>, // (Instructions, Register count)
 }
 
 impl Compiler {
@@ -90,10 +90,8 @@ impl Compiler {
 
     pub(super) fn add_function(&mut self, fake_compiler: &mut Compiler) -> usize {
         let index = self.function_insts.len();
-        self.function_insts.push((
-            std::mem::take(&mut fake_compiler.instructions),
-            fake_compiler.max_reg,
-        ));
+        self.function_insts
+            .push(std::mem::take(&mut fake_compiler.instructions));
         index
     }
 
@@ -185,11 +183,11 @@ impl Compiler {
         self.add_instruction(ASBx(OP_NOP, 0, 0)); // Some break to briefly indicate that this is an area for functions. This will not be run since code should
                                                   // not run anyways
 
-        let mut qlang_functions: Vec<(u64, u64)> = Vec::new();
+        let mut qlang_functions: Vec<u64> = Vec::new();
         for fn_inst in &mut self.function_insts {
             let fn_index = self.instructions.len();
-            self.instructions.append(&mut fn_inst.0);
-            qlang_functions.push((fn_index as u64, fn_inst.1 as u64));
+            self.instructions.append(fn_inst);
+            qlang_functions.push(fn_index as u64);
         }
 
         let integrity_info = BCIntegrityInfo {

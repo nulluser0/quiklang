@@ -34,8 +34,8 @@ pub fn run_vm_repl(
                     vm.function_indexes = bytecode
                         .qlang_functions
                         .iter()
-                        .map(|(f, g)| (*f as usize, *g as usize))
-                        .collect::<Vec<(usize, usize)>>()
+                        .map(|f| *f as usize)
+                        .collect::<Vec<usize>>()
                         .clone();
                     match vm.execute() {
                         Ok(_) => {}
