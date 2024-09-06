@@ -21,12 +21,13 @@ use super::{
 
 type VmHandler = fn(&mut VM, Instruction) -> Result<(), VMRuntimeError>;
 
+#[repr(C, align(2))]
 #[derive(Debug, Clone, Copy)]
 struct CallFrame {
-    pub return_pc: usize,  // PC to return to
-    pub base: usize,       // Base register
-    pub max_reg: usize,    // Maximum register
-    pub result_reg: usize, // Register of caller which stores the result of the function
+    pub return_pc: u16,  // PC to return to
+    pub base: u16,       // Base register
+    pub max_reg: u16,    // Maximum register
+    pub result_reg: u16, // Register of caller which stores the result of the function
 }
 
 // TODO: Consider using this:
@@ -54,6 +55,7 @@ struct CallFrame {
 //                  block {
 //                      let a = share b; // Valid, b does not go out of scope when a is alive.
 //                  }
+#[repr(C, align(4))]
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum RegisterVal {
     Int(i64),
@@ -184,17 +186,20 @@ const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
 static DISPATCH_TABLE: [VmHandler; OP_NOP as usize + 1] = create_dispatch_table();
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct VM {
-    registers: Vec<RegisterVal>,
+    registers: [RegisterVal; 2000],
     pub constant_pool: Vec<RegisterVal>,
     pub function_indexes: Vec<(usize, usize)>, // (inst_ptr, max_reg
     pub program_counter: usize,
     pub main_fn_max_reg: usize,
     pub instructions: Vec<Instruction>,
-    call_stack: Vec<CallFrame>, // Fixed-size array for stack allocation
+    call_stack: [CallFrame; 16384], // Fixed-size array for stack allocation
+    call_stack_pointer: usize,
     qffi: QFFI,
 }
 
+const ARRAY_REPEAT_VALUE: RegisterVal = RegisterVal::Null;
 impl VM {
     pub fn new(
         instructions: Vec<Instruction>,
@@ -202,47 +207,58 @@ impl VM {
         function_indexes: Vec<(usize, usize)>,
         main_fn_max_reg: usize,
     ) -> Self {
-        let mut registers = Vec::with_capacity(1024);
-        registers.append(vec![RegisterVal::Null; main_fn_max_reg].as_mut());
         VM {
-            registers,
+            registers: [ARRAY_REPEAT_VALUE; 2000],
             constant_pool,
             program_counter: 0,
             main_fn_max_reg,
             instructions,
             function_indexes,
-            call_stack: Vec::with_capacity(2048),
+            call_stack: [CallFrame {
+                return_pc: 0,
+                base: 0,
+                max_reg: 0,
+                result_reg: 0,
+            }; 16384],
+            call_stack_pointer: 0,
             qffi: QFFI::new(),
         }
     }
 
     fn push_call_frame(&mut self, frame: CallFrame) -> Result<(), VMRuntimeError> {
-        self.call_stack.push(frame);
+        // self.call_stack.push(frame);
+        if self.call_stack_pointer >= self.call_stack.len() {
+            return Err(VMRuntimeError::StackOverflow);
+        }
+        self.call_stack[self.call_stack_pointer] = frame;
+        self.call_stack_pointer += 1;
         Ok(())
     }
 
     fn pop_call_frame(&mut self) -> Result<CallFrame, VMRuntimeError> {
-        if self.call_stack.is_empty() {
+        if self.call_stack_pointer == 0 {
             return Err(VMRuntimeError::StackUnderflow);
         }
-        let frame = self.call_stack.pop().unwrap();
+        // let frame = self.call_stack.pop().unwrap();
+        let frame = self.call_stack[self.call_stack_pointer - 1];
+        self.call_stack_pointer -= 1;
         Ok(frame)
     }
 
     #[inline]
     fn current_offset(&mut self) -> usize {
-        if self.call_stack.is_empty() {
+        if self.call_stack_pointer == 0 {
             return 0;
         }
-        self.call_stack[self.call_stack.len() - 1].base
+        self.call_stack[self.call_stack_pointer - 1].base as usize
     }
 
     #[inline]
     fn get_current_max_reg(&self) -> usize {
-        if self.call_stack.is_empty() {
+        if self.call_stack_pointer == 0 {
             return self.main_fn_max_reg;
         }
-        self.call_stack[self.call_stack.len() - 1].max_reg
+        self.call_stack[self.call_stack_pointer - 1].max_reg as usize
     }
 
     // fn current_frame(&self) -> &CallFrame {
@@ -272,8 +288,8 @@ impl VM {
     // calls, and popping all of the frames on the stack.
     pub fn on_err_unwind_callstack(&mut self) {
         println!("Unwinding Callstack:");
-        println!("Stack pointer is at: {}", self.call_stack.len());
-        if self.call_stack.len() > 20 {
+        println!("Stack pointer is at: {}", self.call_stack_pointer);
+        if self.call_stack_pointer > 20 {
             println!("Truncating callstack to last 20 calls...");
         }
         let mut count: usize = 0;
@@ -723,23 +739,26 @@ impl VM {
         if (arga as usize) < self.function_indexes.len() {
             // Save callframe
             let call_frame = CallFrame {
-                return_pc: self.program_counter,
-                base: offset + self.get_current_max_reg(),
-                max_reg: self.function_indexes[arga as usize].1,
-                result_reg: argc as usize + offset,
+                return_pc: self.program_counter as u16,
+                base: offset as u16 + self.get_current_max_reg() as u16,
+                max_reg: self.function_indexes[arga as usize].1 as u16,
+                result_reg: argc as u16 + offset as u16,
             };
 
             // Ensure the registers vector is large enough
-            if self.registers.len() < call_frame.max_reg + call_frame.base {
-                self.registers
-                    .resize(call_frame.max_reg + call_frame.base, RegisterVal::Null);
-            }
+            // if self.registers.len() < (call_frame.max_reg + call_frame.base).into() {
+            //     self.registers.resize(
+            //         (call_frame.max_reg + call_frame.base).into(),
+            //         RegisterVal::Null,
+            //     );
+            // }
 
             // Move arguments to the function's registers
             for i in 1..=argb {
                 let src_index = (argc + i) as usize + offset;
-                let dest_index = call_frame.base + i as usize;
-                self.registers[dest_index] = std::mem::take(&mut self.registers[src_index]);
+                let dest_index = call_frame.base + i as u16;
+                self.registers[dest_index as usize] =
+                    std::mem::take(&mut self.registers[src_index as usize]);
             }
 
             // Push callframe
@@ -787,9 +806,10 @@ impl VM {
     fn op_return(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
         // Move base of function to the result register
         let popped_frame = self.pop_call_frame()?;
-        self.registers[popped_frame.result_reg] = self.registers[popped_frame.base].clone();
+        self.registers[popped_frame.result_reg as usize] =
+            self.registers[popped_frame.base as usize].clone();
 
-        self.program_counter = popped_frame.return_pc;
+        self.program_counter = popped_frame.return_pc as usize;
 
         // Deallocate the now unused registers
         // let base = popped_frame.base;
