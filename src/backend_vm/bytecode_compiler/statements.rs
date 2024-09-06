@@ -32,9 +32,9 @@ impl Compiler {
             ),
             Stmt::DeclareStmt {
                 name,
-                is_mutable,
+                is_mutable: _,
                 is_global,
-                var_type,
+                var_type: _,
                 expr,
             } => self.compile_declare_stmt(name, is_global, expr, symbol_table),
             Stmt::ReturnStmt(expr) => self.compile_return_stmt(expr, fn_return, symbol_table),

@@ -367,6 +367,7 @@ impl FromType for Val {
             Type::Struct(_, _) => todo!(),
             Type::Enum(_, _) => todo!(),
             Type::Alias(_, _) => todo!(),
+            Type::Custom(_) => todo!(),
         }
     }
 }

@@ -45,7 +45,7 @@ pub enum Type {
     Struct(String, HashMap<String, Type>),
     Enum(String, HashMap<String, Vec<Type>>),
     Alias(String, Box<Type>),
-    // TODO: Custom(String)
+    Custom(String), // TODO!
 }
 
 pub trait FromType: std::fmt::Debug {
@@ -87,6 +87,7 @@ impl std::fmt::Display for Type {
             Type::Struct(_, _) => todo!(),
             Type::Enum(_, _) => todo!(),
             Type::Alias(name, actual) => write!(f, "{} ==> {}", name, actual),
+            Type::Custom(_) => todo!(),
         }
     }
 }
