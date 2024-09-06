@@ -23,8 +23,10 @@ type VmHandler = fn(&mut VM, Instruction) -> Result<(), VMRuntimeError>;
 
 #[derive(Debug, Clone, Copy)]
 struct CallFrame {
-    pub return_pc: usize, // PC to return to
-    pub base: usize,      // Base register
+    pub return_pc: usize,  // PC to return to
+    pub base: usize,       // Base register
+    pub max_reg: usize,    // Maximum register
+    pub result_reg: usize, // Register of caller which stores the result of the function
 }
 
 // TODO: Consider using this:
@@ -185,7 +187,7 @@ static DISPATCH_TABLE: [VmHandler; OP_NOP as usize + 1] = create_dispatch_table(
 pub struct VM {
     registers: Vec<RegisterVal>,
     pub constant_pool: Vec<RegisterVal>,
-    pub function_indexes: Vec<usize>,
+    pub function_indexes: Vec<(usize, usize)>, // (inst_ptr, max_reg
     pub program_counter: usize,
     pub instructions: Vec<Instruction>,
     call_stack: Vec<CallFrame>, // Fixed-size array for stack allocation
@@ -196,7 +198,7 @@ impl VM {
     pub fn new(
         instructions: Vec<Instruction>,
         constant_pool: Vec<RegisterVal>,
-        function_indexes: Vec<usize>,
+        function_indexes: Vec<(usize, usize)>,
         _num_registers: usize,
     ) -> Self {
         VM {
@@ -212,6 +214,9 @@ impl VM {
 
     fn push_call_frame(&mut self, frame: CallFrame) -> Result<(), VMRuntimeError> {
         self.call_stack.push(frame);
+        let offset = self.current_offset();
+        self.registers
+            .resize(frame.max_reg + offset, RegisterVal::Null);
         Ok(())
     }
 
@@ -221,8 +226,9 @@ impl VM {
         }
         let frame = self.call_stack.pop().unwrap();
         let base = frame.base + 1;
-        let len = self.registers.len();
-        self.registers.drain(base..len);
+        let offset = self.current_offset();
+        let max_reg = frame.max_reg + offset;
+        self.registers.drain(base..max_reg);
         Ok(frame)
     }
 
@@ -232,6 +238,22 @@ impl VM {
             return 0;
         }
         self.call_stack[self.call_stack.len() - 1].base
+    }
+
+    #[inline]
+    fn get_current_max_reg(&self) -> usize {
+        if self.call_stack.is_empty() {
+            return 0;
+        }
+        self.call_stack[self.call_stack.len() - 1].max_reg
+    }
+
+    #[inline]
+    fn get_current_frame(&self) -> Option<&CallFrame> {
+        if self.call_stack.is_empty() {
+            return None;
+        }
+        Some(&self.call_stack[self.call_stack.len() - 1])
     }
 
     // fn current_frame(&self) -> &CallFrame {
@@ -245,8 +267,8 @@ impl VM {
             bytecode
                 .qlang_functions
                 .iter()
-                .map(|f| *f as usize)
-                .collect::<Vec<usize>>()
+                .map(|(f, g)| (*f as usize, *g as usize))
+                .collect::<Vec<(usize, usize)>>()
                 .clone(),
             *bytecode.register_count() as usize,
         )
@@ -705,20 +727,25 @@ impl VM {
 
         // A is the pointer to a function on function_indexes
         // B is the number of args to be pushed into the function's scope
-        // C is the base
-
-        // Save callframe
-        let call_frame = CallFrame {
-            return_pc: self.program_counter,
-            base: (argc as usize) + offset,
-        };
-
-        // push callframe
-        self.push_call_frame(call_frame)?;
+        // C is the base, aka where the result of the function will be stored
 
         // Set the program counter to the function's starting instruction
         if (arga as usize) < self.function_indexes.len() {
-            self.program_counter = self.function_indexes[arga as usize];
+            self.program_counter = self.function_indexes[arga as usize].0;
+
+            // Save callframe
+            let call_frame = CallFrame {
+                return_pc: self.program_counter,
+                base: self.get_current_max_reg(),
+                max_reg: self.function_indexes[arga as usize].1,
+                result_reg: argc as usize + offset,
+            };
+
+            // push callframe
+            self.push_call_frame(call_frame)?;
+
+            //
+
             // return; TODO: Fix to possibly avoid pc --1
             self.program_counter -= 1;
         } else {
@@ -759,7 +786,16 @@ impl VM {
 
     #[inline(always)]
     fn op_return(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.program_counter = self.pop_call_frame()?.return_pc;
+        // Move base of function to the result register
+        let current_frame = self
+            .get_current_frame()
+            .ok_or(VMRuntimeError::StackUnderflow)?;
+        self.registers[current_frame.result_reg] =
+            std::mem::take(&mut self.registers[current_frame.base]);
+
+        let popped_frame = self.pop_call_frame()?;
+
+        self.program_counter = popped_frame.return_pc;
 
         Ok(())
     }

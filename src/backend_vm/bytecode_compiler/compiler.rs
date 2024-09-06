@@ -56,12 +56,12 @@ const fn str_to_byte_array(s: &str) -> [u8; 8] {
 
 #[derive(Debug)]
 pub struct Compiler {
-    max_reg: usize,
-    reg_top: usize,
+    max_reg: usize, // Largest no. of registers used
+    reg_top: usize, // Current top register
     constants: Rc<RefCell<Vec<RegisterVal>>>,
     constant_map: Rc<RefCell<HashMap<RegisterVal, usize>>>,
     instructions: Vec<Instruction>,
-    function_insts: Vec<Vec<Instruction>>,
+    function_insts: Vec<(Vec<Instruction>, usize)>, // (Instructions, Register count)
 }
 
 impl Compiler {
@@ -90,8 +90,10 @@ impl Compiler {
 
     pub(super) fn add_function(&mut self, fake_compiler: &mut Compiler) -> usize {
         let index = self.function_insts.len();
-        self.function_insts
-            .push(std::mem::take(&mut fake_compiler.instructions));
+        self.function_insts.push((
+            std::mem::take(&mut fake_compiler.instructions),
+            fake_compiler.max_reg,
+        ));
         index
     }
 
@@ -186,7 +188,7 @@ impl Compiler {
         let mut qlang_functions: Vec<u64> = Vec::new();
         for fn_inst in &mut self.function_insts {
             let fn_index = self.instructions.len();
-            self.instructions.append(fn_inst);
+            self.instructions.append(&mut fn_inst.0);
             qlang_functions.push(fn_index as u64);
         }
 
