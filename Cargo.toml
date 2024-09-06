@@ -14,10 +14,10 @@ dialoguer = "0.11.0"
 lazy_static = "1.5.0"
 libloading = "0.8.5"
 rustyline = "9.0.0"
-thiserror = "1.0.61"
+thiserror = "1.0.63"
 
 [build-dependencies]
-toml = "0.8.14"
+toml = "0.8.19"
 
 [lib]
 name = "quiklang"
