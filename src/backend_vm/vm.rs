@@ -186,13 +186,13 @@ static DISPATCH_TABLE: [VmHandler; OP_NOP as usize + 1] = create_dispatch_table(
 #[derive(Debug)]
 #[repr(C)]
 pub struct VM {
-    registers: [RegisterVal; 8192],
+    registers: [RegisterVal; 50000],
     pub constant_pool: Vec<RegisterVal>,
     pub function_indexes: Vec<usize>, // (inst_ptr, max_reg
     pub program_counter: usize,
     pub main_fn_max_reg: usize,
     pub instructions: Vec<Instruction>,
-    call_stack: [CallFrame; 4096], // Fixed-size array for stack allocation
+    call_stack: [CallFrame; 10000], // Fixed-size array for stack allocation
     call_stack_pointer: usize,
     qffi: QFFI,
 }
@@ -206,7 +206,7 @@ impl VM {
         main_fn_max_reg: usize,
     ) -> Self {
         VM {
-            registers: [ARRAY_REPEAT_VALUE; 8192],
+            registers: [ARRAY_REPEAT_VALUE; 50000],
             constant_pool,
             program_counter: 0,
             main_fn_max_reg,
@@ -215,7 +215,7 @@ impl VM {
             call_stack: [CallFrame {
                 return_pc: 0,
                 base: 0,
-            }; 4096],
+            }; 10000],
             call_stack_pointer: 0,
             qffi: QFFI::new(),
         }
@@ -277,10 +277,11 @@ impl VM {
     pub fn on_err_unwind_callstack(&mut self) {
         println!("Unwinding Callstack:");
         println!("Stack pointer is at: {}", self.call_stack_pointer);
-        if self.call_stack_pointer > 20 {
-            println!("Truncating callstack to last 20 calls...");
+        if self.call_stack_pointer > 41 {
+            println!("Truncating callstack to first and last 20 calls...");
         }
         let mut count: usize = 0;
+        let mut reverse_count: usize = self.call_stack_pointer;
         while let Ok(call_frame) = self.pop_call_frame() {
             count += 1;
             if count <= 20 {
@@ -289,6 +290,18 @@ impl VM {
                     call_frame.return_pc, call_frame.base
                 )
             }
+
+            if reverse_count == 21 {
+                println!("...");
+            }
+
+            if reverse_count <= 20 {
+                println!(
+                    "Return PC: {:6} | Base: {}",
+                    call_frame.return_pc, call_frame.base
+                )
+            }
+            reverse_count -= 1;
         }
         println!("END");
     }
