@@ -50,8 +50,7 @@
 //
 // 5. QLang Functions:
 //      Offset      Size (bytes)        Description
-//          -           16 (8+8)            8-byte numbers representing u64 number, pointing to the PC of the function.
-//                                            In addition, a 8-byte number (u64) representing register count.
+//          -           8                   8-byte numbers representing u64 number, pointing to the PC of the function.
 //
 // 5. QFFI (extern/foreign) Functions:
 //      Offset      Size (bytes)        Description
@@ -82,7 +81,7 @@ pub struct ByteCode {
     pub metadata: BCMetadata,
     pub integrity_info: BCIntegrityInfo,
     pub constants: Vec<RegisterVal>,
-    pub qlang_functions: Vec<(u64, u64)>,
+    pub qlang_functions: Vec<u64>,
     pub instructions: Vec<Instruction>,
 }
 
@@ -115,13 +114,7 @@ impl Display for ByteCode {
         let qlang_functions_string: String = self
             .qlang_functions
             .iter()
-            .map(|inner| {
-                format!(
-                    "Inst: {} | Max Register: {}",
-                    inner.0,
-                    inner.1
-                )
-            })
+            .map(|inner| format!("Inst: {}", inner))
             .collect::<Vec<String>>()
             .join("\n");
         let mut instructions_fragments: Vec<String> = Vec::new();
@@ -249,11 +242,10 @@ impl ByteCode {
         }
 
         // Read QLang functions
-        let mut qlang_functions: Vec<(u64, u64)> = Vec::with_capacity(num_qlang_functions as usize);
+        let mut qlang_functions: Vec<u64> = Vec::with_capacity(num_qlang_functions as usize);
         for _ in 0..num_qlang_functions {
             let inst_ptr = cursor.read_u64::<LittleEndian>()?;
-            let max_reg = cursor.read_u64::<LittleEndian>()?;
-            qlang_functions.push((inst_ptr, max_reg));
+            qlang_functions.push(inst_ptr);
         }
 
         // Read Instructions
@@ -329,9 +321,8 @@ impl ByteCode {
         }
 
         // Write QLang Functions
-        for (inst_ptr, max_reg) in &bytecode.qlang_functions {
+        for inst_ptr in &bytecode.qlang_functions {
             encoded_bytecode.write_u64::<LittleEndian>(*inst_ptr)?;
-            encoded_bytecode.write_u64::<LittleEndian>(*max_reg)?;
         }
 
         // Write Instructions

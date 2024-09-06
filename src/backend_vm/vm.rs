@@ -24,10 +24,8 @@ type VmHandler = fn(&mut VM, Instruction) -> Result<(), VMRuntimeError>;
 #[repr(C, align(2))]
 #[derive(Debug, Clone, Copy)]
 struct CallFrame {
-    pub return_pc: u16,  // PC to return to
-    pub base: u16,       // Base register
-    pub max_reg: u16,    // Maximum register
-    pub result_reg: u16, // Register of caller which stores the result of the function
+    pub return_pc: u32, // PC to return to
+    pub base: u32,      // Base register
 }
 
 // TODO: Consider using this:
@@ -190,7 +188,7 @@ static DISPATCH_TABLE: [VmHandler; OP_NOP as usize + 1] = create_dispatch_table(
 pub struct VM {
     registers: [RegisterVal; 2000],
     pub constant_pool: Vec<RegisterVal>,
-    pub function_indexes: Vec<(usize, usize)>, // (inst_ptr, max_reg
+    pub function_indexes: Vec<usize>, // (inst_ptr, max_reg
     pub program_counter: usize,
     pub main_fn_max_reg: usize,
     pub instructions: Vec<Instruction>,
@@ -204,7 +202,7 @@ impl VM {
     pub fn new(
         instructions: Vec<Instruction>,
         constant_pool: Vec<RegisterVal>,
-        function_indexes: Vec<(usize, usize)>,
+        function_indexes: Vec<usize>,
         main_fn_max_reg: usize,
     ) -> Self {
         VM {
@@ -217,8 +215,6 @@ impl VM {
             call_stack: [CallFrame {
                 return_pc: 0,
                 base: 0,
-                max_reg: 0,
-                result_reg: 0,
             }; 16384],
             call_stack_pointer: 0,
             qffi: QFFI::new(),
@@ -253,14 +249,6 @@ impl VM {
         self.call_stack[self.call_stack_pointer - 1].base as usize
     }
 
-    #[inline]
-    fn get_current_max_reg(&self) -> usize {
-        if self.call_stack_pointer == 0 {
-            return self.main_fn_max_reg;
-        }
-        self.call_stack[self.call_stack_pointer - 1].max_reg as usize
-    }
-
     // fn current_frame(&self) -> &CallFrame {
     //     &self.call_stack[self.stack_pointer - 1]
     // }
@@ -272,8 +260,8 @@ impl VM {
             bytecode
                 .qlang_functions
                 .iter()
-                .map(|(f, g)| (*f as usize, *g as usize))
-                .collect::<Vec<(usize, usize)>>()
+                .map(|f| *f as usize)
+                .collect::<Vec<usize>>()
                 .clone(),
             *bytecode.register_count() as usize,
         )
@@ -727,45 +715,28 @@ impl VM {
     #[inline(always)]
     fn op_call(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
-        let argb = get_argb(inst);
+        // let argb = get_argb(inst);
         let argc = get_argc(inst);
         let offset = self.current_offset();
 
         // A is the pointer to a function on function_indexes
         // B is the number of args to be pushed into the function's scope
-        // C is the base, aka where the result of the function will be stored
+        // C is the base
+
+        // Save callframe
+        let call_frame = CallFrame {
+            return_pc: self.program_counter as u32,
+            base: (argc as u32) + offset as u32,
+        };
+
+        // push callframe
+        self.push_call_frame(call_frame)?;
 
         // Set the program counter to the function's starting instruction
         if (arga as usize) < self.function_indexes.len() {
-            // Save callframe
-            let call_frame = CallFrame {
-                return_pc: self.program_counter as u16,
-                base: offset as u16 + self.get_current_max_reg() as u16,
-                max_reg: self.function_indexes[arga as usize].1 as u16,
-                result_reg: argc as u16 + offset as u16,
-            };
-
-            // Ensure the registers vector is large enough
-            // if self.registers.len() < (call_frame.max_reg + call_frame.base).into() {
-            //     self.registers.resize(
-            //         (call_frame.max_reg + call_frame.base).into(),
-            //         RegisterVal::Null,
-            //     );
-            // }
-
-            // Move arguments to the function's registers
-            for i in 1..=argb {
-                let src_index = (argc + i) as usize + offset;
-                let dest_index = call_frame.base + i as u16;
-                self.registers[dest_index as usize] =
-                    std::mem::take(&mut self.registers[src_index as usize]);
-            }
-
-            // Push callframe
-            self.push_call_frame(call_frame)?;
-
-            // Set the program counter to the function's starting instruction
-            self.program_counter = self.function_indexes[arga as usize].0 - 1;
+            self.program_counter = self.function_indexes[arga as usize];
+            // return; TODO: Fix to possibly avoid pc --1
+            self.program_counter -= 1;
         } else {
             panic!("Invalid function index: {}", arga);
         }
@@ -804,17 +775,7 @@ impl VM {
 
     #[inline(always)]
     fn op_return(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
-        // Move base of function to the result register
-        let popped_frame = self.pop_call_frame()?;
-        self.registers[popped_frame.result_reg as usize] =
-            self.registers[popped_frame.base as usize].clone();
-
-        self.program_counter = popped_frame.return_pc as usize;
-
-        // Deallocate the now unused registers
-        // let base = popped_frame.base;
-        // let max_reg = popped_frame.max_reg + base;
-        // self.registers.drain(base..=max_reg);
+        self.program_counter = self.pop_call_frame()?.return_pc as usize;
 
         Ok(())
     }
