@@ -202,8 +202,10 @@ impl VM {
         function_indexes: Vec<(usize, usize)>,
         main_fn_max_reg: usize,
     ) -> Self {
+        let mut registers = Vec::with_capacity(1024);
+        registers.append(vec![RegisterVal::Null; main_fn_max_reg].as_mut());
         VM {
-            registers: Vec::with_capacity(512),
+            registers,
             constant_pool,
             program_counter: 0,
             main_fn_max_reg,
@@ -216,9 +218,6 @@ impl VM {
 
     fn push_call_frame(&mut self, frame: CallFrame) -> Result<(), VMRuntimeError> {
         self.call_stack.push(frame);
-        let offset = self.current_offset();
-        self.registers
-            .resize(frame.max_reg + offset, RegisterVal::Null);
         Ok(())
     }
 
@@ -366,7 +365,6 @@ impl VM {
 
     pub fn execute(&mut self) -> Result<(), VMRuntimeError> {
         while self.program_counter < self.instructions.len() {
-            // self.execute_instruction(self.fetch_instruction());
             let inst = self.fetch_instruction();
             let opcode = get_opcode(inst);
             if opcode as usize >= DISPATCH_TABLE.len() {
@@ -713,7 +711,7 @@ impl VM {
     #[inline(always)]
     fn op_call(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
-        // let argb = get_argb(inst);
+        let argb = get_argb(inst);
         let argc = get_argc(inst);
         let offset = self.current_offset();
 
@@ -723,23 +721,32 @@ impl VM {
 
         // Set the program counter to the function's starting instruction
         if (arga as usize) < self.function_indexes.len() {
-            self.program_counter = self.function_indexes[arga as usize].0;
-
             // Save callframe
             let call_frame = CallFrame {
                 return_pc: self.program_counter,
-                base: self.get_current_max_reg(),
+                base: offset + self.get_current_max_reg(),
                 max_reg: self.function_indexes[arga as usize].1,
                 result_reg: argc as usize + offset,
             };
 
-            // push callframe
+            // Ensure the registers vector is large enough
+            if self.registers.len() < call_frame.max_reg + call_frame.base {
+                self.registers
+                    .resize(call_frame.max_reg + call_frame.base, RegisterVal::Null);
+            }
+
+            // Move arguments to the function's registers
+            for i in 1..=argb {
+                let src_index = (argc + i) as usize + offset;
+                let dest_index = call_frame.base + i as usize;
+                self.registers[dest_index] = std::mem::take(&mut self.registers[src_index]);
+            }
+
+            // Push callframe
             self.push_call_frame(call_frame)?;
 
-            //
-
-            // return; TODO: Fix to possibly avoid pc --1
-            self.program_counter -= 1;
+            // Set the program counter to the function's starting instruction
+            self.program_counter = self.function_indexes[arga as usize].0 - 1;
         } else {
             panic!("Invalid function index: {}", arga);
         }
@@ -780,16 +787,14 @@ impl VM {
     fn op_return(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
         // Move base of function to the result register
         let popped_frame = self.pop_call_frame()?;
-        self.registers[popped_frame.result_reg] =
-            std::mem::take(&mut self.registers[popped_frame.base]);
+        self.registers[popped_frame.result_reg] = self.registers[popped_frame.base].clone();
 
         self.program_counter = popped_frame.return_pc;
 
-        // Drop the registers of the function
-        let base = popped_frame.base + 1;
-        let offset = self.current_offset();
-        let max_reg = popped_frame.max_reg + offset;
-        self.registers.drain(base..max_reg);
+        // Deallocate the now unused registers
+        // let base = popped_frame.base;
+        // let max_reg = popped_frame.max_reg + base;
+        // self.registers.drain(base..=max_reg);
 
         Ok(())
     }
