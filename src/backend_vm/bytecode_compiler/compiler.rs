@@ -185,11 +185,11 @@ impl Compiler {
         self.add_instruction(ASBx(OP_NOP, 0, 0)); // Some break to briefly indicate that this is an area for functions. This will not be run since code should
                                                   // not run anyways
 
-        let mut qlang_functions: Vec<u64> = Vec::new();
+        let mut qlang_functions: Vec<(u64, u64)> = Vec::new();
         for fn_inst in &mut self.function_insts {
             let fn_index = self.instructions.len();
             self.instructions.append(&mut fn_inst.0);
-            qlang_functions.push(fn_index as u64);
+            qlang_functions.push((fn_index as u64, fn_inst.1 as u64));
         }
 
         let integrity_info = BCIntegrityInfo {

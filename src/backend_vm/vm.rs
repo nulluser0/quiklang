@@ -189,6 +189,7 @@ pub struct VM {
     pub constant_pool: Vec<RegisterVal>,
     pub function_indexes: Vec<(usize, usize)>, // (inst_ptr, max_reg
     pub program_counter: usize,
+    pub main_fn_max_reg: usize,
     pub instructions: Vec<Instruction>,
     call_stack: Vec<CallFrame>, // Fixed-size array for stack allocation
     qffi: QFFI,
@@ -199,12 +200,13 @@ impl VM {
         instructions: Vec<Instruction>,
         constant_pool: Vec<RegisterVal>,
         function_indexes: Vec<(usize, usize)>,
-        _num_registers: usize,
+        main_fn_max_reg: usize,
     ) -> Self {
         VM {
             registers: Vec::with_capacity(512),
             constant_pool,
             program_counter: 0,
+            main_fn_max_reg,
             instructions,
             function_indexes,
             call_stack: Vec::with_capacity(2048),
@@ -225,10 +227,6 @@ impl VM {
             return Err(VMRuntimeError::StackUnderflow);
         }
         let frame = self.call_stack.pop().unwrap();
-        let base = frame.base + 1;
-        let offset = self.current_offset();
-        let max_reg = frame.max_reg + offset;
-        self.registers.drain(base..max_reg);
         Ok(frame)
     }
 
@@ -243,17 +241,9 @@ impl VM {
     #[inline]
     fn get_current_max_reg(&self) -> usize {
         if self.call_stack.is_empty() {
-            return 0;
+            return self.main_fn_max_reg;
         }
         self.call_stack[self.call_stack.len() - 1].max_reg
-    }
-
-    #[inline]
-    fn get_current_frame(&self) -> Option<&CallFrame> {
-        if self.call_stack.is_empty() {
-            return None;
-        }
-        Some(&self.call_stack[self.call_stack.len() - 1])
     }
 
     // fn current_frame(&self) -> &CallFrame {
@@ -316,14 +306,16 @@ impl VM {
     }
 
     #[inline(always)]
-    fn set_register(&mut self, register: usize, value: RegisterVal) {
+    fn set_register(&mut self, register: usize, value: RegisterVal) -> Result<(), VMRuntimeError> {
         // When tinyvec is used, this will allocate memory for the register.
         let offset = self.current_offset();
         if register + offset >= self.registers.len() {
-            self.registers
-                .resize(register + offset + 1, RegisterVal::Null);
+            // self.registers
+            //     .resize(register + offset + 1, RegisterVal::Null);
+            return Err(VMRuntimeError::InvalidRegisterAccess(register + offset));
         }
         self.registers[register + offset] = value;
+        Ok(())
     }
 
     #[inline(always)]
@@ -392,7 +384,7 @@ impl VM {
         let argb = get_argb(inst);
 
         let value = std::mem::take(self.get_register_mutref(argb as usize)?);
-        self.set_register(arga as usize, value);
+        self.set_register(arga as usize, value)?;
 
         Ok(())
     }
@@ -403,7 +395,7 @@ impl VM {
         let argbx = get_argbx(inst);
 
         let value = self.get_constant_clone(argbx as usize)?;
-        self.set_register(arga as usize, value);
+        self.set_register(arga as usize, value)?;
 
         Ok(())
     }
@@ -419,7 +411,7 @@ impl VM {
         } else {
             RegisterVal::Bool(false)
         };
-        self.set_register(arga as usize, value);
+        self.set_register(arga as usize, value)?;
         if argc != 0 {
             self.program_counter += 1;
         }
@@ -433,7 +425,7 @@ impl VM {
         let argb = get_argb(inst);
 
         for i in arga as usize..=argb as usize {
-            self.set_register(i, RegisterVal::Null);
+            self.set_register(i, RegisterVal::Null)?;
         }
 
         Ok(())
@@ -547,7 +539,7 @@ impl VM {
             _ => return Ok(()), // no-op for unsupported types
         };
 
-        self.set_register(arga as usize, result);
+        self.set_register(arga as usize, result)?;
 
         Ok(())
     }
@@ -560,7 +552,7 @@ impl VM {
 
         if let RegisterVal::Int(value) = self.registers[argb as usize + offset] {
             self.registers[arga as usize + offset] = RegisterVal::Int(!value);
-            self.set_register(arga as usize, RegisterVal::Int(!value));
+            self.set_register(arga as usize, RegisterVal::Int(!value))?;
         }
 
         Ok(())
@@ -584,7 +576,7 @@ impl VM {
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.set_register(arga as usize, RegisterVal::Int(left & right));
+            self.set_register(arga as usize, RegisterVal::Int(left & right))?;
         }
 
         Ok(())
@@ -608,7 +600,7 @@ impl VM {
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.set_register(arga as usize, RegisterVal::Int(left | right));
+            self.set_register(arga as usize, RegisterVal::Int(left | right))?;
         }
 
         Ok(())
@@ -626,7 +618,7 @@ impl VM {
 
         let (b_val, c_val) = self.fetch_values(argb, argc, offset)?;
 
-        self.set_register(arga as usize, RegisterVal::Bool(comp(b_val, c_val)));
+        self.set_register(arga as usize, RegisterVal::Bool(comp(b_val, c_val)))?;
 
         Ok(())
     }
@@ -787,15 +779,17 @@ impl VM {
     #[inline(always)]
     fn op_return(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
         // Move base of function to the result register
-        let current_frame = self
-            .get_current_frame()
-            .ok_or(VMRuntimeError::StackUnderflow)?;
-        self.registers[current_frame.result_reg] =
-            std::mem::take(&mut self.registers[current_frame.base]);
-
         let popped_frame = self.pop_call_frame()?;
+        self.registers[popped_frame.result_reg] =
+            std::mem::take(&mut self.registers[popped_frame.base]);
 
         self.program_counter = popped_frame.return_pc;
+
+        // Drop the registers of the function
+        let base = popped_frame.base + 1;
+        let offset = self.current_offset();
+        let max_reg = popped_frame.max_reg + offset;
+        self.registers.drain(base..max_reg);
 
         Ok(())
     }
@@ -806,7 +800,7 @@ impl VM {
         let offset = self.current_offset();
 
         if let RegisterVal::Int(value) = self.get_register_ref(arga as usize, offset)? {
-            self.set_register(arga as usize, RegisterVal::Int(value.wrapping_add(1)));
+            self.set_register(arga as usize, RegisterVal::Int(value.wrapping_add(1)))?;
         }
 
         Ok(())
@@ -818,7 +812,7 @@ impl VM {
         let offset = self.current_offset();
 
         if let RegisterVal::Int(value) = self.get_register_ref(arga as usize, offset)? {
-            self.set_register(arga as usize, RegisterVal::Int(value.wrapping_sub(1)));
+            self.set_register(arga as usize, RegisterVal::Int(value.wrapping_sub(1)))?;
         }
 
         Ok(())
@@ -842,7 +836,7 @@ impl VM {
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.set_register(arga as usize, RegisterVal::Int(left & right))
+            self.set_register(arga as usize, RegisterVal::Int(left & right))?
         }
 
         Ok(())
@@ -866,7 +860,7 @@ impl VM {
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.set_register(arga as usize, RegisterVal::Int(left | right))
+            self.set_register(arga as usize, RegisterVal::Int(left | right))?
         }
 
         Ok(())
@@ -890,7 +884,7 @@ impl VM {
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.set_register(arga as usize, RegisterVal::Int(left ^ right))
+            self.set_register(arga as usize, RegisterVal::Int(left ^ right))?
         }
 
         Ok(())
@@ -914,7 +908,7 @@ impl VM {
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.set_register(arga as usize, RegisterVal::Int(left << right))
+            self.set_register(arga as usize, RegisterVal::Int(left << right))?
         }
 
         Ok(())
@@ -938,7 +932,7 @@ impl VM {
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.set_register(arga as usize, RegisterVal::Int(left >> right))
+            self.set_register(arga as usize, RegisterVal::Int(left >> right))?
         }
 
         Ok(())
@@ -963,7 +957,7 @@ impl VM {
 
         if let (RegisterVal::Str(left), RegisterVal::Str(right)) = (b_val, c_val) {
             let concatenated = format!("{}{}", left, right);
-            self.set_register(arga as usize, RegisterVal::Str(Rc::new(concatenated)));
+            self.set_register(arga as usize, RegisterVal::Str(Rc::new(concatenated)))?;
         }
 
         Ok(())
@@ -989,7 +983,7 @@ impl VM {
         let argb = get_argb(inst);
 
         let value = self.get_register_clone(argb as usize)?;
-        self.set_register(arga as usize, value);
+        self.set_register(arga as usize, value)?;
 
         Ok(())
     }

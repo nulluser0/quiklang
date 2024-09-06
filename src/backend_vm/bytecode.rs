@@ -118,8 +118,8 @@ impl Display for ByteCode {
             .map(|inner| {
                 format!(
                     "Inst: {} | Max Register: {}",
-                    inner.0.to_string(),
-                    inner.1.to_string()
+                    inner.0,
+                    inner.1
                 )
             })
             .collect::<Vec<String>>()

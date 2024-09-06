@@ -50,3 +50,9 @@ impl SymbolTable {
         None
     }
 }
+
+impl Default for SymbolTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
