@@ -264,6 +264,7 @@ pub enum VMBytecodeError {
 
 // VM Runtime specific errors
 #[derive(Error, Debug)]
+#[repr(C)]
 pub enum VMRuntimeError {
     #[error("STACK OVERFLOW")]
     StackOverflow,
