@@ -183,17 +183,15 @@ static DISPATCH_TABLE: [VmHandler; OP_NOP as usize + 1] = create_dispatch_table(
 
 #[derive(Debug)]
 pub struct VM {
-    registers: [RegisterVal; 256],
+    registers: Vec<RegisterVal>,
     pub constant_pool: Vec<RegisterVal>,
     pub function_indexes: Vec<usize>,
     pub program_counter: usize,
     pub instructions: Vec<Instruction>,
-    call_stack: [CallFrame; 1024], // Fixed-size array for stack allocation
-    stack_pointer: usize,          // Points to the next free slot in the call stack
+    call_stack: Vec<CallFrame>, // Fixed-size array for stack allocation
     qffi: QFFI,
 }
 
-const ARRAY_REPEAT_VALUE: RegisterVal = RegisterVal::Null;
 impl VM {
     pub fn new(
         instructions: Vec<Instruction>,
@@ -202,43 +200,38 @@ impl VM {
         _num_registers: usize,
     ) -> Self {
         VM {
-            registers: [ARRAY_REPEAT_VALUE; 256],
+            registers: Vec::with_capacity(512),
             constant_pool,
             program_counter: 0,
             instructions,
             function_indexes,
-            call_stack: [CallFrame {
-                return_pc: 0,
-                base: 0,
-            }; 1024], // Initialize with default CallFrame
-            stack_pointer: 0,
+            call_stack: Vec::with_capacity(2048),
             qffi: QFFI::new(),
         }
     }
 
     fn push_call_frame(&mut self, frame: CallFrame) -> Result<(), VMRuntimeError> {
-        if self.stack_pointer >= self.call_stack.len() {
-            return Err(VMRuntimeError::StackOverflow);
-        }
-        self.call_stack[self.stack_pointer] = frame;
-        self.stack_pointer += 1;
+        self.call_stack.push(frame);
         Ok(())
     }
 
     fn pop_call_frame(&mut self) -> Result<CallFrame, VMRuntimeError> {
-        if self.stack_pointer == 0 {
+        if self.call_stack.is_empty() {
             return Err(VMRuntimeError::StackUnderflow);
         }
-        self.stack_pointer -= 1;
-        Ok(self.call_stack[self.stack_pointer])
+        let frame = self.call_stack.pop().unwrap();
+        let base = frame.base + 1;
+        let len = self.registers.len();
+        self.registers.drain(base..len);
+        Ok(frame)
     }
 
     #[inline]
     fn current_offset(&mut self) -> usize {
-        if self.stack_pointer == 0 {
+        if self.call_stack.is_empty() {
             return 0;
         }
-        self.call_stack[self.stack_pointer - 1].base
+        self.call_stack[self.call_stack.len() - 1].base
     }
 
     // fn current_frame(&self) -> &CallFrame {
@@ -268,8 +261,8 @@ impl VM {
     // calls, and popping all of the frames on the stack.
     pub fn on_err_unwind_callstack(&mut self) {
         println!("Unwinding Callstack:");
-        println!("Stack pointer is at: {}", self.stack_pointer);
-        if self.stack_pointer > 20 {
+        println!("Stack pointer is at: {}", self.call_stack.len());
+        if self.call_stack.len() > 20 {
             println!("Truncating callstack to last 20 calls...");
         }
         let mut count: usize = 0;
@@ -303,12 +296,16 @@ impl VM {
     #[inline(always)]
     fn set_register(&mut self, register: usize, value: RegisterVal) {
         // When tinyvec is used, this will allocate memory for the register.
-        self.registers[register + self.current_offset()] = value;
+        let offset = self.current_offset();
+        self.registers
+            .resize(register + offset + 1, RegisterVal::Null);
+        self.registers[register + offset] = value;
     }
 
     #[inline(always)]
     fn get_register_mutref(&mut self, register: usize) -> &mut RegisterVal {
-        &mut self.registers[register + self.current_offset()]
+        let offset = self.current_offset();
+        &mut self.registers[register + offset]
     }
 
     #[inline(always)]
@@ -318,7 +315,8 @@ impl VM {
 
     #[inline(always)]
     fn get_register_clone(&mut self, register: usize) -> RegisterVal {
-        self.registers[register + self.current_offset()].clone()
+        let offset = self.current_offset();
+        self.registers[register + offset].clone()
     }
 
     #[inline(always)]
