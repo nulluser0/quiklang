@@ -297,8 +297,10 @@ impl VM {
     fn set_register(&mut self, register: usize, value: RegisterVal) {
         // When tinyvec is used, this will allocate memory for the register.
         let offset = self.current_offset();
-        self.registers
-            .resize(register + offset + 1, RegisterVal::Null);
+        if register + offset >= self.registers.len() {
+            self.registers
+                .resize(register + offset + 1, RegisterVal::Null);
+        }
         self.registers[register + offset] = value;
     }
 
