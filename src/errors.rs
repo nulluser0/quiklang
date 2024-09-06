@@ -283,6 +283,12 @@ pub enum VMRuntimeError {
     #[error("QFFI/Native Function Error: {0}")]
     QFFINativeFnError(String),
 
+    #[error("Access to a register that does not exist: {0}")]
+    InvalidRegisterAccess(usize),
+
+    #[error("Access to a constant that does not exist: {0}")]
+    InvalidConstantAccess(usize),
+
     #[error("Panic: {0}")]
     Panic(String),
 

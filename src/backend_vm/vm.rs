@@ -303,30 +303,49 @@ impl VM {
     }
 
     #[inline(always)]
-    fn get_register_mutref(&mut self, register: usize) -> &mut RegisterVal {
+    fn get_register_mutref(&mut self, register: usize) -> Result<&mut RegisterVal, VMRuntimeError> {
         let offset = self.current_offset();
-        &mut self.registers[register + offset]
+        if register + offset >= self.registers.len() {
+            return Err(VMRuntimeError::InvalidRegisterAccess(register + offset));
+        }
+        Ok(&mut self.registers[register + offset])
     }
 
     #[inline(always)]
-    fn get_register_ref(&self, register: usize, offset: usize) -> &RegisterVal {
-        &self.registers[register + offset]
+    fn get_register_ref(
+        &self,
+        register: usize,
+        offset: usize,
+    ) -> Result<&RegisterVal, VMRuntimeError> {
+        if register + offset >= self.registers.len() {
+            return Err(VMRuntimeError::InvalidRegisterAccess(register + offset));
+        }
+        Ok(&self.registers[register + offset])
     }
 
     #[inline(always)]
-    fn get_register_clone(&mut self, register: usize) -> RegisterVal {
+    fn get_register_clone(&mut self, register: usize) -> Result<RegisterVal, VMRuntimeError> {
         let offset = self.current_offset();
-        self.registers[register + offset].clone()
+        if register + offset >= self.registers.len() {
+            return Err(VMRuntimeError::InvalidRegisterAccess(register + offset));
+        }
+        Ok(self.registers[register + offset].clone())
     }
 
     #[inline(always)]
-    fn get_constant_clone(&mut self, index: usize) -> RegisterVal {
-        self.constant_pool[index].clone()
+    fn get_constant_clone(&mut self, index: usize) -> Result<RegisterVal, VMRuntimeError> {
+        if index >= self.constant_pool.len() {
+            return Err(VMRuntimeError::InvalidConstantAccess(index));
+        }
+        Ok(self.constant_pool[index].clone())
     }
 
     #[inline(always)]
-    fn get_constant_ref(&self, index: usize) -> &RegisterVal {
-        &self.constant_pool[index]
+    fn get_constant_ref(&self, index: usize) -> Result<&RegisterVal, VMRuntimeError> {
+        if index >= self.constant_pool.len() {
+            return Err(VMRuntimeError::InvalidConstantAccess(index));
+        }
+        Ok(&self.constant_pool[index])
     }
 
     pub fn execute(&mut self) -> Result<(), VMRuntimeError> {
@@ -348,7 +367,7 @@ impl VM {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
 
-        let value = std::mem::take(self.get_register_mutref(argb as usize));
+        let value = std::mem::take(self.get_register_mutref(argb as usize)?);
         self.set_register(arga as usize, value);
 
         Ok(())
@@ -359,7 +378,7 @@ impl VM {
         let arga = get_arga(inst);
         let argbx = get_argbx(inst);
 
-        let value = self.get_constant_clone(argbx as usize);
+        let value = self.get_constant_clone(argbx as usize)?;
         self.set_register(arga as usize, value);
 
         Ok(())
@@ -397,18 +416,23 @@ impl VM {
     }
 
     #[inline(always)]
-    fn fetch_values(&self, argb: i32, argc: i32, offset: usize) -> (&RegisterVal, &RegisterVal) {
+    fn fetch_values(
+        &self,
+        argb: i32,
+        argc: i32,
+        offset: usize,
+    ) -> Result<(&RegisterVal, &RegisterVal), VMRuntimeError> {
         let b_val = if is_k(argb) {
-            self.get_constant_ref(rk_to_k(argb) as usize)
+            self.get_constant_ref(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_ref(argb as usize, offset)
+            self.get_register_ref(argb as usize, offset)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_ref(rk_to_k(argc) as usize)
+            self.get_constant_ref(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_ref(argc as usize, offset)
+            self.get_register_ref(argc as usize, offset)?
         };
-        (b_val, c_val)
+        Ok((b_val, c_val))
     }
 
     #[inline(always)]
@@ -481,7 +505,7 @@ impl VM {
         let argc = get_argc(inst);
         let offset = self.current_offset();
 
-        let (b_val, c_val) = self.fetch_values(argb, argc, offset);
+        let (b_val, c_val) = self.fetch_values(argb, argc, offset)?;
 
         let result = match (b_val, c_val) {
             (RegisterVal::Int(left), RegisterVal::Int(right)) => {
@@ -525,14 +549,14 @@ impl VM {
         let argc = get_argc(inst);
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)
+            self.get_constant_clone(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)
+            self.get_register_clone(argb as usize)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)
+            self.get_constant_clone(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)
+            self.get_register_clone(argc as usize)?
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
@@ -549,14 +573,14 @@ impl VM {
         let argc = get_argc(inst);
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)
+            self.get_constant_clone(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)
+            self.get_register_clone(argb as usize)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)
+            self.get_constant_clone(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)
+            self.get_register_clone(argc as usize)?
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
@@ -576,7 +600,7 @@ impl VM {
         let argc = get_argc(inst);
         let offset = self.current_offset();
 
-        let (b_val, c_val) = self.fetch_values(argb, argc, offset);
+        let (b_val, c_val) = self.fetch_values(argb, argc, offset)?;
 
         self.set_register(arga as usize, RegisterVal::Bool(comp(b_val, c_val)));
 
@@ -663,7 +687,7 @@ impl VM {
         let arga = get_arga(inst);
         let argsbx = get_argsbx(inst);
 
-        if let RegisterVal::Bool(false) = self.get_register_mutref(arga as usize) {
+        if let RegisterVal::Bool(false) = self.get_register_mutref(arga as usize)? {
             self.program_counter = (self.program_counter as i32 + argsbx) as usize;
         }
 
@@ -743,7 +767,7 @@ impl VM {
         let arga = get_arga(inst);
         let offset = self.current_offset();
 
-        if let RegisterVal::Int(value) = self.get_register_ref(arga as usize, offset) {
+        if let RegisterVal::Int(value) = self.get_register_ref(arga as usize, offset)? {
             self.set_register(arga as usize, RegisterVal::Int(value.wrapping_add(1)));
         }
 
@@ -755,7 +779,7 @@ impl VM {
         let arga = get_arga(inst);
         let offset = self.current_offset();
 
-        if let RegisterVal::Int(value) = self.get_register_ref(arga as usize, offset) {
+        if let RegisterVal::Int(value) = self.get_register_ref(arga as usize, offset)? {
             self.set_register(arga as usize, RegisterVal::Int(value.wrapping_sub(1)));
         }
 
@@ -769,14 +793,14 @@ impl VM {
         let argc = get_argc(inst);
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)
+            self.get_constant_clone(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)
+            self.get_register_clone(argb as usize)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)
+            self.get_constant_clone(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)
+            self.get_register_clone(argc as usize)?
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
@@ -793,14 +817,14 @@ impl VM {
         let argc = get_argc(inst);
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)
+            self.get_constant_clone(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)
+            self.get_register_clone(argb as usize)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)
+            self.get_constant_clone(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)
+            self.get_register_clone(argc as usize)?
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
@@ -817,14 +841,14 @@ impl VM {
         let argc = get_argc(inst);
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)
+            self.get_constant_clone(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)
+            self.get_register_clone(argb as usize)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)
+            self.get_constant_clone(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)
+            self.get_register_clone(argc as usize)?
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
@@ -841,14 +865,14 @@ impl VM {
         let argc = get_argc(inst);
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)
+            self.get_constant_clone(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)
+            self.get_register_clone(argb as usize)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)
+            self.get_constant_clone(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)
+            self.get_register_clone(argc as usize)?
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
@@ -865,14 +889,14 @@ impl VM {
         let argc = get_argc(inst);
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)
+            self.get_constant_clone(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)
+            self.get_register_clone(argb as usize)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)
+            self.get_constant_clone(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)
+            self.get_register_clone(argc as usize)?
         };
 
         if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
@@ -889,14 +913,14 @@ impl VM {
         let argc = get_argc(inst);
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)
+            self.get_constant_clone(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)
+            self.get_register_clone(argb as usize)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)
+            self.get_constant_clone(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)
+            self.get_register_clone(argc as usize)?
         };
 
         if let (RegisterVal::Str(left), RegisterVal::Str(right)) = (b_val, c_val) {
@@ -926,7 +950,7 @@ impl VM {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
 
-        let value = self.get_register_clone(argb as usize);
+        let value = self.get_register_clone(argb as usize)?;
         self.set_register(arga as usize, value);
 
         Ok(())
