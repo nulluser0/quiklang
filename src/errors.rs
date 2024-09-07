@@ -244,6 +244,9 @@ pub enum VMCompileError {
 
     #[error("Cannot resolve non-existent symbol '{0}'")]
     UndefinedVariable(String),
+
+    #[error("Cannot resolve type from typedef.")]
+    UndefinedType,
 }
 
 // VM Bytecode specific errors

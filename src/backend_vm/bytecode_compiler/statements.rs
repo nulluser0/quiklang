@@ -1,16 +1,17 @@
 // Compiler Statements
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     backend_vm::instructions::{Abc, OP_MOVE, OP_RETURN},
     errors::VMCompileError,
-    frontend::ast::{Expr, Stmt, Type},
+    frontend::ast::{Expr, FromType, Stmt, Type},
 };
 
 use super::{
     compiler::{Compiler, ReturnValue},
     symbol_tracker::SymbolTable,
+    type_table::{self, TypeTableEntry, VMCompilerType},
 };
 
 impl Compiler {
@@ -21,6 +22,7 @@ impl Compiler {
         require_result: bool,
         fn_return: Option<usize>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
+        type_table: &Rc<RefCell<type_table::TypeTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         match stmt {
             Stmt::ExprStmt(expr) => self.compile_expression(
@@ -29,6 +31,7 @@ impl Compiler {
                 require_result,
                 fn_return,
                 symbol_table,
+                type_table,
             ),
             Stmt::DeclareStmt {
                 name,
@@ -36,9 +39,11 @@ impl Compiler {
                 is_global,
                 var_type: _,
                 expr,
-            } => self.compile_declare_stmt(name, is_global, expr, symbol_table),
-            Stmt::ReturnStmt(expr) => self.compile_return_stmt(expr, fn_return, symbol_table),
-            Stmt::BreakStmt(expr) => self.compile_break_stmt(expr, symbol_table),
+            } => self.compile_declare_stmt(name, is_global, expr, symbol_table, type_table),
+            Stmt::ReturnStmt(expr) => {
+                self.compile_return_stmt(expr, fn_return, symbol_table, type_table)
+            }
+            Stmt::BreakStmt(expr) => self.compile_break_stmt(expr, symbol_table, type_table),
             Stmt::FunctionDeclaration {
                 parameters,
                 name,
@@ -52,11 +57,12 @@ impl Compiler {
                 body,
                 is_async,
                 symbol_table,
+                type_table,
             ),
             Stmt::StructDefStmt {
                 ident,
                 key_type_values,
-            } => todo!(),
+            } => self.compile_struct_def_stmt(ident, key_type_values, type_table),
             Stmt::EnumDefStmt { ident, variants } => todo!(),
             Stmt::AliasDefStmt { ident, alias } => todo!(),
             Stmt::ExternFnDeclaration {
@@ -73,11 +79,12 @@ impl Compiler {
         _is_global: bool,
         expr: Option<Expr>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
+        type_table: &Rc<RefCell<type_table::TypeTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         let reg;
         if let Some(inner) = expr {
             reg = self
-                .compile_expression(inner, true, true, None, symbol_table)?
+                .compile_expression(inner, true, true, None, symbol_table, type_table)?
                 .safe_unwrap();
         } else {
             reg = self.allocate_register() as isize;
@@ -94,6 +101,7 @@ impl Compiler {
         body: Vec<Stmt>,
         _is_async: bool,
         symbol_table: &Rc<RefCell<SymbolTable>>,
+        type_table: &Rc<RefCell<type_table::TypeTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         let mut function_compiler = self.new_fake_compiler();
         let function_symbol_table = &Rc::new(RefCell::new(SymbolTable::new()));
@@ -123,6 +131,7 @@ impl Compiler {
                 true,
                 Some(result_register),
                 function_symbol_table,
+                type_table,
             )?;
         }
 
@@ -149,15 +158,41 @@ impl Compiler {
         Ok(ReturnValue::Normal(0))
     }
 
+    fn compile_struct_def_stmt(
+        &self,
+        ident: String,
+        key_type_values: HashMap<String, Type>,
+        type_table: &Rc<RefCell<type_table::TypeTable>>,
+    ) -> Result<ReturnValue, VMCompileError> {
+        let ident: &'static str = Box::leak(ident.into_boxed_str());
+        let mut fields: HashMap<&'static str, VMCompilerType> =
+            HashMap::with_capacity(key_type_values.len());
+
+        for (key, value) in key_type_values {
+            let key: &'static str = Box::leak(key.into_boxed_str());
+            let value = VMCompilerType::from_type(&value).ok_or(VMCompileError::UndefinedType)?;
+            fields.insert(key, value);
+        }
+
+        let entry = TypeTableEntry::StructDefStmt {
+            key_type_values: fields,
+        };
+
+        type_table.borrow_mut().declare_type(ident, entry);
+
+        Ok(ReturnValue::Normal(0))
+    }
+
     fn compile_return_stmt(
         &mut self,
         expr: Option<Expr>,
         fn_return: Option<usize>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
+        type_table: &Rc<RefCell<type_table::TypeTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         if let Some(inner) = expr {
             let reg = self
-                .compile_expression(inner, true, true, None, symbol_table)?
+                .compile_expression(inner, true, true, None, symbol_table, type_table)?
                 .safe_unwrap();
             if let Some(fn_reg) = fn_return {
                 self.add_instruction(Abc(OP_MOVE, fn_reg as i32, reg as i32, 0));
@@ -174,10 +209,11 @@ impl Compiler {
         &mut self,
         expr: Option<Expr>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
+        type_table: &Rc<RefCell<type_table::TypeTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
         if let Some(inner) = expr {
             let reg = self
-                .compile_expression(inner, true, true, None, symbol_table)?
+                .compile_expression(inner, true, true, None, symbol_table, type_table)?
                 .safe_unwrap();
             return Ok(ReturnValue::Break(reg));
         }

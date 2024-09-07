@@ -12,7 +12,7 @@ use crate::{
     frontend::ast::Stmt,
 };
 
-use super::symbol_tracker::SymbolTable;
+use super::{symbol_tracker::SymbolTable, type_table::TypeTable};
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum ReturnValue {
@@ -160,7 +160,17 @@ impl Compiler {
         let symbol_table: &Rc<RefCell<SymbolTable>> = &Rc::new(RefCell::new(
             SymbolTable::new_with_parent(root_symbol_table.clone()),
         ));
-        self.compile(stmts, symbol_table, root_symbol_table)
+        let root_type_table: &Rc<RefCell<TypeTable>> = &Rc::new(RefCell::new(TypeTable::new()));
+        let type_table: &Rc<RefCell<TypeTable>> = &Rc::new(RefCell::new(
+            TypeTable::new_with_parent(root_type_table.clone()),
+        ));
+        self.compile(
+            stmts,
+            symbol_table,
+            root_symbol_table,
+            type_table,
+            root_type_table,
+        )
     }
 
     pub fn compile(
@@ -168,6 +178,8 @@ impl Compiler {
         stmts: Vec<Stmt>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
         _root_symbol_table: &Rc<RefCell<SymbolTable>>,
+        type_table: &Rc<RefCell<TypeTable>>,
+        _root_type_table: &Rc<RefCell<TypeTable>>,
     ) -> Result<ByteCode, VMCompileError> {
         let metadata = BCMetadata {
             ql_version: str_to_byte_array(env!("CARGO_PKG_VERSION")),
@@ -176,7 +188,7 @@ impl Compiler {
         };
 
         // Generate bytecode from AST
-        self.compile_statements(stmts, symbol_table)?;
+        self.compile_statements(stmts, symbol_table, type_table)?;
 
         // Append function_insts into main instructions
         self.add_instruction(Abc(OP_EXIT, 0, 0, 0)); // Prevent unintended execution of functions
@@ -210,9 +222,10 @@ impl Compiler {
         &mut self,
         stmts: Vec<Stmt>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
+        type_table: &Rc<RefCell<TypeTable>>,
     ) -> Result<(), VMCompileError> {
         for stmt in stmts {
-            self.compile_statement(stmt, true, false, None, symbol_table)?;
+            self.compile_statement(stmt, true, false, None, symbol_table, type_table)?;
         }
         Ok(())
     }

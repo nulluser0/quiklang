@@ -4,7 +4,9 @@ use quiklang::{
     backend_interpreter::environment::Environment,
     backend_vm::{
         bytecode::ByteCode,
-        bytecode_compiler::{compiler::Compiler, symbol_tracker::SymbolTable},
+        bytecode_compiler::{
+            compiler::Compiler, symbol_tracker::SymbolTable, type_table::TypeTable,
+        },
         vm::VM,
     },
     errors::{self, VMRuntimeError},
@@ -135,6 +137,11 @@ fn repl_vm() {
         SymbolTable::new_with_parent(root_symbol_table.clone()),
     ));
 
+    let root_type_table = &Rc::new(RefCell::new(TypeTable::new()));
+    let type_table = &Rc::new(RefCell::new(TypeTable::new_with_parent(
+        root_type_table.clone(),
+    )));
+
     let config = Config::builder().build();
     let mut rl = Editor::<()>::with_config(config);
 
@@ -181,6 +188,8 @@ fn repl_vm() {
                     &mut vm,
                     symbol_table,
                     root_symbol_table,
+                    type_table,
+                    root_type_table,
                 );
             }
             Err(ReadlineError::Interrupted) => {
