@@ -11,7 +11,7 @@ use quiklang::{
     },
     errors::{self, VMRuntimeError},
     frontend::type_environment::TypeEnvironment,
-    utils::run::{print_e, run_interpreter, run_vm, run_vm_repl},
+    utils::run::{print_e, run_interpreter, run_vm, run_vm_repl, RunVmReplArgs},
 };
 use rustyline::{error::ReadlineError, Config, Editor};
 
@@ -180,17 +180,17 @@ fn repl_vm() {
                     continue;
                 }
 
-                run_vm_repl(
-                    trimmed_line.to_string(),
-                    &type_env,
-                    &root_type_env,
-                    &mut compiler,
-                    &mut vm,
+                run_vm_repl(RunVmReplArgs {
+                    input: trimmed_line.to_string(),
+                    type_env: &type_env,
+                    root_type_env: &root_type_env,
+                    compiler: &mut compiler,
+                    vm: &mut vm,
                     symbol_table,
                     root_symbol_table,
                     type_table,
                     root_type_table,
-                );
+                });
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");

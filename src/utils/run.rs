@@ -10,16 +10,31 @@ use crate::{
     frontend::{parser, type_environment::TypeEnvironment},
 };
 
+// To also shut up clippy
+pub struct RunVmReplArgs<'a> {
+    pub input: String,
+    pub type_env: &'a Rc<RefCell<TypeEnvironment>>,
+    pub root_type_env: &'a Rc<RefCell<TypeEnvironment>>,
+    pub compiler: &'a mut Compiler,
+    pub vm: &'a mut VM,
+    pub symbol_table: &'a Rc<RefCell<SymbolTable>>,
+    pub root_symbol_table: &'a Rc<RefCell<SymbolTable>>,
+    pub type_table: &'a Rc<RefCell<type_table::TypeTable>>,
+    pub root_type_table: &'a Rc<RefCell<type_table::TypeTable>>,
+}
+
 pub fn run_vm_repl(
-    input: String,
-    type_env: &Rc<RefCell<TypeEnvironment>>,
-    root_type_env: &Rc<RefCell<TypeEnvironment>>,
-    compiler: &mut Compiler,
-    vm: &mut VM,
-    symbol_table: &Rc<RefCell<SymbolTable>>,
-    root_symbol_table: &Rc<RefCell<SymbolTable>>,
-    type_table: &Rc<RefCell<type_table::TypeTable>>,
-    root_type_table: &Rc<RefCell<type_table::TypeTable>>,
+    RunVmReplArgs {
+        input,
+        type_env,
+        root_type_env,
+        compiler,
+        vm,
+        symbol_table,
+        root_symbol_table,
+        type_table,
+        root_type_table,
+    }: RunVmReplArgs,
 ) {
     let mut parser = parser::Parser::new();
     match parser.produce_ast(input, type_env, root_type_env) {
