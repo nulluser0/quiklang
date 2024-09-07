@@ -14,6 +14,17 @@ use super::{
     type_table::{self, TypeTableEntry, VMCompilerType},
 };
 
+// Once again to shut up clippy
+struct FunctionDeclarationArgs<'a> {
+    parameters: Vec<(String, Type, bool)>,
+    name: String,
+    _return_type: Type,
+    body: Vec<Stmt>,
+    _is_async: bool,
+    symbol_table: &'a Rc<RefCell<SymbolTable>>,
+    type_table: &'a Rc<RefCell<type_table::TypeTable>>,
+}
+
 impl Compiler {
     pub(super) fn compile_statement(
         &mut self,
@@ -50,15 +61,15 @@ impl Compiler {
                 return_type,
                 body,
                 is_async,
-            } => self.compile_function_declaration(
+            } => self.compile_function_declaration(FunctionDeclarationArgs {
                 parameters,
                 name,
-                return_type,
+                _return_type: return_type,
                 body,
-                is_async,
+                _is_async: is_async,
                 symbol_table,
                 type_table,
-            ),
+            }),
             Stmt::StructDefStmt {
                 ident,
                 key_type_values,
@@ -95,13 +106,14 @@ impl Compiler {
 
     fn compile_function_declaration(
         &mut self,
-        parameters: Vec<(String, Type, bool)>,
-        name: String,
-        _return_type: Type,
-        body: Vec<Stmt>,
-        _is_async: bool,
-        symbol_table: &Rc<RefCell<SymbolTable>>,
-        type_table: &Rc<RefCell<type_table::TypeTable>>,
+        FunctionDeclarationArgs {
+            parameters,
+            name,
+            body,
+            symbol_table,
+            type_table,
+            ..
+        }: FunctionDeclarationArgs,
     ) -> Result<ReturnValue, VMCompileError> {
         let mut function_compiler = self.new_fake_compiler();
         let function_symbol_table = &Rc::new(RefCell::new(SymbolTable::new()));
