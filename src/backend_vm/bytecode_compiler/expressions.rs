@@ -18,8 +18,18 @@ use crate::{
 use super::{
     compiler::{Compiler, ReturnValue},
     symbol_tracker::SymbolTable,
-    type_table::{self, TypeTable},
+    type_table::TypeTable,
 };
+
+struct IfArgs<'a> {
+    condition: Expr,
+    then: Vec<Stmt>,
+    else_stmt: Option<Vec<Stmt>>,
+    require_result: bool,
+    fn_return: Option<usize>,
+    symbol_table: &'a Rc<RefCell<SymbolTable>>,
+    type_table: &'a Rc<RefCell<TypeTable>>,
+}
 
 impl Compiler {
     pub(super) fn compile_expression(
@@ -60,15 +70,15 @@ impl Compiler {
                 condition,
                 then,
                 else_stmt,
-            } => self.compile_if_expr(
-                *condition,
+            } => self.compile_if_expr(IfArgs {
+                condition: *condition,
                 then,
                 else_stmt,
                 require_result,
                 fn_return,
                 symbol_table,
                 type_table,
-            ),
+            }),
             Expr::ForExpr {
                 identifier,
                 iterable,
@@ -301,13 +311,15 @@ impl Compiler {
 
     fn compile_if_expr(
         &mut self,
-        condition: Expr,
-        then: Vec<Stmt>,
-        else_stmt: Option<Vec<Stmt>>,
-        require_result: bool,
-        fn_return: Option<usize>,
-        symbol_table: &Rc<RefCell<SymbolTable>>,
-        type_table: &Rc<RefCell<TypeTable>>,
+        IfArgs {
+            condition,
+            then,
+            else_stmt,
+            require_result,
+            fn_return,
+            symbol_table,
+            type_table,
+        }: IfArgs,
     ) -> Result<ReturnValue, VMCompileError> {
         // Typical bytecode representation of if expr:
         //      r1 = evaluate condition
