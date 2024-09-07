@@ -21,6 +21,7 @@ use super::{
     type_table::TypeTable,
 };
 
+// To shut up the clippy linter
 struct IfArgs<'a> {
     condition: Expr,
     then: Vec<Stmt>,
