@@ -41,6 +41,7 @@ pub enum Type {
     Range(Box<Type>),
     Tuple(Vec<Type>),
     Mismatch,
+    Future(Box<Type>),
 
     Struct(String, HashMap<String, Type>),
     Enum(String, HashMap<String, Vec<Type>>),
@@ -70,6 +71,7 @@ impl std::fmt::Display for Type {
                 write!(f, "({})", elements.join(", "))
             }
             Type::Mismatch => write!(f, "(Multiple, Mismatched Return Types)"),
+            Type::Future(inner) => write!(f, "Future<{}>", inner),
             Type::Function(params, return_type) => {
                 let mut params_string: String = String::new();
                 for (i, param) in params.iter().enumerate() {

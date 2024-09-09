@@ -412,6 +412,12 @@ impl Parser {
                 .collect(),
             Box::new(return_type.clone()),
         );
+
+        // If async, ensure the return type is Future<T>
+        if is_async {
+            return_type = Type::Future(Box::new(return_type));
+        }
+
         type_env
             .borrow_mut()
             .declare_fn(&name, fn_type.clone(), &declaration)?;

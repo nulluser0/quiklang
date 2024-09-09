@@ -30,6 +30,7 @@ pub enum VMCompilerType {
     Float,
     Null,
     Bool,
+    Future(Box<VMCompilerType>),
     Function(Vec<VMCompilerType>, Box<VMCompilerType>),
     Array(Box<VMCompilerType>),
     Range(Box<VMCompilerType>),
@@ -70,6 +71,7 @@ impl FromType for VMCompilerType {
                 Some(Self::Tuple(types))
             }
             Type::Mismatch => Some(Self::Null),
+            Type::Future(inner) => Some(Self::Future(Box::new(Self::from_type(inner)?))),
             Type::Struct(_, _) => todo!(),
             Type::Enum(_, _) => todo!(),
             Type::Alias(_, _) => todo!(),

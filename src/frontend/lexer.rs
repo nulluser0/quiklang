@@ -68,6 +68,7 @@ pub enum Keyword {
     Exit,   // exit
     Break,  // break
     Async,  // async
+    Await,  // await
     While,  // while
     For,    // for
     Loop,   // loop
@@ -99,6 +100,7 @@ impl FromStr for Keyword {
             "exit" => Ok(Keyword::Exit),
             "break" => Ok(Keyword::Break),
             "async" => Ok(Keyword::Async),
+            "await" => Ok(Keyword::Await),
             "while" => Ok(Keyword::While),
             "for" => Ok(Keyword::For),
             "loop" => Ok(Keyword::Loop),
@@ -131,6 +133,7 @@ impl std::fmt::Display for Keyword {
             Keyword::Exit => write!(f, "Keyword 'exit'"),
             Keyword::Break => write!(f, "Keyword 'break'"),
             Keyword::Async => write!(f, "Keyword 'async'"),
+            Keyword::Await => write!(f, "Keyword 'await'"),
             Keyword::While => write!(f, "Keyword 'while'"),
             Keyword::For => write!(f, "Keyword 'for'"),
             Keyword::Loop => write!(f, "Keyword 'loop'"),
