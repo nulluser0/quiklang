@@ -6,6 +6,8 @@ use std::{
     sync::Arc,
 };
 
+use tokio::sync::{oneshot, Mutex};
+
 use crate::errors::VMRuntimeError;
 
 use std::hash::Hash;
@@ -19,7 +21,7 @@ use super::{
     qffi::QFFI,
 };
 
-type VmHandler = fn(&mut VM, Instruction) -> Result<(), VMRuntimeError>;
+type VmHandler = fn(&mut VMThread, Instruction) -> Result<(), VMRuntimeError>;
 
 #[repr(C, align(2))]
 #[derive(Debug, Clone, Copy)]
@@ -139,85 +141,233 @@ impl Hash for RegisterVal {
 
 const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
     [
-        VM::op_move,
-        VM::op_loadconst,
-        VM::op_loadbool,
-        VM::op_loadnull,
-        VM::op_add,
-        VM::op_sub,
-        VM::op_mul,
-        VM::op_div,
-        VM::op_mod,
-        VM::op_pow,
-        VM::op_not,
-        VM::op_and,
-        VM::op_or,
-        VM::op_eq,
-        VM::op_ne,
-        VM::op_lt,
-        VM::op_le,
-        VM::op_gt,
-        VM::op_ge,
-        VM::op_jump,
-        VM::op_jump_if_true,
-        VM::op_jump_if_false,
-        VM::op_call,
-        VM::op_native_call,
-        VM::op_qffi_call,
-        VM::op_tailcall,
-        VM::op_return,
-        VM::op_inc,
-        VM::op_dec,
-        VM::op_bitand,
-        VM::op_bitor,
-        VM::op_bitxor,
-        VM::op_shl,
-        VM::op_shr,
-        VM::op_concat,
-        VM::op_destructor,
-        VM::op_exit,
-        VM::op_clone,
-        VM::op_nop,
+        VMThread::op_move,
+        VMThread::op_loadconst,
+        VMThread::op_loadbool,
+        VMThread::op_loadnull,
+        VMThread::op_add,
+        VMThread::op_sub,
+        VMThread::op_mul,
+        VMThread::op_div,
+        VMThread::op_mod,
+        VMThread::op_pow,
+        VMThread::op_not,
+        VMThread::op_and,
+        VMThread::op_or,
+        VMThread::op_eq,
+        VMThread::op_ne,
+        VMThread::op_lt,
+        VMThread::op_le,
+        VMThread::op_gt,
+        VMThread::op_ge,
+        VMThread::op_jump,
+        VMThread::op_jump_if_true,
+        VMThread::op_jump_if_false,
+        VMThread::op_call,
+        VMThread::op_native_call,
+        VMThread::op_qffi_call,
+        VMThread::op_tailcall,
+        VMThread::op_return,
+        VMThread::op_inc,
+        VMThread::op_dec,
+        VMThread::op_bitand,
+        VMThread::op_bitor,
+        VMThread::op_bitxor,
+        VMThread::op_shl,
+        VMThread::op_shr,
+        VMThread::op_concat,
+        VMThread::op_destructor,
+        VMThread::op_exit,
+        VMThread::op_clone,
+        VMThread::op_nop,
     ]
 }
 
 static DISPATCH_TABLE: [VmHandler; OP_NOP as usize + 1] = create_dispatch_table();
 
+// The global state, which is the VM itself. Holds immutable, shared data, which local states (VMThread) can access.
 #[derive(Debug)]
 #[repr(C)]
 pub struct VM {
-    registers: [RegisterVal; 5000],
-    pub constant_pool: Vec<RegisterVal>,
-    pub function_indexes: Vec<usize>, // (inst_ptr, max_reg
-    pub program_counter: usize,
-    pub main_fn_max_reg: usize,
-    pub instructions: Vec<Instruction>,
-    call_stack: [CallFrame; 2000], // Fixed-size array for stack allocation
-    call_stack_pointer: usize,
-    qffi: QFFI,
+    constant_pool: Vec<RegisterVal>, // Constant pool
+    function_indexes: Vec<usize>,    // Function indexes
+    instructions: Vec<Instruction>,  // Instructions
+    qffi: QFFI,                      // QFFI instance
+    threads: Mutex<HashMap<usize, tokio::task::JoinHandle<()>>>, // Active threads
+    thread_id_counter: Mutex<usize>, // For assigning unique thread IDs
+                                     // TODO: Add a symbol table for global variables
+                                     // TODO: MPSC channel for inter-thread communication
+}
+
+pub struct VMThread {
+    thread_id: usize,               // Thread ID
+    program_counter: usize,         // Local PC
+    vm: Arc<VM>,                    // Global state (VM)
+    registers: [RegisterVal; 5000], // Local registers
+    call_stack: [CallFrame; 2000],  // Local call stack
+    call_stack_pointer: usize,      // Local stack pointer
 }
 
 const ARRAY_REPEAT_VALUE: RegisterVal = RegisterVal::Null;
+
 impl VM {
+    // Create a new VM instance
     pub fn new(
         instructions: Vec<Instruction>,
         constant_pool: Vec<RegisterVal>,
         function_indexes: Vec<usize>,
-        main_fn_max_reg: usize,
+        // main_fn_max_reg: usize,
     ) -> Self {
         VM {
-            registers: [ARRAY_REPEAT_VALUE; 5000],
             constant_pool,
-            program_counter: 0,
-            main_fn_max_reg,
             instructions,
             function_indexes,
+            qffi: QFFI::new(),
+            threads: Mutex::new(HashMap::new()),
+            thread_id_counter: Mutex::new(0),
+        }
+    }
+
+    // Create a new VM instance from a bytecode
+    pub fn from_bytecode(bytecode: ByteCode) -> Self {
+        VM::new(
+            bytecode.instructions().clone(),
+            bytecode.constant_pool().clone(),
+            bytecode
+                .qlang_functions
+                .iter()
+                .map(|f| *f as usize)
+                .collect::<Vec<usize>>()
+                .clone(),
+            // *bytecode.register_count() as usize,
+        )
+    }
+
+    // Async API to spawn a new thread (VMThread) and execute it
+    #[inline(always)]
+    pub async fn spawn_thread(&mut self, mut vm_thread: VMThread) -> Result<usize, VMRuntimeError> {
+        let (tx, rx) = oneshot::channel();
+
+        // TODO: Optimize this, as it is not efficient to lock the mutex every time a thread is spawned
+        let thread_id = {
+            let mut counter = self.thread_id_counter.lock().await;
+            *counter += 1;
+            *counter
+        };
+
+        vm_thread.thread_id = thread_id;
+
+        let handle = tokio::spawn(async move {
+            let result = vm_thread.execute().await; // Execute thread's instructions
+            let _ = tx.send(result); // Send result back to parent
+        });
+
+        // Store thread in the thread manager
+        self.threads.lock().await.insert(thread_id, handle);
+
+        Ok(thread_id)
+    }
+
+    // Async API to check if a thread has finished and get the result
+    #[inline(always)]
+    pub async fn join_thread(&mut self, thread_id: usize) -> Result<(), VMRuntimeError> {
+        if let Some(handle) = self.threads.lock().await.remove(&thread_id) {
+            handle
+                .await
+                .map_err(|e| VMRuntimeError::ThreadJoinError(thread_id, e))?;
+            Ok(())
+        } else {
+            Err(VMRuntimeError::InvalidThreadId(thread_id))
+        }
+    }
+
+    // API to fetch a constant from the constant pool
+    #[inline(always)]
+    pub fn get_constant(&self, index: usize) -> Option<&RegisterVal> {
+        self.constant_pool.get(index)
+    }
+
+    // API to fetch constant pool len
+    #[inline(always)]
+    pub fn get_constant_pool_len(&self) -> usize {
+        self.constant_pool.len()
+    }
+
+    // API to fetch an instruction from the instruction pool
+    #[inline(always)]
+    pub fn get_instruction(&self, pc: usize) -> Option<&Instruction> {
+        self.instructions.get(pc)
+    }
+
+    // API to fetch instruction pool len
+    #[inline(always)]
+    pub fn get_instruction_len(&self) -> usize {
+        self.instructions.len()
+    }
+
+    // API to access Native QFFI functions
+    #[inline(always)]
+    pub fn call_qffi_native(
+        &self,
+        index: usize,
+        args: &[RegisterVal],
+    ) -> Result<RegisterVal, VMRuntimeError> {
+        self.qffi.call_native_function(index, args)
+    }
+
+    // API to access Extern QFFI functions
+    #[inline(always)]
+    pub fn call_qffi_extern(
+        &self,
+        index: usize,
+        args: &[RegisterVal],
+    ) -> Result<RegisterVal, VMRuntimeError> {
+        self.qffi.call_extern_function(index, args)
+    }
+
+    // API to fetch function index
+    #[inline(always)]
+    pub fn get_function_index(&self, fn_id: usize) -> Option<&usize> {
+        self.function_indexes.get(fn_id)
+    }
+
+    // API to fetch function index len
+    #[inline(always)]
+    pub fn get_function_index_len(&self) -> usize {
+        self.function_indexes.len()
+    }
+
+    // Async API to process exit code
+    // We need to terminate all threads.
+    // Propagating the exit code to the caller of VM.execute() is done by the thread that called this function.
+    #[inline(always)]
+    pub async fn process_exit(&self) {
+        // Terminate all threads
+        for (_, handle) in self.threads.lock().await.drain() {
+            handle.abort();
+        }
+    }
+
+    // Execute the VM
+    // This function simply initializes a new VMThread and executes it.
+    pub async fn execute(self) -> Result<RegisterVal, VMRuntimeError> {
+        let mut vm_thread = VMThread::new(Arc::new(self));
+        vm_thread.execute().await
+    }
+}
+
+impl VMThread {
+    pub fn new(vm: Arc<VM>) -> Self {
+        VMThread {
+            thread_id: 0,
+            program_counter: 0,
+            vm,
+            registers: [ARRAY_REPEAT_VALUE; 5000],
             call_stack: [CallFrame {
                 return_pc: 0,
                 base: 0,
             }; 2000],
             call_stack_pointer: 0,
-            qffi: QFFI::new(),
         }
     }
 
@@ -253,23 +403,10 @@ impl VM {
     //     &self.call_stack[self.stack_pointer - 1]
     // }
 
-    pub fn from_bytecode(bytecode: ByteCode) -> Self {
-        VM::new(
-            bytecode.instructions().clone(),
-            bytecode.constant_pool().clone(),
-            bytecode
-                .qlang_functions
-                .iter()
-                .map(|f| *f as usize)
-                .collect::<Vec<usize>>()
-                .clone(),
-            *bytecode.register_count() as usize,
-        )
-    }
-
     #[inline(always)]
     fn fetch_instruction(&self) -> Instruction {
-        self.instructions[self.program_counter]
+        // self.instructions[self.program_counter]
+        *self.vm.get_instruction(self.program_counter).unwrap()
     }
 
     // This on_err function unwinds the callstack, displaying the user the last 20
@@ -366,31 +503,49 @@ impl VM {
 
     #[inline(always)]
     fn get_constant_clone(&mut self, index: usize) -> Result<RegisterVal, VMRuntimeError> {
-        if index >= self.constant_pool.len() {
-            return Err(VMRuntimeError::InvalidConstantAccess(index));
-        }
-        Ok(self.constant_pool[index].clone())
+        self.vm
+            .get_constant(index)
+            .cloned()
+            .ok_or(VMRuntimeError::InvalidConstantAccess(index))
     }
 
     #[inline(always)]
     fn get_constant_ref(&self, index: usize) -> Result<&RegisterVal, VMRuntimeError> {
-        if index >= self.constant_pool.len() {
-            return Err(VMRuntimeError::InvalidConstantAccess(index));
-        }
-        Ok(&self.constant_pool[index])
+        self.vm
+            .get_constant(index)
+            .ok_or(VMRuntimeError::InvalidConstantAccess(index))
     }
 
-    pub fn execute(&mut self) -> Result<(), VMRuntimeError> {
-        while self.program_counter < self.instructions.len() {
+    #[inline(always)]
+    fn on_thread_failure(&mut self, error: VMRuntimeError) -> VMRuntimeError {
+        println!("Thread ID: {} failed with error: {}", self.thread_id, error);
+        self.on_error_cleanup();
+        error
+    }
+
+    pub async fn execute(&mut self) -> Result<RegisterVal, VMRuntimeError> {
+        // The result is typically register[0], which is the return value of the function. This is important for async functions.
+        let inst_len = self.vm.get_instruction_len();
+        while self.program_counter < inst_len {
             let inst = self.fetch_instruction();
             let opcode = get_opcode(inst);
             if opcode as usize >= DISPATCH_TABLE.len() {
                 return Err(VMRuntimeError::InvalidOpcode(opcode, self.program_counter));
             }
-            DISPATCH_TABLE[opcode as usize](self, inst)?;
+            match DISPATCH_TABLE[opcode as usize](self, inst) {
+                // The instruction was successful, so we continue to the next instruction
+                Ok(_) => {}
+                // Process exited, so we need to interrupt the execution and return the exit code
+                Err(VMRuntimeError::Exit(code)) => {
+                    self.vm.process_exit().await;
+                    return Err(VMRuntimeError::Exit(code));
+                }
+                // The thread failed, so we should unwind the callstack and clean up the memory
+                Err(e) => return Err(self.on_thread_failure(e)),
+            };
             self.program_counter += 1;
         }
-        Ok(())
+        Ok(self.registers.first().unwrap_or(&RegisterVal::Null).clone())
     }
 
     #[inline(always)]
@@ -746,8 +901,8 @@ impl VM {
         self.push_call_frame(call_frame)?;
 
         // Set the program counter to the function's starting instruction
-        if (arga as usize) < self.function_indexes.len() {
-            self.program_counter = self.function_indexes[arga as usize];
+        if (arga as usize) < self.vm.get_function_index_len() {
+            self.program_counter = *self.vm.get_function_index(arga as usize).unwrap();
             // return; TODO: Fix to possibly avoid pc --1
             self.program_counter -= 1;
         } else {
@@ -771,7 +926,7 @@ impl VM {
             args.push(self.registers[i].clone());
         }
 
-        self.qffi.call_native_function(arga as usize, &args)?;
+        self.vm.call_qffi_native(arga as usize, &args)?;
         Ok(())
     }
 

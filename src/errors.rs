@@ -34,6 +34,7 @@
 //! ```
 
 use thiserror::Error;
+use tokio::task::JoinError;
 
 use crate::{
     backend_interpreter::values::ValueType,
@@ -292,6 +293,12 @@ pub enum VMRuntimeError {
 
     #[error("Access to a constant that does not exist: {0}")]
     InvalidConstantAccess(usize),
+
+    #[error("Failed to join thread: {0}. JoinError: {1}")]
+    ThreadJoinError(usize, JoinError),
+
+    #[error("Invalid thread ID: {0}")]
+    InvalidThreadId(usize),
 
     #[error("Panic: {0}")]
     Panic(String),

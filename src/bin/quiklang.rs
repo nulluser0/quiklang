@@ -13,7 +13,7 @@ use quiklang::{
     },
     errors::{self, VMRuntimeError},
     frontend::type_environment::TypeEnvironment,
-    utils::run::{print_e, run_interpreter, run_vm, run_vm_repl, RunVmReplArgs},
+    utils::run::{print_e, run_interpreter, run_vm, RunVmReplArgs},
 };
 use rustyline::{error::ReadlineError, Config, Editor};
 
@@ -97,13 +97,12 @@ async fn run_file_vm(file_path: &str) {
             process::exit(1);
         });
 
-        let mut vm = VM::from_bytecode(bytecode);
-        match vm.execute() {
+        let vm = VM::from_bytecode(bytecode);
+        match vm.execute().await {
             Ok(_) => {}
             Err(VMRuntimeError::Exit(code)) => process::exit(code),
             Err(e) => {
                 print_e(errors::Error::VMRuntimeError(e));
-                vm.on_error_cleanup();
             }
         }
     } else {
@@ -128,7 +127,7 @@ async fn repl_vm() {
     println!("Running experimental VM backend mode. Some things may be broken.");
 
     let mut compiler = Compiler::new();
-    let mut vm = VM::new(vec![], vec![], vec![], 0);
+    let mut vm = VM::new(vec![], vec![], vec![]);
 
     let mut root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
     let mut type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
@@ -172,7 +171,7 @@ async fn repl_vm() {
                         root_type_env.clone(),
                     )));
                     compiler = Compiler::new();
-                    vm = VM::new(vec![], vec![], vec![], 0);
+                    vm = VM::new(vec![], vec![], vec![]);
                     continue;
                 }
 
@@ -183,17 +182,21 @@ async fn repl_vm() {
                     continue;
                 }
 
-                run_vm_repl(RunVmReplArgs {
-                    input: trimmed_line.to_string(),
-                    type_env: &type_env,
-                    root_type_env: &root_type_env,
-                    compiler: &mut compiler,
-                    vm: &mut vm,
-                    symbol_table,
-                    root_symbol_table,
-                    type_table,
-                    root_type_table,
-                });
+                unimplemented!(
+                    "yeah repl_vm is broken due to implementation of multithreading in VM"
+                );
+
+                // run_vm_repl(RunVmReplArgs {
+                //     input: trimmed_line.to_string(),
+                //     type_env: &type_env,
+                //     root_type_env: &root_type_env,
+                //     compiler: &mut compiler,
+                //     vm: &mut vm,
+                //     symbol_table,
+                //     root_symbol_table,
+                //     type_table,
+                //     root_type_table,
+                // });
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");
