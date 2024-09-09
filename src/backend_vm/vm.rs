@@ -3,7 +3,7 @@
 use std::{
     collections::{HashMap, HashSet},
     hash::Hasher,
-    rc::Rc,
+    sync::Arc,
 };
 
 use crate::errors::VMRuntimeError;
@@ -59,11 +59,11 @@ pub enum RegisterVal {
     Int(i64),
     Float(f64),
     Bool(bool),
-    Str(Rc<String>),
-    Array(Rc<Vec<RegisterVal>>),
-    Range(Rc<(RegisterVal, RegisterVal, bool)>),
-    HashMap(Rc<HashMap<RegisterVal, RegisterVal>>),
-    HashSet(Rc<HashSet<RegisterVal>>),
+    Str(Arc<String>),
+    Array(Arc<Vec<RegisterVal>>),
+    Range(Arc<(RegisterVal, RegisterVal, bool)>),
+    HashMap(Arc<HashMap<RegisterVal, RegisterVal>>),
+    HashSet(Arc<HashSet<RegisterVal>>),
     #[default]
     Null,
 }
@@ -956,7 +956,7 @@ impl VM {
 
         if let (RegisterVal::Str(left), RegisterVal::Str(right)) = (b_val, c_val) {
             let concatenated = format!("{}{}", left, right);
-            self.set_register(arga as usize, RegisterVal::Str(Rc::new(concatenated)))?;
+            self.set_register(arga as usize, RegisterVal::Str(Arc::new(concatenated)))?;
         }
 
         Ok(())

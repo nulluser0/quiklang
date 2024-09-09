@@ -1,4 +1,6 @@
-use std::{cell::RefCell, fs::File, io::Read, process, rc::Rc};
+use tokio::{fs::File, io::AsyncReadExt};
+
+use std::{cell::RefCell, process, rc::Rc};
 
 use quiklang::{
     backend_interpreter::environment::Environment,
@@ -15,7 +17,8 @@ use quiklang::{
 };
 use rustyline::{error::ReadlineError, Config, Editor};
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     match args.as_slice() {
@@ -23,16 +26,16 @@ fn main() {
         [_] => print_usage(),
 
         // If "vm" is passed then the file, execute the file using vm mode
-        [_, cmd, file_path] if cmd == "vm" => run_file_vm(file_path),
+        [_, cmd, file_path] if cmd == "vm" => run_file_vm(file_path).await,
 
         // If "repl" is passed, start the REPL
-        [_, cmd] if cmd == "repl" => repl(),
+        [_, cmd] if cmd == "repl" => repl().await,
 
         // If "repl_vm" is passed, start the REPL_VM
-        [_, cmd] if cmd == "repl_vm" => repl_vm(),
+        [_, cmd] if cmd == "repl_vm" => repl_vm().await,
 
         // If a file path is passed, execute the file
-        [_, file_path] => run_file_interpreter(file_path),
+        [_, file_path] => run_file_interpreter(file_path).await,
 
         // Print usage instructions if the input is invalid
         _ => print_usage(),
@@ -46,8 +49,8 @@ fn print_usage() {
     println!("  <file> - Execute the specified QuikLang script file");
 }
 
-fn run_file_interpreter(file_path: &str) {
-    let mut file = match File::open(file_path) {
+async fn run_file_interpreter(file_path: &str) {
+    let mut file = match File::open(file_path).await {
         Ok(file) => file,
         Err(e) => {
             println!("Error opening file {}: {}", file_path, e);
@@ -56,7 +59,7 @@ fn run_file_interpreter(file_path: &str) {
     };
 
     let mut content = String::new();
-    if let Err(e) = file.read_to_string(&mut content) {
+    if let Err(e) = file.read_to_string(&mut content).await {
         println!("Error reading file {}: {}", file_path, e);
         process::exit(1);
     }
@@ -71,8 +74,8 @@ fn run_file_interpreter(file_path: &str) {
     run_interpreter(content, &env, &type_env, &root_type_env)
 }
 
-fn run_file_vm(file_path: &str) {
-    let mut file = match File::open(file_path) {
+async fn run_file_vm(file_path: &str) {
+    let mut file = match tokio::fs::File::open(file_path).await {
         Ok(file) => file,
         Err(e) => {
             println!("Error opening file {}: {}", file_path, e);
@@ -83,7 +86,7 @@ fn run_file_vm(file_path: &str) {
     if file_path.ends_with(".qlbc") {
         // Read the file as binary data
         let mut content = Vec::new();
-        if let Err(e) = file.read_to_end(&mut content) {
+        if let Err(e) = file.read_to_end(&mut content).await {
             println!("Error reading file {}: {}", file_path, e);
             process::exit(1);
         }
@@ -106,7 +109,7 @@ fn run_file_vm(file_path: &str) {
     } else {
         // Read the file as a UTF-8 string
         let mut content = String::new();
-        if let Err(e) = file.read_to_string(&mut content) {
+        if let Err(e) = file.read_to_string(&mut content).await {
             println!("Error reading file {}: {}", file_path, e);
             process::exit(1);
         }
@@ -116,11 +119,11 @@ fn run_file_vm(file_path: &str) {
             root_type_env.clone(),
         )));
 
-        run_vm(content, &type_env, &root_type_env);
+        run_vm(content, &type_env, &root_type_env).await;
     }
 }
 
-fn repl_vm() {
+async fn repl_vm() {
     println!("QuikLang REPL v{}", env!("CARGO_PKG_VERSION"));
     println!("Running experimental VM backend mode. Some things may be broken.");
 
@@ -209,7 +212,7 @@ fn repl_vm() {
     rl.save_history(".quiklang_history").unwrap();
 }
 
-fn repl() {
+async fn repl() {
     println!("QuikLang REPL v{}", env!("CARGO_PKG_VERSION"));
 
     let env = Rc::new(RefCell::new(Environment::new_with_parent(Rc::new(

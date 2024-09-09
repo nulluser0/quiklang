@@ -78,7 +78,7 @@ pub fn run_vm_repl(
     }
 }
 
-pub fn run_vm(
+pub async fn run_vm(
     input: String,
     type_env: &Rc<RefCell<TypeEnvironment>>,
     root_type_env: &Rc<RefCell<TypeEnvironment>>,
