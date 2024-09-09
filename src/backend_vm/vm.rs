@@ -186,13 +186,13 @@ static DISPATCH_TABLE: [VmHandler; OP_NOP as usize + 1] = create_dispatch_table(
 #[derive(Debug)]
 #[repr(C)]
 pub struct VM {
-    registers: [RegisterVal; 50000],
+    registers: [RegisterVal; 5000],
     pub constant_pool: Vec<RegisterVal>,
     pub function_indexes: Vec<usize>, // (inst_ptr, max_reg
     pub program_counter: usize,
     pub main_fn_max_reg: usize,
     pub instructions: Vec<Instruction>,
-    call_stack: [CallFrame; 10000], // Fixed-size array for stack allocation
+    call_stack: [CallFrame; 2000], // Fixed-size array for stack allocation
     call_stack_pointer: usize,
     qffi: QFFI,
 }
@@ -206,7 +206,7 @@ impl VM {
         main_fn_max_reg: usize,
     ) -> Self {
         VM {
-            registers: [ARRAY_REPEAT_VALUE; 50000],
+            registers: [ARRAY_REPEAT_VALUE; 5000],
             constant_pool,
             program_counter: 0,
             main_fn_max_reg,
@@ -215,7 +215,7 @@ impl VM {
             call_stack: [CallFrame {
                 return_pc: 0,
                 base: 0,
-            }; 10000],
+            }; 2000],
             call_stack_pointer: 0,
             qffi: QFFI::new(),
         }
