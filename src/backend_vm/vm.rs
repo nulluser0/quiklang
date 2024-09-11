@@ -200,12 +200,12 @@ pub struct VM {
 }
 
 pub struct VMThread {
-    thread_id: usize,                     // Thread ID
-    program_counter: usize,               // Local PC
-    vm: Arc<VM>,                          // Global state (VM)
-    registers: Box<[RegisterVal; 20000]>, // Local registers
-    call_stack: Box<[CallFrame; 30000]>,  // Local call stack
-    call_stack_pointer: usize,            // Local stack pointer
+    thread_id: usize,              // Thread ID
+    program_counter: usize,        // Local PC
+    vm: Arc<VM>,                   // Global state (VM)
+    registers: Box<[RegisterVal]>, // Local registers
+    call_stack: Box<[CallFrame]>,  // Local call stack
+    call_stack_pointer: usize,     // Local stack pointer
 }
 
 const ARRAY_REPEAT_VALUE: RegisterVal = RegisterVal::Null;
@@ -1157,7 +1157,10 @@ mod tests {
 
     #[tokio::test]
     async fn sizes() {
-        println!("Size of VM: {} bytes", size_of::<VM>());
-        println!("Size of VMThread: {} bytes", size_of::<VMThread>());
+        println!("Size of VM: {} bytes", std::mem::size_of::<VM>());
+        println!(
+            "Size of VMThread: {} bytes",
+            std::mem::size_of::<VMThread>()
+        );
     }
 }
