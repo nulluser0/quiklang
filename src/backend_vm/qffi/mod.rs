@@ -65,7 +65,7 @@ impl QFFI {
     ) -> Result<RegisterVal, VMRuntimeError> {
         if let Some(func) = self.extern_function_table.get(index) {
             let args_ptr = args.as_ptr();
-            func(args_ptr)
+            Ok(func(args_ptr))
         } else {
             Err(VMRuntimeError::UndefinedQFFIFn(index))
         }
