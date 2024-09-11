@@ -58,6 +58,8 @@ struct CallFrame {
 #[repr(C, align(4))]
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum RegisterVal {
+    #[default]
+    Null,
     Int(i64),
     Float(f64),
     Bool(bool),
@@ -66,13 +68,12 @@ pub enum RegisterVal {
     Range(Arc<(RegisterVal, RegisterVal, bool)>),
     HashMap(Arc<HashMap<RegisterVal, RegisterVal>>),
     HashSet(Arc<HashSet<RegisterVal>>),
-    #[default]
-    Null,
 }
 
 impl std::fmt::Display for RegisterVal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            RegisterVal::Null => write!(f, "null"),
             RegisterVal::Int(int) => write!(f, "{}", int),
             RegisterVal::Float(float) => write!(f, "{}", float),
             RegisterVal::Bool(boolean) => write!(f, "{}", boolean),
@@ -81,13 +82,13 @@ impl std::fmt::Display for RegisterVal {
             RegisterVal::Range(range) => write!(f, "{:?}", range),
             RegisterVal::HashMap(hashmap) => write!(f, "{:?}", hashmap),
             RegisterVal::HashSet(hashset) => write!(f, "{:?}", hashset),
-            RegisterVal::Null => write!(f, "null"),
         }
     }
 }
 
 pub fn to_quiklangc_strings(inner: &RegisterVal) -> String {
     match inner {
+        RegisterVal::Null => format!("{:10}| null", "null"),
         RegisterVal::Int(int) => format!("{:10}| {}", "integer", int),
         RegisterVal::Float(float) => format!("{:10}| {}", "float", float),
         RegisterVal::Bool(boolean) => format!("{:10}| {}", "bool", boolean),
@@ -96,7 +97,6 @@ pub fn to_quiklangc_strings(inner: &RegisterVal) -> String {
         RegisterVal::Range(range) => format!("{:10}| {:?}", "range", range),
         RegisterVal::HashMap(hashmap) => format!("{:10}| {:?}", "hashmap", hashmap),
         RegisterVal::HashSet(hashset) => format!("{:10}| {:?}", "hashset", hashset),
-        RegisterVal::Null => format!("{:10}| null", "null"),
     }
 }
 
