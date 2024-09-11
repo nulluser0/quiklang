@@ -14,7 +14,7 @@ use crate::errors::VMRuntimeError;
 use super::vm::RegisterVal;
 
 pub type NativeFunction = fn(&[RegisterVal]) -> Result<RegisterVal, VMRuntimeError>;
-pub type ExternFunction = extern "C" fn(&[RegisterVal]) -> Result<RegisterVal, VMRuntimeError>;
+pub type ExternFunction = extern "C" fn(*const RegisterVal) -> RegisterVal;
 
 #[derive(Debug)]
 pub struct QFFI {
@@ -64,7 +64,8 @@ impl QFFI {
         args: &[RegisterVal],
     ) -> Result<RegisterVal, VMRuntimeError> {
         if let Some(func) = self.extern_function_table.get(index) {
-            func(args)
+            let args_ptr = args.as_ptr();
+            func(args_ptr)
         } else {
             Err(VMRuntimeError::UndefinedQFFIFn(index))
         }
