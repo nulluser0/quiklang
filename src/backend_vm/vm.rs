@@ -1150,3 +1150,14 @@ impl VMThread {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::backend_vm::vm::{VMThread, VM};
+
+    #[tokio::test]
+    async fn sizes() {
+        println!("Size of VM: {} bytes", size_of::<VM>());
+        println!("Size of VMThread: {} bytes", size_of::<VMThread>());
+    }
+}
