@@ -31,7 +31,7 @@ struct CallFrame {
 }
 
 // TODO: Consider using this:
-//      Replace Rc<T> with *const T
+//      Replace Rc<T> with *const T (raw pointer) for performance reasons.
 //      As a result, carefully manage memory in the parsetime and compiletime.
 //      In Parsetime, variables are dropped after their scope is dropped.
 //      Example
@@ -55,6 +55,13 @@ struct CallFrame {
 //                  block {
 //                      let a = share b; // Valid, b does not go out of scope when a is alive.
 //                  }
+
+// TODO: Consider using this:
+//      All the types are guaranteed at compile time, so we can just use a untagged union.
+//      This would be a lot more efficient than using an enum.
+//      There is forseeable performance benefits, it would be 8 bytes (instead of the enum's 16 bytes) for a 64-bit system.
+//      The downside is that there is more emphasis on compile-time safety.
+//      Also, more instructions would be needed since they would determine the type of the value.
 #[repr(C, align(4))]
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum RegisterVal {
