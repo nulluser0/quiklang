@@ -200,12 +200,12 @@ pub struct VM {
 }
 
 pub struct VMThread {
-    thread_id: usize,               // Thread ID
-    program_counter: usize,         // Local PC
-    vm: Arc<VM>,                    // Global state (VM)
-    registers: [RegisterVal; 5000], // Local registers
-    call_stack: [CallFrame; 2000],  // Local call stack
-    call_stack_pointer: usize,      // Local stack pointer
+    thread_id: usize,                     // Thread ID
+    program_counter: usize,               // Local PC
+    vm: Arc<VM>,                          // Global state (VM)
+    registers: Box<[RegisterVal; 20000]>, // Local registers
+    call_stack: Box<[CallFrame; 30000]>,  // Local call stack
+    call_stack_pointer: usize,            // Local stack pointer
 }
 
 const ARRAY_REPEAT_VALUE: RegisterVal = RegisterVal::Null;
@@ -362,11 +362,13 @@ impl VMThread {
             thread_id: 0,
             program_counter: 0,
             vm,
-            registers: [ARRAY_REPEAT_VALUE; 5000],
-            call_stack: [CallFrame {
-                return_pc: 0,
-                base: 0,
-            }; 2000],
+            registers: Box::new([ARRAY_REPEAT_VALUE; 20000]),
+            call_stack: Box::new(
+                [CallFrame {
+                    return_pc: 0,
+                    base: 0,
+                }; 30000],
+            ),
             call_stack_pointer: 0,
         }
     }
