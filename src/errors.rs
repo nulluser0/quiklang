@@ -264,6 +264,9 @@ pub enum VMBytecodeError {
 
     #[error("Bytecode being read contains invalid Magic Number.")]
     InvalidOrNoMagicNumber,
+
+    #[error("Bytecode is inconpatible with the current VM version. VM requires version: {0}, but bytecode is version: {1}. Please recompile the source code.")]
+    IncompatibleBytecodeVersion(i32, i32),
 }
 
 // VM Runtime specific errors

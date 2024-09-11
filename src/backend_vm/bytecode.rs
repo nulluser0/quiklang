@@ -200,6 +200,13 @@ impl ByteCode {
         let mut ql_version: [u8; 8] = [0; 8];
         cursor.read_exact(&mut ql_version)?;
         let ql_vm_ver = cursor.read_i32::<LittleEndian>()?;
+        let current_ql_vm_ver = env!("QUIKLANG_VM_VERSION").parse().unwrap();
+        if ql_vm_ver != current_ql_vm_ver {
+            return Err(VMBytecodeError::IncompatibleBytecodeVersion(
+                current_ql_vm_ver,
+                ql_vm_ver,
+            ));
+        }
         let flags = cursor.read_u64::<LittleEndian>()?;
 
         let metadata = BCMetadata {
