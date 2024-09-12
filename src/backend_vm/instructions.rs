@@ -890,6 +890,92 @@ pub fn to_string(inst: Instruction) -> String {
         OP_DESTRUCTOR => format!("{} | R({}) -> destructor", ops, arga),
         OP_EXIT => format!("{} | std::process::exit({})", ops, arga),
         OP_CLONE => format!("{} | R({}) := R({}).clone()", ops, arga, argb),
+        OP_BITNOT => format!("{} | R({}) := ~R({})", ops, arga, argb),
+        OP_FLOAT_ADD => format!(
+            "{} | R({}) := {} + {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_FLOAT_SUB => format!(
+            "{} | R({}) := {} - {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_FLOAT_MUL => format!(
+            "{} | R({}) := {} * {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_FLOAT_DIV => format!(
+            "{} | R({}) := {} / {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_FLOAT_POW => format!(
+            "{} | R({}) := {} ^ {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_FLOAT_EQ => format!(
+            "{} | R({}) = ({} == {})",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_FLOAT_NE => format!(
+            "{} | R({}) := {} != {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_FLOAT_LT => format!(
+            "{} | R({}) = ({} < {})",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_FLOAT_LE => format!(
+            "{} | R({}) = ({} <= {})",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_FLOAT_GT => format!(
+            "{} | R({}) = ({} > {})",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_FLOAT_GE => format!(
+            "{} | R({}) = ({} >= {})",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
+        OP_FLOAT_INC => format!("{} | R({}) += 1.0", ops, arga),
+        OP_FLOAT_DEC => format!("{} | R({}) -= 1.0", ops, arga),
+        OP_FLOAT_NEG => format!("{} | R({}) := -R({})", ops, arga, argb),
+        OP_INT_NEG => format!("{} | R({}) := -R({})", ops, arga, argb),
+        OP_INT_TO_FLOAT => format!("{} | R({}) := R({}) as float", ops, arga, argb),
+        OP_FLOAT_TO_INT => format!("{} | R({}) := R({}) as int", ops, arga, argb),
+        OP_FLOAT_POSITIVE => format!("{} | R({}) := +R({})", ops, arga, argb),
+        OP_INT_POSITIVE => format!("{} | R({}) := +R({})", ops, arga, argb),
         OP_NOP => ops.to_string(),
         _ => unreachable!(),
     }
