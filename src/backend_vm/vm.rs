@@ -260,6 +260,8 @@ const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
         VMThread::op_float_positive,
         VMThread::op_int_positive,
         VMThread::op_float_mod,
+        VMThread::op_int_to_string,
+        VMThread::op_float_to_string,
         VMThread::op_nop,
     ]
 }
@@ -594,7 +596,7 @@ impl VMThread {
         if register + offset >= self.registers.len() {
             return Err(VMRuntimeError::InvalidRegisterAccess(register + offset));
         }
-        Ok(self.registers[register + offset].clone())
+        Ok(self.registers[register + offset])
     }
 
     #[inline(always)]
@@ -641,11 +643,7 @@ impl VMThread {
             };
             self.program_counter += 1;
         }
-        Ok(self
-            .registers
-            .first()
-            .unwrap_or(&RegisterVal { null: () })
-            .clone())
+        Ok(*self.registers.first().unwrap_or(&RegisterVal { null: () }))
     }
 
     #[inline(always)]
@@ -1410,6 +1408,42 @@ impl VMThread {
     #[inline(always)]
     fn op_float_mod(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         self.perform_float_op(inst, |left, right| left % right)
+    }
+
+    #[inline(always)]
+    fn op_int_to_string(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+
+        let value = self.get_constant_clone(argb as usize)?;
+
+        let string = format!("{}", unsafe { value.int });
+
+        let boxed_str = Box::new(string);
+
+        let ptr = Box::into_raw(boxed_str) as *const ();
+
+        self.set_register(arga as usize, RegisterVal { ptr })?;
+
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn op_float_to_string(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+
+        let value = self.get_constant_clone(argb as usize)?;
+
+        let string = format!("{}", unsafe { value.float });
+
+        let boxed_str = Box::new(string);
+
+        let ptr = Box::into_raw(boxed_str) as *const ();
+
+        self.set_register(arga as usize, RegisterVal { ptr })?;
+
+        Ok(())
     }
 
     #[inline(always)]
