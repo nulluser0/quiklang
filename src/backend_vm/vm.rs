@@ -152,21 +152,21 @@ const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
         VMThread::op_loadconst,
         VMThread::op_loadbool,
         VMThread::op_loadnull,
-        VMThread::op_add,
-        VMThread::op_sub,
-        VMThread::op_mul,
-        VMThread::op_div,
-        VMThread::op_mod,
-        VMThread::op_pow,
-        VMThread::op_not,
-        VMThread::op_and,
-        VMThread::op_or,
-        VMThread::op_eq,
-        VMThread::op_ne,
-        VMThread::op_lt,
-        VMThread::op_le,
-        VMThread::op_gt,
-        VMThread::op_ge,
+        VMThread::op_int_add,
+        VMThread::op_int_sub,
+        VMThread::op_int_mul,
+        VMThread::op_int_div,
+        VMThread::op_int_mod,
+        VMThread::op_int_pow,
+        VMThread::op_logical_not,
+        VMThread::op_logical_and,
+        VMThread::op_logical_or,
+        VMThread::op_int_eq,
+        VMThread::op_int_ne,
+        VMThread::op_int_lt,
+        VMThread::op_int_le,
+        VMThread::op_int_gt,
+        VMThread::op_int_ge,
         VMThread::op_jump,
         VMThread::op_jump_if_true,
         VMThread::op_jump_if_false,
@@ -175,8 +175,8 @@ const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
         VMThread::op_qffi_call,
         VMThread::op_tailcall,
         VMThread::op_return,
-        VMThread::op_inc,
-        VMThread::op_dec,
+        VMThread::op_int_inc,
+        VMThread::op_int_dec,
         VMThread::op_bitand,
         VMThread::op_bitor,
         VMThread::op_bitxor,
@@ -186,6 +186,24 @@ const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
         VMThread::op_destructor,
         VMThread::op_exit,
         VMThread::op_clone,
+        VMThread::op_bitnot,
+        VMThread::op_float_add,
+        VMThread::op_float_sub,
+        VMThread::op_float_mul,
+        VMThread::op_float_div,
+        VMThread::op_float_pow,
+        VMThread::op_float_eq,
+        VMThread::op_float_ne,
+        VMThread::op_float_lt,
+        VMThread::op_float_le,
+        VMThread::op_float_gt,
+        VMThread::op_float_ge,
+        VMThread::op_float_inc,
+        VMThread::op_float_dec,
+        VMThread::op_float_neg,
+        VMThread::op_int_neg,
+        VMThread::op_int_to_float,
+        VMThread::op_float_to_int,
         VMThread::op_nop,
     ]
 }
@@ -631,7 +649,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_add(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_add(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         self.perform_op(
             inst,
             |left, right| left.wrapping_add(right),
@@ -640,7 +658,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_sub(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_sub(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         self.perform_op(
             inst,
             |left, right| left.wrapping_sub(right),
@@ -649,7 +667,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_mul(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_mul(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         self.perform_op(
             inst,
             |left, right| left.wrapping_mul(right),
@@ -658,7 +676,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_div(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_div(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         self.perform_op(
             inst,
             |left, right| left.wrapping_div(right),
@@ -667,7 +685,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_mod(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_mod(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         self.perform_op(
             inst,
             |left, right| left.wrapping_rem(right),
@@ -676,7 +694,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_pow(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_pow(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         self.perform_op(
             inst,
             |left, right| left.wrapping_pow(right as u32),
@@ -724,7 +742,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_not(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_logical_not(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let offset = self.current_offset();
@@ -738,7 +756,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_and(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_logical_and(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -762,7 +780,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_or(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_logical_or(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -803,17 +821,17 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_eq(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_eq(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         self.perform_comparison(inst, |b, c| b == c)
     }
 
     #[inline(always)]
-    fn op_ne(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_ne(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         self.perform_comparison(inst, |b, c| b != c)
     }
 
     #[inline(always)]
-    fn op_lt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_lt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         self.perform_comparison(inst, |b, c| match (b, c) {
             (RegisterVal::Int(b), RegisterVal::Int(c)) => b < c,
             (RegisterVal::Float(b), RegisterVal::Float(c)) => b < c,
@@ -824,7 +842,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_le(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_le(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         self.perform_comparison(inst, |b, c| match (b, c) {
             (RegisterVal::Int(b), RegisterVal::Int(c)) => b <= c,
             (RegisterVal::Float(b), RegisterVal::Float(c)) => b <= c,
@@ -835,7 +853,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_gt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_gt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         self.perform_comparison(inst, |b, c| match (b, c) {
             (RegisterVal::Int(b), RegisterVal::Int(c)) => b > c,
             (RegisterVal::Float(b), RegisterVal::Float(c)) => b > c,
@@ -846,7 +864,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_ge(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_ge(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         self.perform_comparison(inst, |b, c| match (b, c) {
             (RegisterVal::Int(b), RegisterVal::Int(c)) => b >= c,
             (RegisterVal::Float(b), RegisterVal::Float(c)) => b >= c,
@@ -958,7 +976,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_inc(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_inc(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let offset = self.current_offset();
 
@@ -970,7 +988,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_dec(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_dec(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let offset = self.current_offset();
 
@@ -1149,6 +1167,96 @@ impl VMThread {
         self.set_register(arga as usize, value)?;
 
         Ok(())
+    }
+
+    #[inline(always)]
+    fn op_bitnot(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_BITNOT")
+    }
+
+    #[inline(always)]
+    fn op_float_add(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_ADD")
+    }
+
+    #[inline(always)]
+    fn op_float_sub(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_SUB")
+    }
+
+    #[inline(always)]
+    fn op_float_mul(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_MUL")
+    }
+
+    #[inline(always)]
+    fn op_float_div(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_DIV")
+    }
+
+    #[inline(always)]
+    fn op_float_pow(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_POW")
+    }
+
+    #[inline(always)]
+    fn op_float_eq(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_EQ")
+    }
+
+    #[inline(always)]
+    fn op_float_ne(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_NE")
+    }
+
+    #[inline(always)]
+    fn op_float_lt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_LT")
+    }
+
+    #[inline(always)]
+    fn op_float_le(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_LE")
+    }
+
+    #[inline(always)]
+    fn op_float_gt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_GT")
+    }
+
+    #[inline(always)]
+    fn op_float_ge(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_GE")
+    }
+
+    #[inline(always)]
+    fn op_float_inc(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_INC")
+    }
+
+    #[inline(always)]
+    fn op_float_dec(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_DEC")
+    }
+
+    #[inline(always)]
+    fn op_float_neg(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_NEG")
+    }
+
+    #[inline(always)]
+    fn op_int_neg(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_INT_NEG")
+    }
+
+    #[inline(always)]
+    fn op_int_to_float(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_INT_TO_FLOAT")
+    }
+
+    #[inline(always)]
+    fn op_float_to_int(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_TO_INT")
     }
 
     #[inline(always)]

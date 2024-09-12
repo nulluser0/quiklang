@@ -506,21 +506,21 @@ define_opcodes! {
     OP_LOADCONST =>     (1,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::NotUsed, OpType::ABx),
     OP_LOADBOOL =>      (2,     false,  true,   OpArgMode::Used, OpArgMode::Used, OpType::Abc),
     OP_LOADNULL =>      (3,     false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
-    OP_ADD =>           (4,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_SUB =>           (5,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_MUL =>           (6,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_DIV =>           (7,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_MOD =>           (8,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_POW =>           (9,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_NOT =>           (10,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
-    OP_AND =>           (11,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_OR =>            (12,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_EQ =>            (13,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_NE =>            (14,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_LT =>            (15,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_LE =>            (16,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_GT =>            (17,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_GE =>            (18,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_ADD =>       (4,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_SUB =>           (5,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_MUL =>           (6,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_DIV =>           (7,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_MOD =>           (8,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_POW =>           (9,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_LOGICAL_NOT =>           (10,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_LOGICAL_AND =>           (11,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_LOGICAL_OR =>            (12,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_EQ =>            (13,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_NE =>            (14,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_LT =>            (15,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_LE =>            (16,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_GT =>            (17,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_GE =>            (18,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
     OP_JUMP =>          (19,    false,  false,  OpArgMode::Used, OpArgMode::NotUsed, OpType::AsBx),
     OP_JUMP_IF_TRUE =>  (20,    true,   true,   OpArgMode::Used, OpArgMode::NotUsed, OpType::AsBx),
     OP_JUMP_IF_FALSE => (21,    true,   true,   OpArgMode::Used, OpArgMode::NotUsed, OpType::AsBx),
@@ -529,8 +529,8 @@ define_opcodes! {
     OP_QFFI_CALL =>     (24,    false,  true,   OpArgMode::Used, OpArgMode::NotUsed, OpType::Abc),
     OP_TAILCALL =>      (25,    false,  true,   OpArgMode::Used, OpArgMode::Used, OpType::Abc),
     OP_RETURN =>        (26,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
-    OP_INC =>           (27,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
-    OP_DEC =>           (28,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
+    OP_INT_INC =>           (27,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
+    OP_INT_DEC =>           (28,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
     OP_BITAND =>        (29,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
     OP_BITOR =>         (30,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
     OP_BITXOR =>        (31,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
@@ -540,7 +540,25 @@ define_opcodes! {
     OP_DESTRUCTOR =>    (35,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
     OP_EXIT =>          (36,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
     OP_CLONE =>         (37,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
-    OP_NOP =>           (38,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::AsBx),
+    OP_BITNOT =>        (38,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_FLOAT_ADD =>     (39,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_SUB =>     (40,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_MUL =>     (41,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_DIV =>     (42,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_POW =>     (43,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_EQ =>      (44,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_NE =>      (45,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_LT =>      (46,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_LE =>      (47,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_GT =>      (48,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_GE =>      (49,    true,   true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_INC =>     (50,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
+    OP_FLOAT_DEC =>     (51,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
+    OP_FLOAT_NEG =>     (52,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_INT_NEG =>       (53,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_INT_TO_FLOAT =>  (54,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_FLOAT_TO_INT =>  (55,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_NOP =>           (56,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::AsBx),
 }
 
 pub fn op_to_string(op: i32) -> String {
@@ -728,99 +746,99 @@ pub fn to_string(inst: Instruction) -> String {
             ops, arga, argb, argc
         ),
         OP_LOADNULL => format!("{} | R({}) := ... := R({}) := nil", ops, arga, argb),
-        OP_ADD => format!(
+        OP_INT_ADD => format!(
             "{} | R({}) := {} + {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_SUB => format!(
+        OP_INT_SUB => format!(
             "{} | R({}) := {} - {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_MUL => format!(
+        OP_INT_MUL => format!(
             "{} | R({}) := {} * {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_DIV => format!(
+        OP_INT_DIV => format!(
             "{} | R({}) := {} / {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_MOD => format!(
+        OP_INT_MOD => format!(
             "{} | R({}) := {} % {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_POW => format!(
+        OP_INT_POW => format!(
             "{} | R({}) := {} ^ {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_NOT => format!("{} | R({}) := not R({})", ops, arga, argb),
-        OP_AND => format!(
+        OP_LOGICAL_NOT => format!("{} | R({}) := not R({})", ops, arga, argb),
+        OP_LOGICAL_AND => format!(
             "{} | R({}) := {} and {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_OR => format!(
+        OP_LOGICAL_OR => format!(
             "{} | R({}) := {} or {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_EQ => format!(
+        OP_INT_EQ => format!(
             "{} | R({}) = ({} == {})",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_NE => format!(
+        OP_INT_NE => format!(
             "{} | R({}) := {} != {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_LT => format!(
+        OP_INT_LT => format!(
             "{} | R({}) = ({} < {})",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_LE => format!(
+        OP_INT_LE => format!(
             "{} | R({}) = ({} <= {})",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_GT => format!(
+        OP_INT_GT => format!(
             "{} | R({}) = ({} > {})",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_GE => format!(
+        OP_INT_GE => format!(
             "{} | R({}) = ({} >= {})",
             ops,
             arga,
@@ -850,8 +868,8 @@ pub fn to_string(inst: Instruction) -> String {
             ops, arga, arga, arga, argb
         ),
         OP_RETURN => format!("{} | return", ops),
-        OP_INC => format!("{} | R({}) += 1", ops, arga),
-        OP_DEC => format!("{} | R({}) -= 1", ops, arga),
+        OP_INT_INC => format!("{} | R({}) += 1", ops, arga),
+        OP_INT_DEC => format!("{} | R({}) -= 1", ops, arga),
         OP_BITAND => format!(
             "{} | R({}) := R({}) bitwise and R({})",
             ops, arga, argb, argc
