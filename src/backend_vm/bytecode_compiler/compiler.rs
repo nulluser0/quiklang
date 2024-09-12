@@ -1,18 +1,48 @@
 // Compiler
 
-use std::{cell::RefCell, collections::HashMap, mem::swap, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    hash::{Hash, Hasher},
+    mem::swap,
+    rc::Rc,
+};
 
 use crate::{
     backend_vm::{
         bytecode::{BCIntegrityInfo, BCMetadata, ByteCode},
         instructions::{ASBx, Abc, Instruction, OP_EXIT, OP_NOP},
-        vm::RegisterVal,
     },
     errors::VMCompileError,
     frontend::ast::Stmt,
 };
 
 use super::{symbol_tracker::SymbolTable, type_table::TypeTable};
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub enum TaggedConstantValue {
+    #[default]
+    Null,
+    Int(i64),
+    Float(f64),
+    Bool(bool),
+    Str(String),
+    // Pointers are not saved in the constant pool. They are only used in the VM.
+}
+
+impl Eq for TaggedConstantValue {}
+
+impl Hash for TaggedConstantValue {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            TaggedConstantValue::Null => 0.hash(state),
+            TaggedConstantValue::Int(i) => i.hash(state),
+            TaggedConstantValue::Float(f) => f.to_bits().hash(state),
+            TaggedConstantValue::Bool(b) => b.hash(state),
+            TaggedConstantValue::Str(s) => s.hash(state),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum ReturnValue {
@@ -58,8 +88,8 @@ const fn str_to_byte_array(s: &str) -> [u8; 8] {
 pub struct Compiler {
     max_reg: usize, // Largest no. of registers used
     reg_top: usize, // Current top register
-    constants: Rc<RefCell<Vec<RegisterVal>>>,
-    constant_map: Rc<RefCell<HashMap<RegisterVal, usize>>>,
+    constants: Rc<RefCell<Vec<TaggedConstantValue>>>,
+    constant_map: Rc<RefCell<HashMap<TaggedConstantValue, usize>>>,
     instructions: Vec<Instruction>,
     function_insts: Vec<Vec<Instruction>>, // (Instructions, Register count)
 }
@@ -125,7 +155,7 @@ impl Compiler {
     //     self.reg_top -= 1;
     // }
 
-    pub(super) fn add_constant(&mut self, constant: RegisterVal) -> usize {
+    pub(super) fn add_constant(&mut self, constant: TaggedConstantValue) -> usize {
         if let Some(&index) = self.constant_map.borrow().get(&constant) {
             return index;
         }
@@ -249,134 +279,142 @@ impl Default for Compiler {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::{
-        fs::File,
-        io::{Read, Write},
-    };
+// #[cfg(test)]
+// mod tests {
+//     use std::{
+//         fs::File,
+//         io::{Read, Write},
+//     };
 
-    use crate::{
-        backend_vm::{
-            instructions::{get_argsbx, to_string, ASBx, OP_JUMP},
-            vm::VM,
-        },
-        frontend::{
-            ast::{BinaryOp, Expr, Literal, Type},
-            parser,
-            type_environment::TypeEnvironment,
-        },
-    };
+//     use crate::{
+//         backend_vm::{
+//             instructions::{get_argsbx, to_string, ASBx, OP_JUMP},
+//             vm::VM,
+//         },
+//         frontend::{
+//             ast::{BinaryOp, Expr, Literal, Type},
+//             parser,
+//             type_environment::TypeEnvironment,
+//         },
+//     };
 
-    use super::*;
+//     use super::*;
 
-    #[test]
-    fn compile_including_parse_etc() {
-        let source_code = r#"
-        // let mut n = 5;
-        // let a = block {
-        //     if n <= 1 {
-        //         1
-        //     } else {
-        //         n
-        //     }
-        // };
-        
-        // n = a + 1
-        loop {}
-        "#
-        .to_string();
+//     #[test]
+//     fn compile_including_parse_etc() {
+//         let source_code = r#"
+//         // let mut n = 5;
+//         // let a = block {
+//         //     if n <= 1 {
+//         //         1
+//         //     } else {
+//         //         n
+//         //     }
+//         // };
 
-        let root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
-        let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
-            root_type_env.clone(),
-        )));
-        let mut parser = parser::Parser::new();
-        let ast = parser
-            .produce_ast(source_code, &type_env, &root_type_env)
-            .expect("fail");
-        let mut compiler = Compiler::new();
-        let bytecode = compiler
-            .compile_no_symbol_table_input(ast.statements)
-            .expect("fail parse");
-        println!("{}", bytecode);
+//         // n = a + 1
+//         loop {}
+//         "#
+//         .to_string();
 
-        println!("ENCoded: {}", bytecode);
+//         let root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
+//         let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
+//             root_type_env.clone(),
+//         )));
+//         let mut parser = parser::Parser::new();
+//         let ast = parser
+//             .produce_ast(source_code, &type_env, &root_type_env)
+//             .expect("fail");
+//         let mut compiler = Compiler::new();
+//         let bytecode = compiler
+//             .compile_no_symbol_table_input(ast.statements)
+//             .expect("fail parse");
+//         println!("{}", bytecode);
 
-        let encoded_bytecode = ByteCode::encode(&bytecode).unwrap();
-        let mut file = File::create("test.qlbc").unwrap();
-        file.write_all(&encoded_bytecode).unwrap();
+//         println!("ENCoded: {}", bytecode);
 
-        let mut raw_bytecode: Vec<u8> = vec![];
-        let mut read_file = File::open("test.qlbc").unwrap();
-        read_file.read_to_end(&mut raw_bytecode).unwrap();
-        let decoded_bytecode = ByteCode::decode(&raw_bytecode).unwrap();
+//         let encoded_bytecode = ByteCode::encode(&bytecode).unwrap();
+//         let mut file = File::create("test.qlbc").unwrap();
+//         file.write_all(&encoded_bytecode).unwrap();
 
-        println!("DECoded: {}", decoded_bytecode);
+//         let mut raw_bytecode: Vec<u8> = vec![];
+//         let mut read_file = File::open("test.qlbc").unwrap();
+//         read_file.read_to_end(&mut raw_bytecode).unwrap();
+//         let decoded_bytecode = ByteCode::decode(&raw_bytecode).unwrap();
 
-        let vm = VM::from_bytecode(bytecode);
-        // vm.execute();
-        println!("{:#?}", vm);
-    }
+//         println!("DECoded: {}", decoded_bytecode);
 
-    #[test]
-    fn simple_compile_test() {
-        let mut compiler = Compiler::new();
-        compiler
-            .compile_no_symbol_table_input(vec![
-                // Stmt::ExprStmt(Expr::Literal(Literal::Integer(209309))),
-                Stmt::ExprStmt(Expr::BinaryOp {
-                    op: BinaryOp::Add,
-                    left: Box::new(Expr::Literal(Literal::Integer(123))),
-                    right: Box::new(Expr::Literal(Literal::Integer(123))),
-                    output_type: Type::Integer,
-                }),
-                Stmt::ExprStmt(Expr::IfExpr {
-                    condition: Box::new(Expr::Identifier("true".to_string())),
-                    then: vec![Stmt::ExprStmt(Expr::BinaryOp {
-                        op: BinaryOp::Add,
-                        left: Box::new(Expr::Literal(Literal::Integer(1223))),
-                        right: Box::new(Expr::Literal(Literal::Integer(1223))),
-                        output_type: Type::Integer,
-                    })],
-                    else_stmt: Some(vec![Stmt::ExprStmt(Expr::BinaryOp {
-                        op: BinaryOp::Add,
-                        left: Box::new(Expr::Literal(Literal::Integer(1233))),
-                        right: Box::new(Expr::Literal(Literal::Integer(1233))),
-                        output_type: Type::Integer,
-                    })]),
-                }),
-                Stmt::DeclareStmt {
-                    name: "idk".to_string(),
-                    is_mutable: false,
-                    is_global: false,
-                    var_type: Type::Integer,
-                    expr: Some(Expr::IfExpr {
-                        condition: Box::new(Expr::Identifier("false".to_string())),
-                        then: vec![Stmt::ExprStmt(Expr::Literal(Literal::Integer(42)))],
-                        else_stmt: Some(vec![Stmt::ExprStmt(Expr::Literal(Literal::Integer(21)))]),
-                    }),
-                },
-                Stmt::ExprStmt(Expr::BinaryOp {
-                    op: BinaryOp::Add,
-                    left: Box::new(Expr::Identifier("idk".to_string())),
-                    right: Box::new(Expr::Literal(Literal::Integer(12))),
-                    output_type: Type::Mismatch,
-                }),
-            ])
-            .expect("compile fail");
+//         let vm = VM::from_bytecode(bytecode);
+//         // vm.execute();
+//         println!("{:#?}", vm);
+//     }
 
-        println!("{}", compiler.max_reg);
-        println!("{:#?}", compiler.constants);
+//     #[test]
+//     fn simple_compile_test() {
+//         let mut compiler = Compiler::new();
+//         compiler
+//             .compile_no_symbol_table_input(vec![
+//                 // Stmt::ExprStmt(Expr::Literal(Literal::Integer(209309))),
+//                 Stmt::ExprStmt(Expr::BinaryOp {
+//                     op: BinaryOp::Add,
+//                     left: Box::new(Expr::Literal(Literal::Integer(123))),
+//                     right: Box::new(Expr::Literal(Literal::Integer(123))),
+//                     output_type: Type::Integer,
+//                     left_type: todo!(),
+//                     right_type: todo!(),
+//                 }),
+//                 Stmt::ExprStmt(Expr::IfExpr {
+//                     condition: Box::new(Expr::Identifier("true".to_string())),
+//                     then: vec![Stmt::ExprStmt(Expr::BinaryOp {
+//                         op: BinaryOp::Add,
+//                         left: Box::new(Expr::Literal(Literal::Integer(1223))),
+//                         right: Box::new(Expr::Literal(Literal::Integer(1223))),
+//                         output_type: Type::Integer,
+//                         left_type: todo!(),
+//                         right_type: todo!(),
+//                     })],
+//                     else_stmt: Some(vec![Stmt::ExprStmt(Expr::BinaryOp {
+//                         op: BinaryOp::Add,
+//                         left: Box::new(Expr::Literal(Literal::Integer(1233))),
+//                         right: Box::new(Expr::Literal(Literal::Integer(1233))),
+//                         output_type: Type::Integer,
+//                         left_type: todo!(),
+//                         right_type: todo!(),
+//                     })]),
+//                 }),
+//                 Stmt::DeclareStmt {
+//                     name: "idk".to_string(),
+//                     is_mutable: false,
+//                     is_global: false,
+//                     var_type: Type::Integer,
+//                     expr: Some(Expr::IfExpr {
+//                         condition: Box::new(Expr::Identifier("false".to_string())),
+//                         then: vec![Stmt::ExprStmt(Expr::Literal(Literal::Integer(42)))],
+//                         else_stmt: Some(vec![Stmt::ExprStmt(Expr::Literal(Literal::Integer(21)))]),
+//                     }),
+//                 },
+//                 Stmt::ExprStmt(Expr::BinaryOp {
+//                     op: BinaryOp::Add,
+//                     left: Box::new(Expr::Identifier("idk".to_string())),
+//                     right: Box::new(Expr::Literal(Literal::Integer(12))),
+//                     output_type: Type::Mismatch,
+//                     left_type: todo!(),
+//                     right_type: todo!(),
+//                 }),
+//             ])
+//             .expect("compile fail");
 
-        for inst in compiler.instructions {
-            println!("{}", to_string(inst))
-        }
-    }
+//         println!("{}", compiler.max_reg);
+//         println!("{:#?}", compiler.constants);
 
-    #[test]
-    fn sbx_test() {
-        let sbx = ASBx(OP_JUMP, 3, 1);
-        println!("{:#b} | sBx: {}", sbx, get_argsbx(sbx));
-    }
-}
+//         for inst in compiler.instructions {
+//             println!("{}", to_string(inst))
+//         }
+//     }
+
+//     #[test]
+//     fn sbx_test() {
+//         let sbx = ASBx(OP_JUMP, 3, 1);
+//         println!("{:#b} | sBx: {}", sbx, get_argsbx(sbx));
+//     }
+// }

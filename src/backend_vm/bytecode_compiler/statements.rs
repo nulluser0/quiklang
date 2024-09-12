@@ -182,7 +182,9 @@ impl Compiler {
 
         for (key, value) in key_type_values {
             let key: &'static str = Box::leak(key.into_boxed_str());
-            let value = VMCompilerType::from_type(&value).ok_or(VMCompileError::UndefinedType)?;
+            let value = VMCompilerType::from_type(&value).ok_or(VMCompileError::UndefinedType(
+                "Unknown type during struct compilation.".to_string(),
+            ))?;
             fields.insert(key, value);
         }
 

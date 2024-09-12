@@ -30,6 +30,8 @@ pub fn evaluate_expr(
             left,
             right,
             output_type: _,
+            left_type: _,
+            right_type: _,
         } => evaluate_binary_op(op, *left, *right, env, root_env),
         Expr::UnaryOp(op, expr, _) => evaluate_unary_op(op, *expr, env, root_env),
         Expr::FunctionCall(args, caller) => evaluate_call_expr(args, *caller, env, root_env),

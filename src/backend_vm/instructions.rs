@@ -531,11 +531,11 @@ define_opcodes! {
     OP_RETURN =>        (26,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
     OP_INT_INC =>       (27,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
     OP_INT_DEC =>       (28,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
-    OP_BITAND =>        (29,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_BITOR =>         (30,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_BITXOR =>        (31,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_SHL =>           (32,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_SHR =>           (33,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_BITAND =>    (29,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_BITOR =>     (30,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_BITXOR =>    (31,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_SHL =>       (32,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_SHR =>           (33,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
     OP_CONCAT =>        (34,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
     OP_DESTRUCTOR =>    (35,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
     OP_EXIT =>          (36,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
@@ -873,20 +873,20 @@ pub fn to_string(inst: Instruction) -> String {
         OP_RETURN => format!("{} | return", ops),
         OP_INT_INC => format!("{} | R({}) += 1", ops, arga),
         OP_INT_DEC => format!("{} | R({}) -= 1", ops, arga),
-        OP_BITAND => format!(
+        OP_INT_BITAND => format!(
             "{} | R({}) := R({}) bitwise and R({})",
             ops, arga, argb, argc
         ),
-        OP_BITOR => format!(
+        OP_INT_BITOR => format!(
             "{} | R({}) := R({}) bitwise or R({})",
             ops, arga, argb, argc
         ),
-        OP_BITXOR => format!(
+        OP_INT_BITXOR => format!(
             "{} | R({}) := R({}) bitwise exclusive or R({})",
             ops, arga, argb, argc
         ),
-        OP_SHL => format!("{} | R({}) := R({}) << R({})", ops, arga, argb, argc),
-        OP_SHR => format!("{} | R({}) := R({}) >> R({})", ops, arga, argb, argc),
+        OP_INT_SHL => format!("{} | R({}) := R({}) << R({})", ops, arga, argb, argc),
+        OP_INT_SHR => format!("{} | R({}) := R({}) >> R({})", ops, arga, argb, argc),
         OP_CONCAT => format!("{} | R({}) := R({}) & R({})", ops, arga, argb, argc),
         OP_DESTRUCTOR => format!("{} | R({}) -> destructor", ops, arga),
         OP_EXIT => format!("{} | std::process::exit({})", ops, arga),

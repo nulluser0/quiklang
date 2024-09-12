@@ -246,10 +246,10 @@ pub enum VMCompileError {
     #[error("Cannot resolve non-existent symbol '{0}'")]
     UndefinedVariable(String),
 
-    #[error("Cannot resolve type from typedef.")]
-    UndefinedType,
+    #[error("Cannot resolve type from typedef. {0}")]
+    UndefinedType(String),
 
-    #[error("Unexpected type mismatch")]
+    #[error("Unexpected type mismatch.")]
     UnexpectedMismatch,
 }
 
@@ -305,6 +305,9 @@ pub enum VMRuntimeError {
 
     #[error("Invalid thread ID: {0}")]
     InvalidThreadId(usize),
+
+    #[error("Null Pointer Dereference. Pointer {0:016x} in register {1} is null.")]
+    NullPtrDeref(i64, i32), // Pointer represented as 8 bytes, Register represented as 4 bytes from instruction
 
     #[error("Panic: {0}")]
     Panic(String),

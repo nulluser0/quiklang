@@ -27,7 +27,7 @@ lazy_static! {
 
 pub(super) fn println(args: &[RegisterVal]) -> Result<RegisterVal, VMRuntimeError> {
     println!("{}", args[0]);
-    Ok(RegisterVal::Null)
+    Ok(RegisterVal { null: () })
 }
 
 pub(super) fn time(_args: &[RegisterVal]) -> Result<RegisterVal, VMRuntimeError> {
@@ -40,7 +40,7 @@ pub(super) fn time(_args: &[RegisterVal]) -> Result<RegisterVal, VMRuntimeError>
             )))
         }
     };
-    Ok(RegisterVal::Int(time))
+    Ok(RegisterVal { int: time })
 }
 
 pub(super) fn panic(args: &[RegisterVal]) -> Result<RegisterVal, VMRuntimeError> {

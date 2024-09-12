@@ -2,7 +2,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    hash::Hasher,
+    fmt::Debug,
     sync::Arc,
 };
 
@@ -10,10 +10,9 @@ use tokio::sync::{oneshot, Mutex};
 
 use crate::errors::VMRuntimeError;
 
-use std::hash::Hash;
-
 use super::{
     bytecode::ByteCode,
+    bytecode_compiler::compiler::TaggedConstantValue,
     instructions::{
         get_arga, get_argb, get_argbx, get_argc, get_argsbx, get_opcode, is_k, rk_to_k,
         Instruction, OP_NOP,
@@ -62,91 +61,145 @@ struct CallFrame {
 //      There is forseeable performance benefits, it would be 8 bytes (instead of the enum's 16 bytes) for a 64-bit system.
 //      The downside is that there is more emphasis on compile-time safety.
 //      Also, more instructions would be needed since they would determine the type of the value.
-#[repr(C, align(4))]
-#[derive(Debug, Clone, PartialEq, Default)]
-pub enum RegisterVal {
-    #[default]
-    Null,
-    Int(i64),
-    Float(f64),
-    Bool(bool),
-    Str(Arc<String>),
-    Array(Arc<Vec<RegisterVal>>),
-    Range(Arc<(RegisterVal, RegisterVal, bool)>),
-    HashMap(Arc<HashMap<RegisterVal, RegisterVal>>),
-    HashSet(Arc<HashSet<RegisterVal>>),
+
+// #[repr(C, align(4))]
+// #[derive(Debug, Clone, PartialEq, Default)]
+// pub enum RegisterVal {
+//     #[default]
+//     Null,
+//     Int(i64),
+//     Float(f64),
+//     Bool(bool),
+//     Str(Arc<String>),
+//     Array(Arc<Vec<RegisterVal>>),
+//     Range(Arc<(RegisterVal, RegisterVal, bool)>),
+//     HashMap(Arc<HashMap<RegisterVal, RegisterVal>>),
+//     HashSet(Arc<HashSet<RegisterVal>>),
+// }
+
+#[repr(C, align(8))]
+#[derive(Clone, Copy)]
+pub union RegisterVal {
+    pub null: (), // Nulls, ints, floats, and bools are all primitives, so they are stored directly in the union.
+    pub int: i64,
+    pub float: f64,
+    pub bool: bool,
+    pub ptr: *const (), // Universal pointer to heap allocated object. Unsafe, so requires a destructor and a brain to manage memory.
 }
 
-// pub union RegisterVal {
-//     pub null: (), // Nulls, ints, floats, and bools are all primitives, so they are stored directly in the union.
-//     pub int: i64,
-//     pub float: f64,
-//     pub bool: bool,
-//     pub ptr: *const u8, // Universal pointer to heap allocated object. Unsafe, so requires a destructor and a brain to manage memory.
-// }
+impl Default for RegisterVal {
+    fn default() -> Self {
+        RegisterVal { null: () }
+    }
+}
+
+// Implement Send and Sync for RegisterVal
+unsafe impl Send for RegisterVal {}
+unsafe impl Sync for RegisterVal {}
+
+impl Debug for RegisterVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Access the union as its raw bytes
+        unsafe { self.int.fmt(f) }
+    }
+}
 
 impl std::fmt::Display for RegisterVal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RegisterVal::Null => write!(f, "null"),
-            RegisterVal::Int(int) => write!(f, "{}", int),
-            RegisterVal::Float(float) => write!(f, "{}", float),
-            RegisterVal::Bool(boolean) => write!(f, "{}", boolean),
-            RegisterVal::Str(string) => write!(f, "{}", string),
-            RegisterVal::Array(array) => write!(f, "{:?}", array),
-            RegisterVal::Range(range) => write!(f, "{:?}", range),
-            RegisterVal::HashMap(hashmap) => write!(f, "{:?}", hashmap),
-            RegisterVal::HashSet(hashset) => write!(f, "{:?}", hashset),
+        // match self {
+        //     RegisterVal::Null => write!(f, "null"),
+        //     RegisterVal::Int(int) => write!(f, "{}", int),
+        //     RegisterVal::Float(float) => write!(f, "{}", float),
+        //     RegisterVal::Bool(boolean) => write!(f, "{}", boolean),
+        //     RegisterVal::Str(string) => write!(f, "{}", string),
+        //     RegisterVal::Array(array) => write!(f, "{:?}", array),
+        //     RegisterVal::Range(range) => write!(f, "{:?}", range),
+        //     RegisterVal::HashMap(hashmap) => write!(f, "{:?}", hashmap),
+        //     RegisterVal::HashSet(hashset) => write!(f, "{:?}", hashset),
+        // }
+
+        unsafe {
+            match self {
+                RegisterVal { null: () } => write!(f, "null"),
+                RegisterVal { int } => write!(f, "{}", int),
+                RegisterVal { float } => write!(f, "{}", float),
+                RegisterVal { bool } => write!(f, "{}", bool),
+                RegisterVal { ptr } => write!(f, "{:?}", ptr),
+            }
         }
     }
 }
 
-pub fn to_quiklangc_strings(inner: &RegisterVal) -> String {
-    match inner {
-        RegisterVal::Null => format!("{:10}| null", "null"),
-        RegisterVal::Int(int) => format!("{:10}| {}", "integer", int),
-        RegisterVal::Float(float) => format!("{:10}| {}", "float", float),
-        RegisterVal::Bool(boolean) => format!("{:10}| {}", "bool", boolean),
-        RegisterVal::Str(string) => format!("{:10}| {}", "string", string),
-        RegisterVal::Array(array) => format!("{:10}| {:?}", "array", array),
-        RegisterVal::Range(range) => format!("{:10}| {:?}", "range", range),
-        RegisterVal::HashMap(hashmap) => format!("{:10}| {:?}", "hashmap", hashmap),
-        RegisterVal::HashSet(hashset) => format!("{:10}| {:?}", "hashset", hashset),
+impl RegisterVal {
+    pub fn get_string(&self) -> *const String {
+        unsafe { self.ptr as *const String }
     }
+
+    pub fn get_array(&self) -> *const Vec<RegisterVal> {
+        unsafe { self.ptr as *const Vec<RegisterVal> }
+    }
+
+    pub fn get_hashmap(&self) -> *const HashMap<RegisterVal, RegisterVal> {
+        unsafe { self.ptr as *const HashMap<RegisterVal, RegisterVal> }
+    }
+
+    pub fn get_hashset(&self) -> *const HashSet<RegisterVal> {
+        unsafe { self.ptr as *const HashSet<RegisterVal> }
+    }
+}
+
+pub fn to_quiklangc_strings(inner: &TaggedConstantValue) -> String {
+    match inner {
+        TaggedConstantValue::Null => format!("{:10}| null", "null"),
+        TaggedConstantValue::Int(int) => format!("{:10}| {}", "integer", int),
+        TaggedConstantValue::Float(float) => format!("{:10}| {}", "float", float),
+        TaggedConstantValue::Bool(boolean) => format!("{:10}| {}", "bool", boolean),
+        TaggedConstantValue::Str(string) => format!("{:10}| {}", "string", string),
+    }
+
+    // unsafe {
+    //     match inner {
+    //         RegisterVal { null: () } => format!("{:10}| null", "null"),
+    //         RegisterVal { int } => format!("{:10}| {}", "integer", int),
+    //         RegisterVal { float } => format!("{:10}| {}", "float", float),
+    //         RegisterVal { bool } => format!("{:10}| {}", "bool", bool),
+    //         RegisterVal { ptr } => format!("{:10}| {:?}", "pointer", ptr),
+    //     }
+    // }
 }
 
 // Manual implementations of certain traits
-impl Eq for RegisterVal {}
+// impl Eq for RegisterVal {}
 
-impl Hash for RegisterVal {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            RegisterVal::Int(val) => val.hash(state),
-            RegisterVal::Float(val) => {
-                let int_val: i64 = (*val).to_bits() as i64; // Convert to bits and hash as integer
-                int_val.hash(state);
-            }
-            RegisterVal::Bool(val) => val.hash(state),
-            RegisterVal::Str(val) => val.hash(state),
-            RegisterVal::Null => 0_u8.hash(state),
-            RegisterVal::Array(val) => val.hash(state),
-            RegisterVal::Range(val) => val.hash(state),
-            RegisterVal::HashMap(val) => {
-                // Iterate over the entries and hash them
-                for (key, value) in val.iter() {
-                    key.hash(state);
-                    value.hash(state);
-                }
-            }
-            RegisterVal::HashSet(val) => {
-                // Iterate over the items and hash them
-                for item in val.iter() {
-                    item.hash(state);
-                }
-            }
-        }
-    }
-}
+// impl Hash for RegisterVal {
+//     fn hash<H: Hasher>(&self, state: &mut H) {
+//         match self {
+//             RegisterVal::Int(val) => val.hash(state),
+//             RegisterVal::Float(val) => {
+//                 let int_val: i64 = (*val).to_bits() as i64; // Convert to bits and hash as integer
+//                 int_val.hash(state);
+//             }
+//             RegisterVal::Bool(val) => val.hash(state),
+//             RegisterVal::Str(val) => val.hash(state),
+//             RegisterVal::Null => 0_u8.hash(state),
+//             RegisterVal::Array(val) => val.hash(state),
+//             RegisterVal::Range(val) => val.hash(state),
+//             RegisterVal::HashMap(val) => {
+//                 // Iterate over the entries and hash them
+//                 for (key, value) in val.iter() {
+//                     key.hash(state);
+//                     value.hash(state);
+//                 }
+//             }
+//             RegisterVal::HashSet(val) => {
+//                 // Iterate over the items and hash them
+//                 for item in val.iter() {
+//                     item.hash(state);
+//                 }
+//             }
+//         }
+//     }
+// }
 
 // A note about converting from bytecode to vm for strings specifically:
 // A constant entry with a string has information we know: its lens and string content.
@@ -185,11 +238,11 @@ const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
         VMThread::op_return,
         VMThread::op_int_inc,
         VMThread::op_int_dec,
-        VMThread::op_bitand,
-        VMThread::op_bitor,
-        VMThread::op_bitxor,
-        VMThread::op_shl,
-        VMThread::op_shr,
+        VMThread::op_int_bitand,
+        VMThread::op_int_bitor,
+        VMThread::op_int_bitxor,
+        VMThread::op_int_shl,
+        VMThread::op_int_shr,
         VMThread::op_concat,
         VMThread::op_destructor,
         VMThread::op_exit,
@@ -244,7 +297,7 @@ pub struct VMThread {
     call_stack_pointer: usize,     // Local stack pointer
 }
 
-const ARRAY_REPEAT_VALUE: RegisterVal = RegisterVal::Null;
+const ARRAY_REPEAT_VALUE: RegisterVal = RegisterVal { null: () };
 
 impl VM {
     // Create a new VM instance
@@ -268,7 +321,20 @@ impl VM {
     pub fn from_bytecode(bytecode: ByteCode) -> Self {
         VM::new(
             bytecode.instructions().clone(),
-            bytecode.constant_pool().clone(),
+            bytecode
+                .constant_pool()
+                .clone()
+                .iter()
+                .map(|f| match f {
+                    TaggedConstantValue::Null => RegisterVal { null: () },
+                    TaggedConstantValue::Int(int) => RegisterVal { int: *int },
+                    TaggedConstantValue::Float(float) => RegisterVal { float: *float },
+                    TaggedConstantValue::Bool(bool) => RegisterVal { bool: *bool },
+                    TaggedConstantValue::Str(str) => RegisterVal {
+                        ptr: str.clone().as_ptr() as *const (),
+                    },
+                })
+                .collect(),
             bytecode
                 .qlang_functions
                 .iter()
@@ -583,7 +649,11 @@ impl VMThread {
             };
             self.program_counter += 1;
         }
-        Ok(self.registers.first().unwrap_or(&RegisterVal::Null).clone())
+        Ok(self
+            .registers
+            .first()
+            .unwrap_or(&RegisterVal { null: () })
+            .clone())
     }
 
     #[inline(always)]
@@ -615,9 +685,9 @@ impl VMThread {
         let argc = get_argc(inst);
 
         let value = if argb != 0 {
-            RegisterVal::Bool(true)
+            RegisterVal { bool: true }
         } else {
-            RegisterVal::Bool(false)
+            RegisterVal { bool: false }
         };
         self.set_register(arga as usize, value)?;
         if argc != 0 {
@@ -633,7 +703,7 @@ impl VMThread {
         let argb = get_argb(inst);
 
         for i in arga as usize..=argb as usize {
-            self.set_register(i, RegisterVal::Null)?;
+            self.set_register(i, RegisterVal { null: () })?;
         }
 
         Ok(())
@@ -661,67 +731,64 @@ impl VMThread {
 
     #[inline(always)]
     fn op_int_add(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_op(
-            inst,
-            |left, right| left.wrapping_add(right),
-            |left, right| left + right,
-        )
+        self.perform_int_op(inst, |left, right| left.wrapping_add(right))
     }
 
     #[inline(always)]
     fn op_int_sub(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_op(
-            inst,
-            |left, right| left.wrapping_sub(right),
-            |left, right| left - right,
-        )
+        self.perform_int_op(inst, |left, right| left.wrapping_sub(right))
     }
 
     #[inline(always)]
     fn op_int_mul(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_op(
-            inst,
-            |left, right| left.wrapping_mul(right),
-            |left, right| left * right,
-        )
+        self.perform_int_op(inst, |left, right| left.wrapping_mul(right))
     }
 
     #[inline(always)]
     fn op_int_div(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_op(
-            inst,
-            |left, right| left.wrapping_div(right),
-            |left, right| left / right,
-        )
+        self.perform_int_op(inst, |left, right| left.wrapping_div(right))
     }
 
     #[inline(always)]
     fn op_int_mod(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_op(
-            inst,
-            |left, right| left.wrapping_rem(right),
-            |left, right| left % right,
-        )
+        self.perform_int_op(inst, |left, right| left.wrapping_rem(right))
     }
 
     #[inline(always)]
     fn op_int_pow(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_op(
-            inst,
-            |left, right| left.wrapping_pow(right as u32),
-            |left, right| left.powf(right),
-        )
+        self.perform_int_op(inst, |left, right| left.wrapping_pow(right as u32))
     }
 
     #[inline(always)]
-    fn perform_op<FInt, FFloat>(
+    fn perform_int_op<FInt>(
         &mut self,
         inst: Instruction,
         int_op: FInt,
-        float_op: FFloat,
     ) -> Result<(), VMRuntimeError>
     where
         FInt: FnOnce(i64, i64) -> i64,
+    {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let (b_val, c_val) = self.fetch_values(argb, argc, offset)?;
+
+        let result = int_op(unsafe { b_val.int }, unsafe { c_val.int });
+
+        self.set_register(arga as usize, RegisterVal { int: result })?;
+
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn perform_float_op<FFloat>(
+        &mut self,
+        inst: Instruction,
+        float_op: FFloat,
+    ) -> Result<(), VMRuntimeError>
+    where
         FFloat: FnOnce(f64, f64) -> f64,
     {
         let arga = get_arga(inst);
@@ -731,23 +798,9 @@ impl VMThread {
 
         let (b_val, c_val) = self.fetch_values(argb, argc, offset)?;
 
-        let result = match (b_val, c_val) {
-            (RegisterVal::Int(left), RegisterVal::Int(right)) => {
-                RegisterVal::Int(int_op(*left, *right))
-            }
-            (RegisterVal::Float(left), RegisterVal::Float(right)) => {
-                RegisterVal::Float(float_op(*left, *right))
-            }
-            (RegisterVal::Int(left), RegisterVal::Float(right)) => {
-                RegisterVal::Float(float_op(*left as f64, *right))
-            }
-            (RegisterVal::Float(left), RegisterVal::Int(right)) => {
-                RegisterVal::Float(float_op(*left, *right as f64))
-            }
-            _ => return Ok(()), // no-op for unsupported types
-        };
+        let result = float_op(unsafe { b_val.float }, unsafe { c_val.float });
 
-        self.set_register(arga as usize, result)?;
+        self.set_register(arga as usize, RegisterVal { float: result })?;
 
         Ok(())
     }
@@ -756,12 +809,19 @@ impl VMThread {
     fn op_logical_not(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
-        let offset = self.current_offset();
 
-        if let RegisterVal::Int(value) = self.registers[argb as usize + offset] {
-            self.registers[arga as usize + offset] = RegisterVal::Int(!value);
-            self.set_register(arga as usize, RegisterVal::Int(!value))?;
-        }
+        let b_val = if is_k(argb) {
+            self.get_constant_clone(rk_to_k(argb) as usize)?
+        } else {
+            self.get_register_clone(argb as usize)?
+        };
+
+        self.set_register(
+            arga as usize,
+            RegisterVal {
+                bool: !unsafe { b_val.bool },
+            },
+        )?;
 
         Ok(())
     }
@@ -783,9 +843,12 @@ impl VMThread {
             self.get_register_clone(argc as usize)?
         };
 
-        if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.set_register(arga as usize, RegisterVal::Int(left & right))?;
-        }
+        self.set_register(
+            arga as usize,
+            RegisterVal {
+                bool: unsafe { b_val.bool } && unsafe { c_val.bool },
+            },
+        )?;
 
         Ok(())
     }
@@ -807,17 +870,24 @@ impl VMThread {
             self.get_register_clone(argc as usize)?
         };
 
-        if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.set_register(arga as usize, RegisterVal::Int(left | right))?;
-        }
+        self.set_register(
+            arga as usize,
+            RegisterVal {
+                bool: unsafe { b_val.bool } || unsafe { c_val.bool },
+            },
+        )?;
 
         Ok(())
     }
 
     #[inline(always)]
-    fn perform_comparison<F>(&mut self, inst: Instruction, comp: F) -> Result<(), VMRuntimeError>
+    fn perform_int_comparison<F>(
+        &mut self,
+        inst: Instruction,
+        int_comp: F,
+    ) -> Result<(), VMRuntimeError>
     where
-        F: FnOnce(&RegisterVal, &RegisterVal) -> bool,
+        F: FnOnce(i64, i64) -> bool,
     {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -826,63 +896,70 @@ impl VMThread {
 
         let (b_val, c_val) = self.fetch_values(argb, argc, offset)?;
 
-        self.set_register(arga as usize, RegisterVal::Bool(comp(b_val, c_val)))?;
+        self.set_register(
+            arga as usize,
+            RegisterVal {
+                bool: int_comp(unsafe { b_val.int }, unsafe { c_val.int }),
+            },
+        )?;
+
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn perform_float_comparison<F>(
+        &mut self,
+        inst: Instruction,
+        float_comp: F,
+    ) -> Result<(), VMRuntimeError>
+    where
+        F: FnOnce(f64, f64) -> bool,
+    {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let argc = get_argc(inst);
+        let offset = self.current_offset();
+
+        let (b_val, c_val) = self.fetch_values(argb, argc, offset)?;
+
+        self.set_register(
+            arga as usize,
+            RegisterVal {
+                bool: float_comp(unsafe { b_val.float }, unsafe { c_val.float }),
+            },
+        )?;
 
         Ok(())
     }
 
     #[inline(always)]
     fn op_int_eq(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_comparison(inst, |b, c| b == c)
+        self.perform_int_comparison(inst, |b, c| b == c)
     }
 
     #[inline(always)]
     fn op_int_ne(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_comparison(inst, |b, c| b != c)
+        self.perform_int_comparison(inst, |b, c| b != c)
     }
 
     #[inline(always)]
     fn op_int_lt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_comparison(inst, |b, c| match (b, c) {
-            (RegisterVal::Int(b), RegisterVal::Int(c)) => b < c,
-            (RegisterVal::Float(b), RegisterVal::Float(c)) => b < c,
-            (RegisterVal::Int(b), RegisterVal::Float(c)) => (*b as f64) < *c,
-            (RegisterVal::Float(b), RegisterVal::Int(c)) => b < &(*c as f64),
-            _ => false,
-        })
+        self.perform_int_comparison(inst, |b, c| b < c)
     }
 
     #[inline(always)]
     fn op_int_le(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_comparison(inst, |b, c| match (b, c) {
-            (RegisterVal::Int(b), RegisterVal::Int(c)) => b <= c,
-            (RegisterVal::Float(b), RegisterVal::Float(c)) => b <= c,
-            (RegisterVal::Int(b), RegisterVal::Float(c)) => (*b as f64) <= *c,
-            (RegisterVal::Float(b), RegisterVal::Int(c)) => b <= &(*c as f64),
-            _ => false,
-        })
+        self.perform_int_comparison(inst, |b, c| b <= c)
     }
 
     #[inline(always)]
     fn op_int_gt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_comparison(inst, |b, c| match (b, c) {
-            (RegisterVal::Int(b), RegisterVal::Int(c)) => b > c,
-            (RegisterVal::Float(b), RegisterVal::Float(c)) => b > c,
-            (RegisterVal::Int(b), RegisterVal::Float(c)) => (*b as f64) > *c,
-            (RegisterVal::Float(b), RegisterVal::Int(c)) => b > &(*c as f64),
-            _ => false,
-        })
+        self.perform_int_comparison(inst, |b, c| b > c)
     }
 
     #[inline(always)]
     fn op_int_ge(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_comparison(inst, |b, c| match (b, c) {
-            (RegisterVal::Int(b), RegisterVal::Int(c)) => b >= c,
-            (RegisterVal::Float(b), RegisterVal::Float(c)) => b >= c,
-            (RegisterVal::Int(b), RegisterVal::Float(c)) => (*b as f64) >= *c,
-            (RegisterVal::Float(b), RegisterVal::Int(c)) => b >= &(*c as f64),
-            _ => false,
-        })
+        self.perform_int_comparison(inst, |b, c| b >= c)
     }
 
     #[inline(always)]
@@ -898,8 +975,9 @@ impl VMThread {
     fn op_jump_if_true(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argsbx = get_argsbx(inst);
+        let offset = self.current_offset();
 
-        if let RegisterVal::Bool(true) = self.registers[arga as usize] {
+        if unsafe { self.get_register_ref(arga as usize, offset)?.bool } == true {
             self.program_counter = (self.program_counter as i32 + argsbx) as usize;
         }
 
@@ -910,8 +988,9 @@ impl VMThread {
     fn op_jump_if_false(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argsbx = get_argsbx(inst);
+        let offset = self.current_offset();
 
-        if let RegisterVal::Bool(false) = self.get_register_mutref(arga as usize)? {
+        if unsafe { self.get_register_ref(arga as usize, offset)?.bool } == false {
             self.program_counter = (self.program_counter as i32 + argsbx) as usize;
         }
 
@@ -989,11 +1068,15 @@ impl VMThread {
     #[inline(always)]
     fn op_int_inc(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
-        let offset = self.current_offset();
 
-        if let RegisterVal::Int(value) = self.get_register_ref(arga as usize, offset)? {
-            self.set_register(arga as usize, RegisterVal::Int(value.wrapping_add(1)))?;
-        }
+        let value = self.get_constant_ref(arga as usize)?;
+
+        self.set_register(
+            arga as usize,
+            RegisterVal {
+                int: unsafe { value.int }.wrapping_add(1),
+            },
+        )?;
 
         Ok(())
     }
@@ -1001,17 +1084,21 @@ impl VMThread {
     #[inline(always)]
     fn op_int_dec(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
-        let offset = self.current_offset();
 
-        if let RegisterVal::Int(value) = self.get_register_ref(arga as usize, offset)? {
-            self.set_register(arga as usize, RegisterVal::Int(value.wrapping_sub(1)))?;
-        }
+        let value = self.get_constant_ref(arga as usize)?;
+
+        self.set_register(
+            arga as usize,
+            RegisterVal {
+                int: unsafe { value.int }.wrapping_sub(1),
+            },
+        )?;
 
         Ok(())
     }
 
     #[inline(always)]
-    fn op_bitand(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_bitand(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1027,15 +1114,18 @@ impl VMThread {
             self.get_register_clone(argc as usize)?
         };
 
-        if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.set_register(arga as usize, RegisterVal::Int(left & right))?
-        }
+        self.set_register(
+            arga as usize,
+            RegisterVal {
+                int: unsafe { b_val.int } & unsafe { c_val.int },
+            },
+        )?;
 
         Ok(())
     }
 
     #[inline(always)]
-    fn op_bitor(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_bitor(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1051,15 +1141,18 @@ impl VMThread {
             self.get_register_clone(argc as usize)?
         };
 
-        if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.set_register(arga as usize, RegisterVal::Int(left | right))?
-        }
+        self.set_register(
+            arga as usize,
+            RegisterVal {
+                int: unsafe { b_val.int } | unsafe { c_val.int },
+            },
+        )?;
 
         Ok(())
     }
 
     #[inline(always)]
-    fn op_bitxor(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_bitxor(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1075,15 +1168,18 @@ impl VMThread {
             self.get_register_clone(argc as usize)?
         };
 
-        if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.set_register(arga as usize, RegisterVal::Int(left ^ right))?
-        }
+        self.set_register(
+            arga as usize,
+            RegisterVal {
+                int: unsafe { b_val.int } ^ unsafe { c_val.int },
+            },
+        )?;
 
         Ok(())
     }
 
     #[inline(always)]
-    fn op_shl(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_shl(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1099,15 +1195,18 @@ impl VMThread {
             self.get_register_clone(argc as usize)?
         };
 
-        if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.set_register(arga as usize, RegisterVal::Int(left << right))?
-        }
+        self.set_register(
+            arga as usize,
+            RegisterVal {
+                int: unsafe { b_val.int } << unsafe { c_val.int },
+            },
+        )?;
 
         Ok(())
     }
 
     #[inline(always)]
-    fn op_shr(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_int_shr(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
@@ -1123,9 +1222,12 @@ impl VMThread {
             self.get_register_clone(argc as usize)?
         };
 
-        if let (RegisterVal::Int(left), RegisterVal::Int(right)) = (b_val, c_val) {
-            self.set_register(arga as usize, RegisterVal::Int(left >> right))?
-        }
+        self.set_register(
+            arga as usize,
+            RegisterVal {
+                int: unsafe { b_val.int } >> unsafe { c_val.int },
+            },
+        )?;
 
         Ok(())
     }
@@ -1147,10 +1249,21 @@ impl VMThread {
             self.get_register_clone(argc as usize)?
         };
 
-        if let (RegisterVal::Str(left), RegisterVal::Str(right)) = (b_val, c_val) {
-            let concatenated = format!("{}{}", left, right);
-            self.set_register(arga as usize, RegisterVal::Str(Arc::new(concatenated)))?;
-        }
+        let b_val_str = unsafe { b_val.get_string().as_ref() }
+            .ok_or(VMRuntimeError::NullPtrDeref(unsafe { b_val.int }, argb))?;
+        let c_val_str = unsafe { c_val.get_string().as_ref() }
+            .ok_or(VMRuntimeError::NullPtrDeref(unsafe { c_val.int }, argc))?;
+
+        // Concatenate the strings
+        let concatenated = format!("{}{}", b_val_str, c_val_str);
+
+        // Create a `Box` to manage the memory for the concatenated string
+        let boxed_str = Box::new(concatenated);
+
+        // Obtain a raw pointer to the boxed string
+        let ptr = Box::into_raw(boxed_str) as *const ();
+
+        self.set_register(arga as usize, RegisterVal { ptr })?;
 
         Ok(())
     }
@@ -1187,67 +1300,89 @@ impl VMThread {
 
     #[inline(always)]
     fn op_float_add(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_ADD")
+        self.perform_float_op(inst, |left, right| left + right)
     }
 
     #[inline(always)]
     fn op_float_sub(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_SUB")
+        self.perform_float_op(inst, |left, right| left - right)
     }
 
     #[inline(always)]
     fn op_float_mul(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_MUL")
+        self.perform_float_op(inst, |left, right| left * right)
     }
 
     #[inline(always)]
     fn op_float_div(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_DIV")
+        self.perform_float_op(inst, |left, right| left - right)
     }
 
     #[inline(always)]
     fn op_float_pow(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_POW")
+        self.perform_float_op(inst, |left, right| left.powf(right))
     }
 
     #[inline(always)]
     fn op_float_eq(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_EQ")
+        self.perform_float_comparison(inst, |b, c| b == c)
     }
 
     #[inline(always)]
     fn op_float_ne(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_NE")
+        self.perform_float_comparison(inst, |b, c| b != c)
     }
 
     #[inline(always)]
     fn op_float_lt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_LT")
+        self.perform_float_comparison(inst, |b, c| b < c)
     }
 
     #[inline(always)]
     fn op_float_le(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_LE")
+        self.perform_float_comparison(inst, |b, c| b <= c)
     }
 
     #[inline(always)]
     fn op_float_gt(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_GT")
+        self.perform_float_comparison(inst, |b, c| b > c)
     }
 
     #[inline(always)]
     fn op_float_ge(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_GE")
+        self.perform_float_comparison(inst, |b, c| b >= c)
     }
 
     #[inline(always)]
     fn op_float_inc(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_INC")
+        let arga = get_arga(inst);
+
+        let value = self.get_constant_ref(arga as usize)?;
+
+        self.set_register(
+            arga as usize,
+            RegisterVal {
+                float: unsafe { value.float } + 1.0,
+            },
+        )?;
+
+        Ok(())
     }
 
     #[inline(always)]
     fn op_float_dec(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_DEC")
+        let arga = get_arga(inst);
+
+        let value = self.get_constant_ref(arga as usize)?;
+
+        self.set_register(
+            arga as usize,
+            RegisterVal {
+                float: unsafe { value.float } - 1.0,
+            },
+        )?;
+
+        Ok(())
     }
 
     #[inline(always)]
@@ -1282,7 +1417,7 @@ impl VMThread {
 
     #[inline(always)]
     fn op_float_mod(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_MOD")
+        self.perform_float_op(inst, |left, right| left % right)
     }
 
     #[inline(always)]

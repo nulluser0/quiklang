@@ -119,6 +119,8 @@ pub enum Expr {
         op: BinaryOp,
         left: Box<Expr>,
         right: Box<Expr>,
+        left_type: Type,
+        right_type: Type,
         output_type: Type,
     },
     UnaryOp(UnaryOp, Box<Expr>, Type), // Op, Expr, Output Type
@@ -186,6 +188,8 @@ impl ParsetimeType for Expr {
                 op,
                 left,
                 right,
+                left_type: _,
+                right_type: _,
                 output_type: _,
             } => match op {
                 BinaryOp::Add

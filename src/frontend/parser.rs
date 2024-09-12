@@ -800,6 +800,9 @@ impl Parser {
             let right = self.parse_concatenation_expr(type_env, root_type_env)?;
             left.clone()
                 .verify_type(type_env, operator_astoken.line, operator_astoken.col)?;
+            let left_type = left.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
+            let right_type =
+                right.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
             let output_type = match operator {
                 BinaryOp::Equal
                 | BinaryOp::LessThan
@@ -810,11 +813,7 @@ impl Parser {
                 | BinaryOp::NotEqual
                 | BinaryOp::Or => Type::Bool,
                 _ => {
-                    let left_type =
-                        left.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
-                    let right_type =
-                        right.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
-                    match (left_type, right_type) {
+                    match (left_type.clone(), right_type.clone()) {
                         (Type::Integer, Type::Integer) => Type::Integer,
                         (Type::Float, Type::Float) => Type::Float,
                         (Type::Integer, Type::Float) => Type::Float,
@@ -836,6 +835,8 @@ impl Parser {
                 op: operator,
                 left: Box::new(left),
                 right: Box::new(right),
+                left_type,
+                right_type,
                 output_type,
             };
         }
@@ -949,6 +950,9 @@ impl Parser {
             let right = self.parse_multiplicative_expr(type_env, root_type_env)?;
             left.clone()
                 .verify_type(type_env, operator_astoken.line, operator_astoken.col)?;
+            let left_type = left.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
+            let right_type =
+                right.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
             let output_type = match operator {
                 BinaryOp::Equal
                 | BinaryOp::LessThan
@@ -959,11 +963,7 @@ impl Parser {
                 | BinaryOp::NotEqual
                 | BinaryOp::Or => Type::Bool,
                 _ => {
-                    let left_type =
-                        left.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
-                    let right_type =
-                        right.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
-                    match (left_type, right_type) {
+                    match (left_type.clone(), right_type.clone()) {
                         (Type::Integer, Type::Integer) => Type::Integer,
                         (Type::Float, Type::Float) => Type::Float,
                         (Type::Integer, Type::Float) => Type::Float,
@@ -985,6 +985,8 @@ impl Parser {
                 op: operator,
                 left: Box::new(left),
                 right: Box::new(right),
+                left_type,
+                right_type,
                 output_type,
             };
         }
@@ -1018,6 +1020,9 @@ impl Parser {
             let right = self.parse_call_member_expr(type_env, root_type_env)?;
             left.clone()
                 .verify_type(type_env, operator_astoken.line, operator_astoken.col)?;
+            let left_type = left.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
+            let right_type =
+                right.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
             let output_type = match operator {
                 BinaryOp::Equal
                 | BinaryOp::LessThan
@@ -1028,11 +1033,7 @@ impl Parser {
                 | BinaryOp::NotEqual
                 | BinaryOp::Or => Type::Bool,
                 _ => {
-                    let left_type =
-                        left.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
-                    let right_type =
-                        right.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
-                    match (left_type, right_type) {
+                    match (left_type.clone(), right_type.clone()) {
                         (Type::Integer, Type::Integer) => Type::Integer,
                         (Type::Float, Type::Float) => Type::Float,
                         (Type::Integer, Type::Float) => Type::Float,
@@ -1054,6 +1055,8 @@ impl Parser {
                 op: operator,
                 left: Box::new(left),
                 right: Box::new(right),
+                left_type,
+                right_type,
                 output_type,
             };
         }

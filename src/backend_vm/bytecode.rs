@@ -74,13 +74,15 @@ use crate::{
     errors::VMBytecodeError,
 };
 
-use super::{instructions::Instruction, vm::RegisterVal};
+use super::{
+    bytecode_compiler::compiler::TaggedConstantValue, instructions::Instruction, vm::RegisterVal,
+};
 
 #[derive(Debug, Clone)]
 pub struct ByteCode {
     pub metadata: BCMetadata,
     pub integrity_info: BCIntegrityInfo,
-    pub constants: Vec<RegisterVal>,
+    pub constants: Vec<TaggedConstantValue>,
     pub qlang_functions: Vec<u64>,
     pub instructions: Vec<Instruction>,
 }
@@ -229,20 +231,22 @@ impl ByteCode {
         };
 
         // Read Constant Pool and add to String Pool
-        let mut constants: Vec<RegisterVal> = Vec::with_capacity(num_constants as usize);
+        let mut constants: Vec<TaggedConstantValue> = Vec::with_capacity(num_constants as usize);
         for _ in 0..num_constants {
             let discriminant = cursor.read_u8()?;
             match discriminant {
-                0 => constants.push(RegisterVal::Int(cursor.read_i64::<LittleEndian>()?)),
-                1 => constants.push(RegisterVal::Float(cursor.read_f64::<LittleEndian>()?)),
-                2 => constants.push(RegisterVal::Bool(cursor.read_u8()? != 0)),
-                3 => constants.push(RegisterVal::Null),
+                0 => constants.push(TaggedConstantValue::Int(cursor.read_i64::<LittleEndian>()?)),
+                1 => constants.push(TaggedConstantValue::Float(
+                    cursor.read_f64::<LittleEndian>()?,
+                )),
+                2 => constants.push(TaggedConstantValue::Bool(cursor.read_u8()? != 0)),
+                3 => constants.push(TaggedConstantValue::Null),
                 4 => {
                     // It is a string.
                     let lens = cursor.read_u64::<LittleEndian>()? as usize;
                     let mut string: Vec<u8> = vec![0; lens];
                     cursor.read_exact(&mut string)?;
-                    constants.push(RegisterVal::Str(String::from_utf8(string)?.into()));
+                    constants.push(TaggedConstantValue::Str(String::from_utf8(string)?.into()));
                 }
                 _ => return Err(VMBytecodeError::InvalidConstantType(discriminant)),
             }
@@ -302,28 +306,24 @@ impl ByteCode {
         // Write Constant Pool
         for constant in bytecode.constants.iter() {
             match constant {
-                RegisterVal::Int(int) => {
+                TaggedConstantValue::Int(int) => {
                     encoded_bytecode.write_u8(0)?;
                     encoded_bytecode.write_i64::<LittleEndian>(*int)?;
                 }
-                RegisterVal::Float(float) => {
+                TaggedConstantValue::Float(float) => {
                     encoded_bytecode.write_u8(1)?;
                     encoded_bytecode.write_f64::<LittleEndian>(*float)?;
                 }
-                RegisterVal::Bool(boolean) => {
+                TaggedConstantValue::Bool(boolean) => {
                     encoded_bytecode.write_u8(2)?;
                     encoded_bytecode.write_u8(if *boolean { 1 } else { 0 })?;
                 }
-                RegisterVal::Str(string) => {
+                TaggedConstantValue::Str(string) => {
                     encoded_bytecode.write_u8(4)?;
                     encoded_bytecode.write_u64::<LittleEndian>(string.len() as u64)?;
                     encoded_bytecode.write_all(string.as_bytes())?;
                 }
-                RegisterVal::Null => encoded_bytecode.write_u8(3)?,
-                RegisterVal::Array(_) => todo!(),
-                RegisterVal::Range(_) => todo!(),
-                RegisterVal::HashMap(_) => todo!(),
-                RegisterVal::HashSet(_) => todo!(),
+                TaggedConstantValue::Null => encoded_bytecode.write_u8(3)?,
             }
         }
 
@@ -348,7 +348,7 @@ impl ByteCode {
         &self.integrity_info.num_register
     }
 
-    pub fn constant_pool(&self) -> &Vec<RegisterVal> {
+    pub fn constant_pool(&self) -> &Vec<TaggedConstantValue> {
         &self.constants
     }
 }
@@ -454,7 +454,7 @@ mod tests {
         println!("{}", result.as_ref().unwrap());
         let bytecode = result.unwrap();
         assert_eq!(bytecode.constants.len(), 3);
-        assert_eq!(bytecode.constants[0], RegisterVal::Int(42));
+        assert_eq!(bytecode.constants[0], TaggedConstantValue::Int(42));
         assert_eq!(bytecode.instructions.len(), 3);
 
         // Check instructions
