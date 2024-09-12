@@ -204,6 +204,8 @@ const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
         VMThread::op_int_neg,
         VMThread::op_int_to_float,
         VMThread::op_float_to_int,
+        VMThread::op_float_positive,
+        VMThread::op_int_positive,
         VMThread::op_nop,
     ]
 }
@@ -1257,6 +1259,16 @@ impl VMThread {
     #[inline(always)]
     fn op_float_to_int(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         todo!("OP_FLOAT_TO_INT")
+    }
+
+    #[inline(always)]
+    fn op_float_positive(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_FLOAT_POSITIVE")
+    }
+
+    #[inline(always)]
+    fn op_int_positive(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_INT_POSITIVE")
     }
 
     #[inline(always)]

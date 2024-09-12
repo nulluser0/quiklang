@@ -5,10 +5,11 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     backend_vm::{
         instructions::{
-            rk_ask, ABx, ASBx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_INT_ADD, OP_INT_DIV,
-            OP_INT_EQ, OP_INT_GE, OP_INT_GT, OP_INT_LE, OP_INT_LT, OP_INT_MOD, OP_INT_MUL,
-            OP_INT_NE, OP_INT_SUB, OP_JUMP, OP_JUMP_IF_FALSE, OP_LOADBOOL, OP_LOADCONST,
-            OP_LOADNULL, OP_LOGICAL_AND, OP_LOGICAL_NOT, OP_LOGICAL_OR, OP_MOVE, OP_NATIVE_CALL,
+            rk_ask, ABx, ASBx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_FLOAT_NEG, OP_FLOAT_POSITIVE,
+            OP_INT_ADD, OP_INT_DIV, OP_INT_EQ, OP_INT_GE, OP_INT_GT, OP_INT_LE, OP_INT_LT,
+            OP_INT_MOD, OP_INT_MUL, OP_INT_NE, OP_INT_NEG, OP_INT_POSITIVE, OP_INT_SUB, OP_JUMP,
+            OP_JUMP_IF_FALSE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LOGICAL_AND,
+            OP_LOGICAL_NOT, OP_LOGICAL_OR, OP_MOVE, OP_NATIVE_CALL,
         },
         vm::RegisterVal,
     },
@@ -243,12 +244,20 @@ impl Compiler {
     ) -> Result<ReturnValue, VMCompileError> {
         let reg = self.allocate_register();
         let b = self
-            .compile_expression(expr, false, true, None, symbol_table, type_table)?
+            .compile_expression(expr.clone(), false, true, None, symbol_table, type_table)?
             .safe_unwrap() as i32;
         let opcode = match op {
             UnaryOp::LogicalNot => OP_LOGICAL_NOT,
-            UnaryOp::ArithmeticNegative => todo!(),
-            UnaryOp::ArithmeticPositive => todo!(),
+            UnaryOp::ArithmeticNegative => match expr {
+                Expr::Literal(Literal::Integer(_)) => OP_INT_NEG,
+                Expr::Literal(Literal::Float(_)) => OP_FLOAT_NEG,
+                _ => return Err(VMCompileError::UndefinedType),
+            },
+            UnaryOp::ArithmeticPositive => match expr {
+                Expr::Literal(Literal::Integer(_)) => OP_INT_POSITIVE,
+                Expr::Literal(Literal::Float(_)) => OP_FLOAT_POSITIVE,
+                _ => return Err(VMCompileError::UndefinedType),
+            },
             UnaryOp::BitwiseNot => OP_BITNOT,
         };
         self.add_instruction(Abc(opcode, reg as i32, b, 0));
