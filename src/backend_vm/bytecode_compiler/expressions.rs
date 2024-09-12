@@ -5,9 +5,11 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     backend_vm::{
         instructions::{
-            rk_ask, ABx, ASBx, Abc, OP_ADD, OP_AND, OP_CALL, OP_CLONE, OP_DIV, OP_EQ, OP_GE, OP_GT,
-            OP_JUMP, OP_JUMP_IF_FALSE, OP_LE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LT,
-            OP_MOD, OP_MOVE, OP_MUL, OP_NATIVE_CALL, OP_NE, OP_NOT, OP_OR, OP_SUB,
+            rk_ask, ABx, ASBx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_FLOAT_NEG, OP_FLOAT_POSITIVE,
+            OP_INT_ADD, OP_INT_DIV, OP_INT_EQ, OP_INT_GE, OP_INT_GT, OP_INT_LE, OP_INT_LT,
+            OP_INT_MOD, OP_INT_MUL, OP_INT_NE, OP_INT_NEG, OP_INT_POSITIVE, OP_INT_SUB, OP_JUMP,
+            OP_JUMP_IF_FALSE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LOGICAL_AND,
+            OP_LOGICAL_NOT, OP_LOGICAL_OR, OP_MOVE, OP_NATIVE_CALL,
         },
         vm::RegisterVal,
     },
@@ -215,19 +217,19 @@ impl Compiler {
             .compile_expression(right, false, true, None, symbol_table, type_table)?
             .safe_unwrap() as i32;
         let opcode = match op {
-            BinaryOp::Add => OP_ADD,
-            BinaryOp::Subtract => OP_SUB,
-            BinaryOp::Multiply => OP_MUL,
-            BinaryOp::Divide => OP_DIV,
-            BinaryOp::GreaterThan => OP_GT,
-            BinaryOp::LessThan => OP_LT,
-            BinaryOp::GreaterOrEqual => OP_GE,
-            BinaryOp::LessOrEqual => OP_LE,
-            BinaryOp::Equal => OP_EQ,
-            BinaryOp::NotEqual => OP_NE,
-            BinaryOp::And => OP_AND,
-            BinaryOp::Or => OP_OR,
-            BinaryOp::Modulus => OP_MOD,
+            BinaryOp::Add => OP_INT_ADD,
+            BinaryOp::Subtract => OP_INT_SUB,
+            BinaryOp::Multiply => OP_INT_MUL,
+            BinaryOp::Divide => OP_INT_DIV,
+            BinaryOp::GreaterThan => OP_INT_GT,
+            BinaryOp::LessThan => OP_INT_LT,
+            BinaryOp::GreaterOrEqual => OP_INT_GE,
+            BinaryOp::LessOrEqual => OP_INT_LE,
+            BinaryOp::Equal => OP_INT_EQ,
+            BinaryOp::NotEqual => OP_INT_NE,
+            BinaryOp::And => OP_LOGICAL_AND,
+            BinaryOp::Or => OP_LOGICAL_OR,
+            BinaryOp::Modulus => OP_INT_MOD,
         };
         self.add_instruction(Abc(opcode, reg as i32, b, c));
         Ok(ReturnValue::Normal(reg as isize))
@@ -242,13 +244,21 @@ impl Compiler {
     ) -> Result<ReturnValue, VMCompileError> {
         let reg = self.allocate_register();
         let b = self
-            .compile_expression(expr, false, true, None, symbol_table, type_table)?
+            .compile_expression(expr.clone(), false, true, None, symbol_table, type_table)?
             .safe_unwrap() as i32;
         let opcode = match op {
-            UnaryOp::LogicalNot => OP_NOT,
-            UnaryOp::ArithmeticNegative => todo!(),
-            UnaryOp::ArithmeticPositive => todo!(),
-            UnaryOp::BitwiseNot => OP_NOT,
+            UnaryOp::LogicalNot => OP_LOGICAL_NOT,
+            UnaryOp::ArithmeticNegative => match expr {
+                Expr::Literal(Literal::Integer(_)) => OP_INT_NEG,
+                Expr::Literal(Literal::Float(_)) => OP_FLOAT_NEG,
+                _ => return Err(VMCompileError::UndefinedType),
+            },
+            UnaryOp::ArithmeticPositive => match expr {
+                Expr::Literal(Literal::Integer(_)) => OP_INT_POSITIVE,
+                Expr::Literal(Literal::Float(_)) => OP_FLOAT_POSITIVE,
+                _ => return Err(VMCompileError::UndefinedType),
+            },
+            UnaryOp::BitwiseNot => OP_BITNOT,
         };
         self.add_instruction(Abc(opcode, reg as i32, b, 0));
         Ok(ReturnValue::Normal(reg as isize))

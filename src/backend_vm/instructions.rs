@@ -36,413 +36,532 @@ pub const OPCODE_MAX_C: OpCodeSize = (1 << OPCODE_SIZE_C) - 1;
 pub const OPCODE_MAX_BX: OpCodeSize = (1 << OPCODE_SIZE_BX) - 1;
 pub const OPCODE_MAX_SBX: OpCodeSize = OPCODE_MAX_BX >> 1;
 
-// Opcodes
+// // Opcodes
 pub type OpCode = i32;
 
-// A B      R(A) := R(B)
-pub const OP_MOVE: OpCode = 0;
-// A Bx     R(A) := K(Bx)
-pub const OP_LOADCONST: OpCode = 1;
-// A B C    R(A) := (Bool)B; if (C) pc++
-pub const OP_LOADBOOL: OpCode = 2;
-// A B      R(A) := ... := R(B) := nil
-pub const OP_LOADNULL: OpCode = 3;
-pub const OP_ADD: OpCode = 4;
-pub const OP_SUB: OpCode = 5;
-pub const OP_MUL: OpCode = 6;
-pub const OP_DIV: OpCode = 7;
-pub const OP_MOD: OpCode = 8;
-pub const OP_POW: OpCode = 9;
-pub const OP_NOT: OpCode = 10;
-pub const OP_AND: OpCode = 11;
-pub const OP_OR: OpCode = 12;
-pub const OP_EQ: OpCode = 13;
-pub const OP_NE: OpCode = 14;
-pub const OP_LT: OpCode = 15;
-pub const OP_LE: OpCode = 16;
-pub const OP_GT: OpCode = 17;
-pub const OP_GE: OpCode = 18;
-pub const OP_JUMP: OpCode = 19; // A  PC += A
-pub const OP_JUMP_IF_TRUE: OpCode = 20;
-pub const OP_JUMP_IF_FALSE: OpCode = 21; // A B  if (!R(A)) PC += B
-pub const OP_CALL: OpCode = 22; // A B  Call function at R(A) with B arguments
-pub const OP_NATIVE_CALL: OpCode = 23; // A B  Call VM-Native function at R(A) with B arguments. TODO: A is index to Native Fn registry, then called by QFFI.
-pub const OP_QFFI_CALL: OpCode = 24; // A B  Call FFI (extern) function at R(A) with B arguments. TODO: A is index to FFI registry, then called by QFFI.
-pub const OP_TAILCALL: OpCode = 25;
-pub const OP_RETURN: OpCode = 26; // A  Return with R(A)
-pub const OP_INC: OpCode = 27; // A  R(A)++
-pub const OP_DEC: OpCode = 28; // A  R(A)--
-pub const OP_BITAND: OpCode = 29; // A B C  R(A) := R(B) & R(C)
-pub const OP_BITOR: OpCode = 30; // A B C  R(A) := R(B) | R(C)
-pub const OP_BITXOR: OpCode = 31; // A B C  R(A) := R(B) ^ R(C)
-pub const OP_SHL: OpCode = 32; // A B C  R(A) := R(B) << R(C)
-pub const OP_SHR: OpCode = 33; // A B C  R(A) := R(B) >> R(C)
-pub const OP_CONCAT: OpCode = 34; // A B C  R(A) := RK(B) & RK(C)
-pub const OP_DESTRUCTOR: OpCode = 35; // A B C  R(A) where A is a pointer to heap obj, heap obj is destroyed.
-pub const OP_EXIT: OpCode = 36; // A B C  A is exit code, default 0.
-pub const OP_CLONE: OpCode = 37; // A B  R(A) := R(B).clone()
-                                 // TODO: Add both array, string, hashmap, etc. (Heap-allocated objects) instructions
-pub const OP_ARRAY_ALLOCATE: OpCode = 34; // A B C  R(A) := allocate_array(b - size)
-pub const OP_HASHMAP_ALLOCATE: OpCode = 35; // A B C  R(A) := allocate_hashmap(b - size)
-pub const OP_HASHSET_ALLOCATE: OpCode = 36; // A B C  R(A) := allocate_hashset(b - size)
-pub const OP_STRING_ALLOCATE: OpCode = 37; // A B C  R(A) := allocate_string(b - size)
-pub const OP_ARRAY_OR_HASHSET_PUSH: OpCode = 37; // A B C  array/hashset(A).push(C)
-pub const OP_ARRAY_OR_HASHSET_POP: OpCode = 38; // A B C  R(A) := array/hashset(B).pop()
-pub const OP_GROWABLE_SET: OpCode = 39; // A B C  growable(A)[R(B)].set(C)
-pub const OP_GROWABLE_GET: OpCode = 40; // A B C  R(A) := growable(B)[R(C)]
-pub const OP_HASHMAP_OR_HASHSET_CONTAINS: OpCode = 41; // A B C  R(A) := hashmap/hashset(B).contains(C)
-pub const OP_GROWABLE_REMOVE: OpCode = 42; // A B C  R(A) := growable(B).remove(R(C))
-pub const OP_NOP: OpCode = 38; // NOP
+// // A B      R(A) := R(B)
+// pub const OP_MOVE: OpCode = 0;
+// // A Bx     R(A) := K(Bx)
+// pub const OP_LOADCONST: OpCode = 1;
+// // A B C    R(A) := (Bool)B; if (C) pc++
+// pub const OP_LOADBOOL: OpCode = 2;
+// // A B      R(A) := ... := R(B) := nil
+// pub const OP_LOADNULL: OpCode = 3;
+// pub const OP_ADD: OpCode = 4;
+// pub const OP_SUB: OpCode = 5;
+// pub const OP_MUL: OpCode = 6;
+// pub const OP_DIV: OpCode = 7;
+// pub const OP_MOD: OpCode = 8;
+// pub const OP_POW: OpCode = 9;
+// pub const OP_NOT: OpCode = 10;
+// pub const OP_AND: OpCode = 11;
+// pub const OP_OR: OpCode = 12;
+// pub const OP_EQ: OpCode = 13;
+// pub const OP_NE: OpCode = 14;
+// pub const OP_LT: OpCode = 15;
+// pub const OP_LE: OpCode = 16;
+// pub const OP_GT: OpCode = 17;
+// pub const OP_GE: OpCode = 18;
+// pub const OP_JUMP: OpCode = 19; // A  PC += A
+// pub const OP_JUMP_IF_TRUE: OpCode = 20;
+// pub const OP_JUMP_IF_FALSE: OpCode = 21; // A B  if (!R(A)) PC += B
+// pub const OP_CALL: OpCode = 22; // A B  Call function at R(A) with B arguments
+// pub const OP_NATIVE_CALL: OpCode = 23; // A B  Call VM-Native function at R(A) with B arguments. TODO: A is index to Native Fn registry, then called by QFFI.
+// pub const OP_QFFI_CALL: OpCode = 24; // A B  Call FFI (extern) function at R(A) with B arguments. TODO: A is index to FFI registry, then called by QFFI.
+// pub const OP_TAILCALL: OpCode = 25;
+// pub const OP_RETURN: OpCode = 26; // A  Return with R(A)
+// pub const OP_INC: OpCode = 27; // A  R(A)++
+// pub const OP_DEC: OpCode = 28; // A  R(A)--
+// pub const OP_BITAND: OpCode = 29; // A B C  R(A) := R(B) & R(C)
+// pub const OP_BITOR: OpCode = 30; // A B C  R(A) := R(B) | R(C)
+// pub const OP_BITXOR: OpCode = 31; // A B C  R(A) := R(B) ^ R(C)
+// pub const OP_SHL: OpCode = 32; // A B C  R(A) := R(B) << R(C)
+// pub const OP_SHR: OpCode = 33; // A B C  R(A) := R(B) >> R(C)
+// pub const OP_CONCAT: OpCode = 34; // A B C  R(A) := RK(B) & RK(C)
+// pub const OP_DESTRUCTOR: OpCode = 35; // A B C  R(A) where A is a pointer to heap obj, heap obj is destroyed.
+// pub const OP_EXIT: OpCode = 36; // A B C  A is exit code, default 0.
+// pub const OP_CLONE: OpCode = 37; // A B  R(A) := R(B).clone()
+//                                  // TODO: Add both array, string, hashmap, etc. (Heap-allocated objects) instructions
+// pub const OP_ARRAY_ALLOCATE: OpCode = 34; // A B C  R(A) := allocate_array(b - size)
+// pub const OP_HASHMAP_ALLOCATE: OpCode = 35; // A B C  R(A) := allocate_hashmap(b - size)
+// pub const OP_HASHSET_ALLOCATE: OpCode = 36; // A B C  R(A) := allocate_hashset(b - size)
+// pub const OP_STRING_ALLOCATE: OpCode = 37; // A B C  R(A) := allocate_string(b - size)
+// pub const OP_ARRAY_OR_HASHSET_PUSH: OpCode = 37; // A B C  array/hashset(A).push(C)
+// pub const OP_ARRAY_OR_HASHSET_POP: OpCode = 38; // A B C  R(A) := array/hashset(B).pop()
+// pub const OP_GROWABLE_SET: OpCode = 39; // A B C  growable(A)[R(B)].set(C)
+// pub const OP_GROWABLE_GET: OpCode = 40; // A B C  R(A) := growable(B)[R(C)]
+// pub const OP_HASHMAP_OR_HASHSET_CONTAINS: OpCode = 41; // A B C  R(A) := hashmap/hashset(B).contains(C)
+// pub const OP_GROWABLE_REMOVE: OpCode = 42; // A B C  R(A) := growable(B).remove(R(C))
+// pub const OP_NOP: OpCode = 38; // NOP
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-enum OpArgMode {
-    NotUsed,
-    Used,
-    RegisterOrJumpOffset,
-    ConstantOrRegisterConstant,
-}
+// #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+// enum OpArgMode {
+//     NotUsed,
+//     Used,
+//     RegisterOrJumpOffset,
+//     ConstantOrRegisterConstant,
+// }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-enum OpType {
-    Abc,
-    ABx,
-    AsBx,
-}
+// #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+// enum OpType {
+//     Abc,
+//     ABx,
+//     AsBx,
+// }
 
-impl Display for OpType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            OpType::Abc => write!(f, "Abc"),
-            OpType::ABx => write!(f, "ABx"),
-            OpType::AsBx => write!(f, "AsBx"),
+// impl Display for OpType {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match *self {
+//             OpType::Abc => write!(f, "Abc"),
+//             OpType::ABx => write!(f, "ABx"),
+//             OpType::AsBx => write!(f, "AsBx"),
+//         }
+//     }
+// }
+
+// #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+// pub struct OpProp {
+//     name: &'static str,
+//     is_test: bool,
+//     set_reg_a: bool,
+//     mode_arg_b: OpArgMode,
+//     mode_arg_c: OpArgMode,
+//     typ: OpType,
+// }
+
+// pub static OP_NAMES: &[OpProp; OP_NOP as usize + 1] = &[
+//     OpProp {
+//         name: "MOVE",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::RegisterOrJumpOffset,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "LOADCONST",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::ABx,
+//     },
+//     OpProp {
+//         name: "LOADBOOL",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::Used,
+//         mode_arg_c: OpArgMode::Used,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "LOADNULL",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::RegisterOrJumpOffset,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "ADD",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "SUB",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "MUL",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "DIV",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "MOD",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "POW",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "NOT",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::RegisterOrJumpOffset,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "AND",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "OR",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "EQ",
+//         is_test: true,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "NE",
+//         is_test: true,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "LT",
+//         is_test: true,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "LE",
+//         is_test: true,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "GT",
+//         is_test: true,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "GE",
+//         is_test: true,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "JUMP",
+//         is_test: false,
+//         set_reg_a: false,
+//         mode_arg_b: OpArgMode::Used,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::AsBx,
+//     },
+//     OpProp {
+//         name: "JUMP_IF_TRUE",
+//         is_test: true,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::Used,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::AsBx,
+//     },
+//     OpProp {
+//         name: "JUMP_IF_FALSE",
+//         is_test: true,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::Used,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::AsBx,
+//     },
+//     OpProp {
+//         name: "CALL",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::Used,
+//         mode_arg_c: OpArgMode::Used,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "NATIVE_CALL",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::Used,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "OP_QFFI_CALL",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::Used,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "TAILCALL",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::Used,
+//         mode_arg_c: OpArgMode::Used,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "RETURN",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::NotUsed,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "INC",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::NotUsed,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "DEC",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::NotUsed,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "BITAND",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "BITOR",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "BITXOR",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "SHL",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "SHR",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "CONCAT",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
+//         mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "DESTRUCTOR",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::NotUsed,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "EXIT",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::NotUsed,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "CLONE",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::RegisterOrJumpOffset,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::Abc,
+//     },
+//     OpProp {
+//         name: "NOP",
+//         is_test: false,
+//         set_reg_a: true,
+//         mode_arg_b: OpArgMode::NotUsed,
+//         mode_arg_c: OpArgMode::NotUsed,
+//         typ: OpType::AsBx,
+//     },
+// ];
+
+macro_rules! define_opcodes {
+    ($($name:ident => ($op:expr, $is_test:expr, $set_reg_a:expr, $mode_arg_b:expr, $mode_arg_c:expr, $typ:expr)),* $(,)?) => {
+        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+        enum OpArgMode {
+            NotUsed,
+            Used,
+            RegisterOrJumpOffset,
+            ConstantOrRegisterConstant,
         }
-    }
+
+        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+        enum OpType {
+            Abc,
+            ABx,
+            AsBx,
+        }
+
+        impl Display for OpType {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match *self {
+                    OpType::Abc => write!(f, "Abc"),
+                    OpType::ABx => write!(f, "ABx"),
+                    OpType::AsBx => write!(f, "AsBx"),
+                }
+            }
+        }
+
+        #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+        pub struct OpProp {
+            name: &'static str,
+            is_test: bool,
+            set_reg_a: bool,
+            mode_arg_b: OpArgMode,
+            mode_arg_c: OpArgMode,
+            typ: OpType,
+        }
+
+        pub static OP_NAMES: &[OpProp] = &[
+            $(
+                OpProp {
+                    name: stringify!($name),
+                    is_test: $is_test,
+                    set_reg_a: $set_reg_a,
+                    mode_arg_b: $mode_arg_b,
+                    mode_arg_c: $mode_arg_c,
+                    typ: $typ,
+                },
+            )*
+        ];
+
+        $(
+            pub const $name: OpCode = $op;
+        )*
+    };
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct OpProp {
-    name: &'static str,
-    is_test: bool,
-    set_reg_a: bool,
-    mode_arg_b: OpArgMode,
-    mode_arg_c: OpArgMode,
-    typ: OpType,
+#[rustfmt::skip]
+define_opcodes! {
+    OP_MOVE =>          (0,     false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_LOADCONST =>     (1,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::NotUsed, OpType::ABx),
+    OP_LOADBOOL =>      (2,     false,  true,   OpArgMode::Used, OpArgMode::Used, OpType::Abc),
+    OP_LOADNULL =>      (3,     false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_INT_ADD =>       (4,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_SUB =>       (5,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_MUL =>       (6,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_DIV =>       (7,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_MOD =>       (8,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_POW =>       (9,     false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_LOGICAL_NOT =>   (10,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_LOGICAL_AND =>   (11,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_LOGICAL_OR =>    (12,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_EQ =>        (13,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_NE =>        (14,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_LT =>        (15,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_LE =>        (16,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_GT =>        (17,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_GE =>        (18,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_JUMP =>          (19,    false,  false,  OpArgMode::Used, OpArgMode::NotUsed, OpType::AsBx),
+    OP_JUMP_IF_TRUE =>  (20,    false,  true,   OpArgMode::Used, OpArgMode::NotUsed, OpType::AsBx),
+    OP_JUMP_IF_FALSE => (21,    false,  true,   OpArgMode::Used, OpArgMode::NotUsed, OpType::AsBx),
+    OP_CALL =>          (22,    false,  true,   OpArgMode::Used, OpArgMode::Used, OpType::Abc),
+    OP_NATIVE_CALL =>   (23,    false,  true,   OpArgMode::Used, OpArgMode::NotUsed, OpType::Abc),
+    OP_QFFI_CALL =>     (24,    false,  true,   OpArgMode::Used, OpArgMode::NotUsed, OpType::Abc),
+    OP_TAILCALL =>      (25,    false,  true,   OpArgMode::Used, OpArgMode::Used, OpType::Abc),
+    OP_RETURN =>        (26,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
+    OP_INT_INC =>       (27,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
+    OP_INT_DEC =>       (28,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
+    OP_BITAND =>        (29,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_BITOR =>         (30,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_BITXOR =>        (31,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_SHL =>           (32,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_SHR =>           (33,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_CONCAT =>        (34,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_DESTRUCTOR =>    (35,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
+    OP_EXIT =>          (36,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
+    OP_CLONE =>         (37,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_BITNOT =>        (38,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_FLOAT_ADD =>     (39,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_SUB =>     (40,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_MUL =>     (41,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_DIV =>     (42,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_POW =>     (43,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_EQ =>      (44,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_NE =>      (45,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_LT =>      (46,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_LE =>      (47,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_GT =>      (48,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_GE =>      (49,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_FLOAT_INC =>     (50,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
+    OP_FLOAT_DEC =>     (51,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
+    OP_FLOAT_NEG =>     (52,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_INT_NEG =>       (53,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_INT_TO_FLOAT =>  (54,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_FLOAT_TO_INT =>  (55,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_FLOAT_POSITIVE =>(56,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_INT_POSITIVE =>  (57,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_NOP =>           (58,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::AsBx),
 }
-
-pub static OP_NAMES: &[OpProp; OP_NOP as usize + 1] = &[
-    OpProp {
-        name: "MOVE",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::RegisterOrJumpOffset,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "LOADCONST",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::ABx,
-    },
-    OpProp {
-        name: "LOADBOOL",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::Used,
-        mode_arg_c: OpArgMode::Used,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "LOADNULL",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::RegisterOrJumpOffset,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "ADD",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "SUB",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "MUL",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "DIV",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "MOD",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "POW",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "NOT",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::RegisterOrJumpOffset,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "AND",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "OR",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "EQ",
-        is_test: true,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "NE",
-        is_test: true,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "LT",
-        is_test: true,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "LE",
-        is_test: true,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "GT",
-        is_test: true,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "GE",
-        is_test: true,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "JUMP",
-        is_test: false,
-        set_reg_a: false,
-        mode_arg_b: OpArgMode::Used,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::AsBx,
-    },
-    OpProp {
-        name: "JUMP_IF_TRUE",
-        is_test: true,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::Used,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::AsBx,
-    },
-    OpProp {
-        name: "JUMP_IF_FALSE",
-        is_test: true,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::Used,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::AsBx,
-    },
-    OpProp {
-        name: "CALL",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::Used,
-        mode_arg_c: OpArgMode::Used,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "NATIVE_CALL",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::Used,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "OP_QFFI_CALL",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::Used,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "TAILCALL",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::Used,
-        mode_arg_c: OpArgMode::Used,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "RETURN",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::NotUsed,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "INC",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::NotUsed,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "DEC",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::NotUsed,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "BITAND",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "BITOR",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "BITXOR",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "SHL",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "SHR",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "CONCAT",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::ConstantOrRegisterConstant,
-        mode_arg_c: OpArgMode::ConstantOrRegisterConstant,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "DESTRUCTOR",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::NotUsed,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "EXIT",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::NotUsed,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "CLONE",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::RegisterOrJumpOffset,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::Abc,
-    },
-    OpProp {
-        name: "NOP",
-        is_test: false,
-        set_reg_a: true,
-        mode_arg_b: OpArgMode::NotUsed,
-        mode_arg_c: OpArgMode::NotUsed,
-        typ: OpType::AsBx,
-    },
-];
 
 pub fn op_to_string(op: i32) -> String {
     OP_NAMES[op as usize].name.to_string()
@@ -629,99 +748,99 @@ pub fn to_string(inst: Instruction) -> String {
             ops, arga, argb, argc
         ),
         OP_LOADNULL => format!("{} | R({}) := ... := R({}) := nil", ops, arga, argb),
-        OP_ADD => format!(
+        OP_INT_ADD => format!(
             "{} | R({}) := {} + {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_SUB => format!(
+        OP_INT_SUB => format!(
             "{} | R({}) := {} - {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_MUL => format!(
+        OP_INT_MUL => format!(
             "{} | R({}) := {} * {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_DIV => format!(
+        OP_INT_DIV => format!(
             "{} | R({}) := {} / {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_MOD => format!(
+        OP_INT_MOD => format!(
             "{} | R({}) := {} % {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_POW => format!(
+        OP_INT_POW => format!(
             "{} | R({}) := {} ^ {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_NOT => format!("{} | R({}) := not R({})", ops, arga, argb),
-        OP_AND => format!(
+        OP_LOGICAL_NOT => format!("{} | R({}) := not R({})", ops, arga, argb),
+        OP_LOGICAL_AND => format!(
             "{} | R({}) := {} and {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_OR => format!(
+        OP_LOGICAL_OR => format!(
             "{} | R({}) := {} or {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_EQ => format!(
+        OP_INT_EQ => format!(
             "{} | R({}) = ({} == {})",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_NE => format!(
+        OP_INT_NE => format!(
             "{} | R({}) := {} != {}",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_LT => format!(
+        OP_INT_LT => format!(
             "{} | R({}) = ({} < {})",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_LE => format!(
+        OP_INT_LE => format!(
             "{} | R({}) = ({} <= {})",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_GT => format!(
+        OP_INT_GT => format!(
             "{} | R({}) = ({} > {})",
             ops,
             arga,
             format_rk(argb),
             format_rk(argc)
         ),
-        OP_GE => format!(
+        OP_INT_GE => format!(
             "{} | R({}) = ({} >= {})",
             ops,
             arga,
@@ -751,8 +870,8 @@ pub fn to_string(inst: Instruction) -> String {
             ops, arga, arga, arga, argb
         ),
         OP_RETURN => format!("{} | return", ops),
-        OP_INC => format!("{} | R({}) += 1", ops, arga),
-        OP_DEC => format!("{} | R({}) -= 1", ops, arga),
+        OP_INT_INC => format!("{} | R({}) += 1", ops, arga),
+        OP_INT_DEC => format!("{} | R({}) -= 1", ops, arga),
         OP_BITAND => format!(
             "{} | R({}) := R({}) bitwise and R({})",
             ops, arga, argb, argc

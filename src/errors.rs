@@ -248,6 +248,9 @@ pub enum VMCompileError {
 
     #[error("Cannot resolve type from typedef.")]
     UndefinedType,
+
+    #[error("Unexpected type mismatch")]
+    UnexpectedMismatch,
 }
 
 // VM Bytecode specific errors
