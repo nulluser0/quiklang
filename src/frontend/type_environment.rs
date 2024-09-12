@@ -58,7 +58,7 @@ fn setup_type_env(type_env: &mut TypeEnvironment) -> Result<(), ParserError> {
 
     type_env.declare_fn(
         "println",
-        Type::Function(vec![(Type::Any, false)], Box::new(Type::Null)),
+        Type::Function(vec![(Type::String, false)], Box::new(Type::Null)),
         &Token {
             token: TokenType::EOF,
             line: 0,

@@ -145,6 +145,7 @@ pub enum Expr {
     SpecialNull, // Literally just returns null. Should ONLY be returned as a result of a semicolon.
     StructLiteral(String, Vec<Property>),
     EnumLiteral(String, String, Vec<Expr>),
+    TypeCast(Box<Expr>, Type, Type), // Expr, root type, cast to type
 }
 
 impl Expr {
@@ -325,6 +326,7 @@ impl ParsetimeType for Expr {
             Expr::SpecialNull => Ok(Type::Null),
             Expr::StructLiteral(_, _) => todo!(),
             Expr::EnumLiteral(_, _, _) => todo!(),
+            Expr::TypeCast(_, _, cast_into_type) => Ok(cast_into_type.clone()),
         }
     }
 }

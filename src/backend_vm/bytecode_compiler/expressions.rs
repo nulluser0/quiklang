@@ -6,11 +6,11 @@ use crate::{
     backend_vm::instructions::{
         rk_ask, ABx, ASBx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_FLOAT_ADD, OP_FLOAT_DIV,
         OP_FLOAT_EQ, OP_FLOAT_GE, OP_FLOAT_GT, OP_FLOAT_LE, OP_FLOAT_LT, OP_FLOAT_MOD,
-        OP_FLOAT_MUL, OP_FLOAT_NE, OP_FLOAT_NEG, OP_FLOAT_POSITIVE, OP_FLOAT_SUB, OP_INT_ADD,
-        OP_INT_DIV, OP_INT_EQ, OP_INT_GE, OP_INT_GT, OP_INT_LE, OP_INT_LT, OP_INT_MOD, OP_INT_MUL,
-        OP_INT_NE, OP_INT_NEG, OP_INT_POSITIVE, OP_INT_SUB, OP_INT_TO_FLOAT, OP_JUMP,
-        OP_JUMP_IF_FALSE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LOGICAL_AND, OP_LOGICAL_NOT,
-        OP_LOGICAL_OR, OP_MOVE, OP_NATIVE_CALL,
+        OP_FLOAT_MUL, OP_FLOAT_NE, OP_FLOAT_NEG, OP_FLOAT_POSITIVE, OP_FLOAT_SUB, OP_FLOAT_TO_INT,
+        OP_FLOAT_TO_STRING, OP_INT_ADD, OP_INT_DIV, OP_INT_EQ, OP_INT_GE, OP_INT_GT, OP_INT_LE,
+        OP_INT_LT, OP_INT_MOD, OP_INT_MUL, OP_INT_NE, OP_INT_NEG, OP_INT_POSITIVE, OP_INT_SUB,
+        OP_INT_TO_FLOAT, OP_INT_TO_STRING, OP_JUMP, OP_JUMP_IF_FALSE, OP_LOADBOOL, OP_LOADCONST,
+        OP_LOADNULL, OP_LOGICAL_AND, OP_LOGICAL_NOT, OP_LOGICAL_OR, OP_MOVE, OP_NATIVE_CALL,
     },
     errors::VMCompileError,
     frontend::ast::{BinaryOp, Expr, Literal, Stmt, Type, UnaryOp},
@@ -142,6 +142,14 @@ impl Compiler {
             ),
             Expr::StructLiteral(_, _) => todo!(),
             Expr::EnumLiteral(_, _, _) => todo!(),
+            Expr::TypeCast(expr, expr_type, cast_into_type) => self.compile_type_cast(
+                *expr,
+                expr_type,
+                cast_into_type,
+                require_constant_as_register,
+                symbol_table,
+                type_table,
+            ),
         }
     }
 
@@ -811,5 +819,58 @@ impl Compiler {
         self.manually_change_register_count(current_reg_top);
 
         Ok(ReturnValue::Normal(result_register as isize))
+    }
+
+    fn compile_type_cast(
+        &mut self,
+        expr: Expr,
+        expr_type: Type,
+        cast_into_type: Type,
+        require_constant_as_register: bool,
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+        type_table: &Rc<RefCell<TypeTable>>,
+    ) -> Result<ReturnValue, VMCompileError> {
+        let _ = require_constant_as_register;
+        let reg = self.allocate_register();
+        let b = self
+            .compile_expression(expr, false, true, None, symbol_table, type_table)?
+            .safe_unwrap() as i32;
+        match expr_type {
+            Type::Integer => match cast_into_type {
+                Type::Float => {
+                    self.add_instruction(Abc(OP_INT_TO_FLOAT, reg as i32, b, 0));
+                }
+                Type::String => {
+                    self.add_instruction(Abc(OP_INT_TO_STRING, reg as i32, b, 0));
+                }
+                e => {
+                    return Err(VMCompileError::UndefinedType(format!(
+                        "Type cast from integer to {:?} is not supported.",
+                        e
+                    )));
+                }
+            },
+            Type::Float => match cast_into_type {
+                Type::Integer => {
+                    self.add_instruction(Abc(OP_FLOAT_TO_INT, reg as i32, b, 0));
+                }
+                Type::String => {
+                    self.add_instruction(Abc(OP_FLOAT_TO_STRING, reg as i32, b, 0));
+                }
+                e => {
+                    return Err(VMCompileError::UndefinedType(format!(
+                        "Type cast from float to {:?} is not supported.",
+                        e
+                    )));
+                }
+            },
+            e => {
+                return Err(VMCompileError::UndefinedType(format!(
+                    "Type cast from {:?} is not supported.",
+                    e
+                )));
+            }
+        }
+        Ok(ReturnValue::Normal(reg as isize))
     }
 }

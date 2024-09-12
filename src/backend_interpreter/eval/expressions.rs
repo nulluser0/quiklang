@@ -69,6 +69,7 @@ pub fn evaluate_expr(
         Expr::BlockExpr(then) => evaluate_block_expr(then, env, root_env),
         Expr::StructLiteral(_, _) => todo!(),
         Expr::EnumLiteral(_, _, _) => todo!(),
+        Expr::TypeCast(_, _, _) => todo!(),
     }
 }
 

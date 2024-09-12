@@ -998,7 +998,7 @@ impl Parser {
         type_env: &Rc<RefCell<TypeEnvironment>>,
         root_type_env: &Rc<RefCell<TypeEnvironment>>,
     ) -> Result<Expr, ParserError> {
-        let mut left = self.parse_call_member_expr(type_env, root_type_env)?;
+        let mut left = self.parse_type_cast(type_env, root_type_env)?;
 
         while matches!(
             self.at().token,
@@ -1017,7 +1017,7 @@ impl Parser {
                     ));
                 }
             };
-            let right = self.parse_call_member_expr(type_env, root_type_env)?;
+            let right = self.parse_type_cast(type_env, root_type_env)?;
             left.clone()
                 .verify_type(type_env, operator_astoken.line, operator_astoken.col)?;
             let left_type = left.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
@@ -1061,6 +1061,62 @@ impl Parser {
             };
         }
         Ok(left)
+    }
+
+    fn parse_type_cast(
+        &mut self,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let expr = self.parse_call_member_expr(type_env, root_type_env)?;
+        if self.at().token == TokenType::Keyword(Keyword::As) {
+            self.eat(); // consume 'as'
+            let target_type = self.parse_type_declaration()?;
+            let expr_type = expr.get_type(type_env, self.at().line, self.at().col)?;
+            // Match if expr can be casted to target type
+            match expr_type {
+                Type::Integer => match target_type {
+                    Type::Integer => {}
+                    Type::Float => {}
+                    Type::String => {}
+                    _ => {
+                        return Err(ParserError::TypeError {
+                            expected: Type::Integer,
+                            found: target_type,
+                            line: self.at().line,
+                            col: self.at().col,
+                            message: "Cannot cast integer to target type.".to_string(),
+                        });
+                    }
+                },
+                Type::Float => match target_type {
+                    Type::Integer => {}
+                    Type::Float => {}
+                    Type::String => {}
+                    _ => {
+                        return Err(ParserError::TypeError {
+                            expected: Type::Float,
+                            found: target_type,
+                            line: self.at().line,
+                            col: self.at().col,
+                            message: "Cannot cast float to target type.".to_string(),
+                        });
+                    }
+                },
+                _ => {
+                    // TODO: When types can implement their own logic for stuff like impl to_type traits, this can be removed.
+                    return Err(ParserError::TypeError {
+                        expected: Type::Integer,
+                        found: expr_type,
+                        line: self.at().line,
+                        col: self.at().col,
+                        message: "Unsupported types for type cast.".to_string(),
+                    });
+                }
+            }
+            return Ok(Expr::TypeCast(Box::new(expr), expr_type, target_type));
+        }
+        Ok(expr)
     }
 
     fn parse_call_member_expr(
