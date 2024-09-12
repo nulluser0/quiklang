@@ -118,15 +118,7 @@ impl std::fmt::Display for RegisterVal {
         //     RegisterVal::HashSet(hashset) => write!(f, "{:?}", hashset),
         // }
 
-        unsafe {
-            match self {
-                RegisterVal { null: () } => write!(f, "null"),
-                RegisterVal { int } => write!(f, "{}", int),
-                RegisterVal { float } => write!(f, "{}", float),
-                RegisterVal { bool } => write!(f, "{}", bool),
-                RegisterVal { ptr } => write!(f, "{:?}", ptr),
-            }
-        }
+        unsafe { write!(f, "{:?}", self.int) }
     }
 }
 
