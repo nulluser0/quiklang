@@ -800,10 +800,43 @@ impl Parser {
             let right = self.parse_concatenation_expr(type_env, root_type_env)?;
             left.clone()
                 .verify_type(type_env, operator_astoken.line, operator_astoken.col)?;
+            let output_type = match operator {
+                BinaryOp::Equal
+                | BinaryOp::LessThan
+                | BinaryOp::LessOrEqual
+                | BinaryOp::GreaterOrEqual
+                | BinaryOp::GreaterThan
+                | BinaryOp::And
+                | BinaryOp::NotEqual
+                | BinaryOp::Or => Type::Bool,
+                _ => {
+                    let left_type =
+                        left.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
+                    let right_type =
+                        right.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
+                    match (left_type, right_type) {
+                        (Type::Integer, Type::Integer) => Type::Integer,
+                        (Type::Float, Type::Float) => Type::Float,
+                        (Type::Integer, Type::Float) => Type::Float,
+                        (Type::Float, Type::Integer) => Type::Float,
+                        _ => {
+                            // TODO: When types can implement their own logic for stuff like binary operators, this can be removed.
+                            return Err(ParserError::TypeError {
+                                expected: Type::Integer,
+                                found: Type::Float,
+                                line: operator_astoken.line,
+                                col: operator_astoken.col,
+                                message: "Unsupported types for relational operator.".to_string(),
+                            });
+                        }
+                    }
+                }
+            };
             left = Expr::BinaryOp {
                 op: operator,
                 left: Box::new(left),
                 right: Box::new(right),
+                output_type,
             };
         }
         Ok(left)
@@ -822,6 +855,7 @@ impl Parser {
             left = Expr::ConcatOp {
                 left: Box::new(left),
                 right: Box::new(right),
+                defined_type: Type::String,
             };
             left.clone().verify_type(type_env, op.line, op.col)?;
         }
@@ -915,10 +949,43 @@ impl Parser {
             let right = self.parse_multiplicative_expr(type_env, root_type_env)?;
             left.clone()
                 .verify_type(type_env, operator_astoken.line, operator_astoken.col)?;
+            let output_type = match operator {
+                BinaryOp::Equal
+                | BinaryOp::LessThan
+                | BinaryOp::LessOrEqual
+                | BinaryOp::GreaterOrEqual
+                | BinaryOp::GreaterThan
+                | BinaryOp::And
+                | BinaryOp::NotEqual
+                | BinaryOp::Or => Type::Bool,
+                _ => {
+                    let left_type =
+                        left.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
+                    let right_type =
+                        right.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
+                    match (left_type, right_type) {
+                        (Type::Integer, Type::Integer) => Type::Integer,
+                        (Type::Float, Type::Float) => Type::Float,
+                        (Type::Integer, Type::Float) => Type::Float,
+                        (Type::Float, Type::Integer) => Type::Float,
+                        _ => {
+                            // TODO: When types can implement their own logic for stuff like binary operators, this can be removed.
+                            return Err(ParserError::TypeError {
+                                expected: Type::Integer,
+                                found: Type::Float,
+                                line: operator_astoken.line,
+                                col: operator_astoken.col,
+                                message: "Unsupported types for binary operator.".to_string(),
+                            });
+                        }
+                    }
+                }
+            };
             left = Expr::BinaryOp {
                 op: operator,
                 left: Box::new(left),
                 right: Box::new(right),
+                output_type,
             };
         }
         Ok(left)
@@ -951,10 +1018,43 @@ impl Parser {
             let right = self.parse_call_member_expr(type_env, root_type_env)?;
             left.clone()
                 .verify_type(type_env, operator_astoken.line, operator_astoken.col)?;
+            let output_type = match operator {
+                BinaryOp::Equal
+                | BinaryOp::LessThan
+                | BinaryOp::LessOrEqual
+                | BinaryOp::GreaterOrEqual
+                | BinaryOp::GreaterThan
+                | BinaryOp::And
+                | BinaryOp::NotEqual
+                | BinaryOp::Or => Type::Bool,
+                _ => {
+                    let left_type =
+                        left.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
+                    let right_type =
+                        right.get_type(type_env, operator_astoken.line, operator_astoken.col)?;
+                    match (left_type, right_type) {
+                        (Type::Integer, Type::Integer) => Type::Integer,
+                        (Type::Float, Type::Float) => Type::Float,
+                        (Type::Integer, Type::Float) => Type::Float,
+                        (Type::Float, Type::Integer) => Type::Float,
+                        _ => {
+                            // TODO: When types can implement their own logic for stuff like binary operators, this can be removed.
+                            return Err(ParserError::TypeError {
+                                expected: Type::Integer,
+                                found: Type::Float,
+                                line: operator_astoken.line,
+                                col: operator_astoken.col,
+                                message: "Unsupported types for binary operator.".to_string(),
+                            });
+                        }
+                    }
+                }
+            };
             left = Expr::BinaryOp {
                 op: operator,
                 left: Box::new(left),
                 right: Box::new(right),
+                output_type,
             };
         }
         Ok(left)
@@ -1243,23 +1343,39 @@ impl Parser {
             // Unary Operators
             TokenType::Operator(Operator::LogicalNot) => {
                 let expr = self.parse_call_member_expr(type_env, root_type_env)?;
-                Expr::UnaryOp(UnaryOp::LogicalNot, Box::new(expr))
-                    .verify_type(type_env, tk.line, tk.col)
+                Expr::UnaryOp(
+                    UnaryOp::LogicalNot,
+                    Box::new(expr.clone()),
+                    expr.get_type(type_env, tk.line, tk.col)?,
+                )
+                .verify_type(type_env, tk.line, tk.col)
             }
             TokenType::Operator(Operator::Subtract) => {
                 let expr = self.parse_call_member_expr(type_env, root_type_env)?;
-                Expr::UnaryOp(UnaryOp::ArithmeticNegative, Box::new(expr))
-                    .verify_type(type_env, tk.line, tk.col)
+                Expr::UnaryOp(
+                    UnaryOp::ArithmeticNegative,
+                    Box::new(expr.clone()),
+                    expr.get_type(type_env, tk.line, tk.col)?,
+                )
+                .verify_type(type_env, tk.line, tk.col)
             }
             TokenType::Operator(Operator::Add) => {
                 let expr = self.parse_call_member_expr(type_env, root_type_env)?;
-                Expr::UnaryOp(UnaryOp::ArithmeticPositive, Box::new(expr))
-                    .verify_type(type_env, tk.line, tk.col)
+                Expr::UnaryOp(
+                    UnaryOp::ArithmeticPositive,
+                    Box::new(expr.clone()),
+                    expr.get_type(type_env, tk.line, tk.col)?,
+                )
+                .verify_type(type_env, tk.line, tk.col)
             }
             TokenType::Operator(Operator::BitwiseNot) => {
                 let expr = self.parse_call_member_expr(type_env, root_type_env)?;
-                Expr::UnaryOp(UnaryOp::BitwiseNot, Box::new(expr))
-                    .verify_type(type_env, tk.line, tk.col)
+                Expr::UnaryOp(
+                    UnaryOp::BitwiseNot,
+                    Box::new(expr.clone()),
+                    expr.get_type(type_env, tk.line, tk.col)?,
+                )
+                .verify_type(type_env, tk.line, tk.col)
             }
             // Symbols
             TokenType::Symbol(Symbol::LeftParen) => {

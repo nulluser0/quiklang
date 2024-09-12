@@ -113,15 +113,17 @@ pub enum Expr {
     ConcatOp {
         left: Box<Expr>,
         right: Box<Expr>,
+        defined_type: Type,
     },
     BinaryOp {
         op: BinaryOp,
         left: Box<Expr>,
         right: Box<Expr>,
+        output_type: Type,
     },
-    UnaryOp(UnaryOp, Box<Expr>),
+    UnaryOp(UnaryOp, Box<Expr>, Type), // Op, Expr, Output Type
     FunctionCall(Vec<(Expr, bool)>, Box<Expr>), // Args, Caller
-    Member(Box<Expr>, Box<Expr>),               // Object, Property
+    Member(Box<Expr>, Box<Expr>),      // Object, Property
     IfExpr {
         condition: Box<Expr>,
         then: Vec<Stmt>,
@@ -180,7 +182,12 @@ impl ParsetimeType for Expr {
             )),
             Expr::AssignmentExpr { expr, .. } => expr.get_type(type_env, line, col),
             Expr::ConcatOp { .. } => Ok(Type::String),
-            Expr::BinaryOp { op, left, right } => match op {
+            Expr::BinaryOp {
+                op,
+                left,
+                right,
+                output_type: _,
+            } => match op {
                 BinaryOp::Add
                 | BinaryOp::Subtract
                 | BinaryOp::Multiply
@@ -213,7 +220,7 @@ impl ParsetimeType for Expr {
                 | BinaryOp::And
                 | BinaryOp::Or => Ok(Type::Bool),
             },
-            Expr::UnaryOp(op, expr) => match op {
+            Expr::UnaryOp(op, expr, _) => match op {
                 UnaryOp::LogicalNot => {
                     // Should be boolean
                     let expr_type = expr.get_type(type_env, line, col)?;

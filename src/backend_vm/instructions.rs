@@ -560,7 +560,8 @@ define_opcodes! {
     OP_FLOAT_TO_INT =>  (55,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
     OP_FLOAT_POSITIVE =>(56,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
     OP_INT_POSITIVE =>  (57,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
-    OP_NOP =>           (58,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::AsBx),
+    OP_FLOAT_MOD =>     (58,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_NOP =>           (59,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::AsBx),
 }
 
 pub fn op_to_string(op: i32) -> String {
@@ -976,6 +977,13 @@ pub fn to_string(inst: Instruction) -> String {
         OP_FLOAT_TO_INT => format!("{} | R({}) := R({}) as int", ops, arga, argb),
         OP_FLOAT_POSITIVE => format!("{} | R({}) := +R({})", ops, arga, argb),
         OP_INT_POSITIVE => format!("{} | R({}) := +R({})", ops, arga, argb),
+        OP_FLOAT_MOD => format!(
+            "{} | R({}) := {} % {}",
+            ops,
+            arga,
+            format_rk(argb),
+            format_rk(argc)
+        ),
         OP_NOP => ops.to_string(),
         _ => unreachable!(),
     }

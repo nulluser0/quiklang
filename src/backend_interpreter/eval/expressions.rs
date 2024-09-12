@@ -25,8 +25,13 @@ pub fn evaluate_expr(
         Expr::Literal(literal) => evaluate_literal(literal, env, root_env),
         Expr::Identifier(identifier) => evaluate_identifier(identifier, env),
         Expr::Tuple(values) => evaluate_tuple(values, env, root_env),
-        Expr::BinaryOp { op, left, right } => evaluate_binary_op(op, *left, *right, env, root_env),
-        Expr::UnaryOp(op, expr) => evaluate_unary_op(op, *expr, env, root_env),
+        Expr::BinaryOp {
+            op,
+            left,
+            right,
+            output_type: _,
+        } => evaluate_binary_op(op, *left, *right, env, root_env),
+        Expr::UnaryOp(op, expr, _) => evaluate_unary_op(op, *expr, env, root_env),
         Expr::FunctionCall(args, caller) => evaluate_call_expr(args, *caller, env, root_env),
         Expr::AssignmentExpr { assignee, expr } => {
             evaluate_assignment(*assignee, *expr, env, root_env)
@@ -54,7 +59,11 @@ pub fn evaluate_expr(
             defined_type,
         } => evaluate_range_expr(*start, *end, inclusive, defined_type, env, root_env),
         Expr::SpecialNull => Ok(mk_null!()),
-        Expr::ConcatOp { left, right } => evaluate_concatenation_expr(*left, *right, env, root_env),
+        Expr::ConcatOp {
+            left,
+            right,
+            defined_type: _,
+        } => evaluate_concatenation_expr(*left, *right, env, root_env),
         Expr::BlockExpr(then) => evaluate_block_expr(then, env, root_env),
         Expr::StructLiteral(_, _) => todo!(),
         Expr::EnumLiteral(_, _, _) => todo!(),

@@ -329,6 +329,7 @@ mod tests {
                     op: BinaryOp::Add,
                     left: Box::new(Expr::Literal(Literal::Integer(123))),
                     right: Box::new(Expr::Literal(Literal::Integer(123))),
+                    output_type: Type::Integer,
                 }),
                 Stmt::ExprStmt(Expr::IfExpr {
                     condition: Box::new(Expr::Identifier("true".to_string())),
@@ -336,11 +337,13 @@ mod tests {
                         op: BinaryOp::Add,
                         left: Box::new(Expr::Literal(Literal::Integer(1223))),
                         right: Box::new(Expr::Literal(Literal::Integer(1223))),
+                        output_type: Type::Integer,
                     })],
                     else_stmt: Some(vec![Stmt::ExprStmt(Expr::BinaryOp {
                         op: BinaryOp::Add,
                         left: Box::new(Expr::Literal(Literal::Integer(1233))),
                         right: Box::new(Expr::Literal(Literal::Integer(1233))),
+                        output_type: Type::Integer,
                     })]),
                 }),
                 Stmt::DeclareStmt {
@@ -358,6 +361,7 @@ mod tests {
                     op: BinaryOp::Add,
                     left: Box::new(Expr::Identifier("idk".to_string())),
                     right: Box::new(Expr::Literal(Literal::Integer(12))),
+                    output_type: Type::Mismatch,
                 }),
             ])
             .expect("compile fail");

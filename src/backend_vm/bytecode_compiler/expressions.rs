@@ -5,16 +5,18 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     backend_vm::{
         instructions::{
-            rk_ask, ABx, ASBx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_FLOAT_NEG, OP_FLOAT_POSITIVE,
-            OP_INT_ADD, OP_INT_DIV, OP_INT_EQ, OP_INT_GE, OP_INT_GT, OP_INT_LE, OP_INT_LT,
-            OP_INT_MOD, OP_INT_MUL, OP_INT_NE, OP_INT_NEG, OP_INT_POSITIVE, OP_INT_SUB, OP_JUMP,
+            rk_ask, ABx, ASBx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_FLOAT_ADD, OP_FLOAT_DIV,
+            OP_FLOAT_EQ, OP_FLOAT_GE, OP_FLOAT_GT, OP_FLOAT_LE, OP_FLOAT_LT, OP_FLOAT_MOD,
+            OP_FLOAT_MUL, OP_FLOAT_NE, OP_FLOAT_NEG, OP_FLOAT_POSITIVE, OP_FLOAT_SUB, OP_INT_ADD,
+            OP_INT_DIV, OP_INT_EQ, OP_INT_GE, OP_INT_GT, OP_INT_LE, OP_INT_LT, OP_INT_MOD,
+            OP_INT_MUL, OP_INT_NE, OP_INT_NEG, OP_INT_POSITIVE, OP_INT_SUB, OP_JUMP,
             OP_JUMP_IF_FALSE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LOGICAL_AND,
             OP_LOGICAL_NOT, OP_LOGICAL_OR, OP_MOVE, OP_NATIVE_CALL,
         },
         vm::RegisterVal,
     },
     errors::VMCompileError,
-    frontend::ast::{BinaryOp, Expr, Literal, Stmt, UnaryOp},
+    frontend::ast::{BinaryOp, Expr, Literal, Stmt, Type, UnaryOp},
 };
 
 use super::{
@@ -60,11 +62,20 @@ impl Compiler {
             Expr::AssignmentExpr { assignee, expr } => {
                 self.compile_assignment(*assignee, *expr, symbol_table, type_table)
             }
-            Expr::ConcatOp { left, right } => todo!(),
-            Expr::BinaryOp { op, left, right } => {
-                self.compile_binary_op(op, *left, *right, symbol_table, type_table)
+            Expr::ConcatOp {
+                left,
+                right,
+                defined_type,
+            } => todo!(),
+            Expr::BinaryOp {
+                op,
+                left,
+                right,
+                output_type,
+            } => self.compile_binary_op(op, *left, *right, output_type, symbol_table, type_table),
+            Expr::UnaryOp(op, expr, output_type) => {
+                self.compile_unary_op(op, *expr, output_type, symbol_table, type_table)
             }
-            Expr::UnaryOp(op, expr) => self.compile_unary_op(op, *expr, symbol_table, type_table),
             Expr::FunctionCall(args, caller) => {
                 self.compile_function_call(args, *caller, symbol_table, type_table)
             }
@@ -206,6 +217,7 @@ impl Compiler {
         op: BinaryOp,
         left: Expr,
         right: Expr,
+        output_type: Type,
         symbol_table: &Rc<RefCell<SymbolTable>>,
         type_table: &Rc<RefCell<TypeTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
@@ -216,20 +228,41 @@ impl Compiler {
         let c = self
             .compile_expression(right, false, true, None, symbol_table, type_table)?
             .safe_unwrap() as i32;
-        let opcode = match op {
-            BinaryOp::Add => OP_INT_ADD,
-            BinaryOp::Subtract => OP_INT_SUB,
-            BinaryOp::Multiply => OP_INT_MUL,
-            BinaryOp::Divide => OP_INT_DIV,
-            BinaryOp::GreaterThan => OP_INT_GT,
-            BinaryOp::LessThan => OP_INT_LT,
-            BinaryOp::GreaterOrEqual => OP_INT_GE,
-            BinaryOp::LessOrEqual => OP_INT_LE,
-            BinaryOp::Equal => OP_INT_EQ,
-            BinaryOp::NotEqual => OP_INT_NE,
-            BinaryOp::And => OP_LOGICAL_AND,
-            BinaryOp::Or => OP_LOGICAL_OR,
-            BinaryOp::Modulus => OP_INT_MOD,
+        let opcode = match output_type {
+            Type::Integer => match op {
+                BinaryOp::Add => OP_INT_ADD,
+                BinaryOp::Subtract => OP_INT_SUB,
+                BinaryOp::Multiply => OP_INT_MUL,
+                BinaryOp::Divide => OP_INT_DIV,
+                BinaryOp::GreaterThan => OP_INT_GT,
+                BinaryOp::LessThan => OP_INT_LT,
+                BinaryOp::GreaterOrEqual => OP_INT_GE,
+                BinaryOp::LessOrEqual => OP_INT_LE,
+                BinaryOp::Equal => OP_INT_EQ,
+                BinaryOp::NotEqual => OP_INT_NE,
+                BinaryOp::And => OP_LOGICAL_AND,
+                BinaryOp::Or => OP_LOGICAL_OR,
+                BinaryOp::Modulus => OP_INT_MOD,
+            },
+            Type::Float => match op {
+                BinaryOp::Add => OP_FLOAT_ADD,
+                BinaryOp::Subtract => OP_FLOAT_SUB,
+                BinaryOp::Multiply => OP_FLOAT_MUL,
+                BinaryOp::Divide => OP_FLOAT_DIV,
+                BinaryOp::GreaterThan => OP_FLOAT_GT,
+                BinaryOp::LessThan => OP_FLOAT_LT,
+                BinaryOp::GreaterOrEqual => OP_FLOAT_GE,
+                BinaryOp::LessOrEqual => OP_FLOAT_LE,
+                BinaryOp::Equal => OP_FLOAT_EQ,
+                BinaryOp::NotEqual => OP_FLOAT_NE,
+                BinaryOp::And => OP_LOGICAL_AND,
+                BinaryOp::Or => OP_LOGICAL_OR,
+                BinaryOp::Modulus => OP_FLOAT_MOD,
+            },
+            _ => {
+                // TODO: Handle other types when (custom) types can implement their own binary op traits.
+                return Err(VMCompileError::UndefinedType);
+            }
         };
         self.add_instruction(Abc(opcode, reg as i32, b, c));
         Ok(ReturnValue::Normal(reg as isize))
@@ -239,6 +272,7 @@ impl Compiler {
         &mut self,
         op: UnaryOp,
         expr: Expr,
+        output_type: Type,
         symbol_table: &Rc<RefCell<SymbolTable>>,
         type_table: &Rc<RefCell<TypeTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
@@ -248,15 +282,21 @@ impl Compiler {
             .safe_unwrap() as i32;
         let opcode = match op {
             UnaryOp::LogicalNot => OP_LOGICAL_NOT,
-            UnaryOp::ArithmeticNegative => match expr {
-                Expr::Literal(Literal::Integer(_)) => OP_INT_NEG,
-                Expr::Literal(Literal::Float(_)) => OP_FLOAT_NEG,
-                _ => return Err(VMCompileError::UndefinedType),
+            UnaryOp::ArithmeticNegative => match output_type {
+                Type::Integer => OP_INT_NEG,
+                Type::Float => OP_FLOAT_NEG,
+                _ => {
+                    // TODO: Handle other types when (custom) types can implement their own unary op traits.
+                    return Err(VMCompileError::UndefinedType);
+                }
             },
-            UnaryOp::ArithmeticPositive => match expr {
-                Expr::Literal(Literal::Integer(_)) => OP_INT_POSITIVE,
-                Expr::Literal(Literal::Float(_)) => OP_FLOAT_POSITIVE,
-                _ => return Err(VMCompileError::UndefinedType),
+            UnaryOp::ArithmeticPositive => match output_type {
+                Type::Integer => OP_INT_POSITIVE,
+                Type::Float => OP_FLOAT_POSITIVE,
+                _ => {
+                    // TODO: Handle other types when (custom) types can implement their own unary op traits.
+                    return Err(VMCompileError::UndefinedType);
+                }
             },
             UnaryOp::BitwiseNot => OP_BITNOT,
         };
