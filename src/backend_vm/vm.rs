@@ -77,6 +77,14 @@ pub enum RegisterVal {
     HashSet(Arc<HashSet<RegisterVal>>),
 }
 
+// pub union RegisterVal {
+//     pub null: (), // Nulls, ints, floats, and bools are all primitives, so they are stored directly in the union.
+//     pub int: i64,
+//     pub float: f64,
+//     pub bool: bool,
+//     pub ptr: *const u8, // Universal pointer to heap allocated object. Unsafe, so requires a destructor and a brain to manage memory.
+// }
+
 impl std::fmt::Display for RegisterVal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
