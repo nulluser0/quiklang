@@ -260,7 +260,7 @@ const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
         VMThread::op_int_shl,
         VMThread::op_int_shr,
         VMThread::op_concat,
-        VMThread::op_destructor,
+        VMThread::op_drop,
         VMThread::op_exit,
         VMThread::op_clone,
         VMThread::op_bitnot,
@@ -1278,7 +1278,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_destructor(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_drop(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
         // destroy heap objs, where A is a pointer to the heap obj flagged for destruction.
         // TODO!
         todo!()
@@ -1433,8 +1433,13 @@ impl VMThread {
     fn op_int_to_string(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
+        let offset = self.current_offset();
 
-        let value = self.get_constant_clone(argb as usize)?;
+        let value = if is_k(argb) {
+            self.get_constant_ref(rk_to_k(argb) as usize)?
+        } else {
+            self.get_register_ref(argb as usize, offset)?
+        };
 
         let string = format!("{}", unsafe { value.int });
 
@@ -1449,8 +1454,13 @@ impl VMThread {
     fn op_float_to_string(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
+        let offset = self.current_offset();
 
-        let value = self.get_constant_clone(argb as usize)?;
+        let value = if is_k(argb) {
+            self.get_constant_ref(rk_to_k(argb) as usize)?
+        } else {
+            self.get_register_ref(argb as usize, offset)?
+        };
 
         let string = format!("{}", unsafe { value.float });
 

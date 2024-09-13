@@ -27,6 +27,16 @@ lazy_static! {
 
 pub(super) fn println(args: &[RegisterVal]) -> Result<RegisterVal, VMRuntimeError> {
     // Input is a string (A pointer to the string in the heap)
+
+    // let ptr = RegisterVal {
+    //     ptr: RegisterVal::set_string("what the sigma".to_string()),
+    // };
+    // let string = ptr.get_string()?;
+
+    // println!("{}", string);
+
+    // drop(ptr);
+
     println!(
         "{}",
         args[0].get_string()? // Null pointer dereference on error
