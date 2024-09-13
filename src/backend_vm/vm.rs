@@ -123,20 +123,44 @@ impl std::fmt::Display for RegisterVal {
 }
 
 impl RegisterVal {
-    pub fn get_string(&self) -> *const String {
-        unsafe { self.ptr as *const String }
+    pub fn get_string(&self) -> Result<&String, VMRuntimeError> {
+        let ptr = unsafe { self.ptr } as *mut String;
+        unsafe { ptr.as_ref().ok_or(VMRuntimeError::NullPtrDeref) }
     }
 
-    pub fn get_array(&self) -> *const Vec<RegisterVal> {
-        unsafe { self.ptr as *const Vec<RegisterVal> }
+    pub fn set_string(string: String) -> *const () {
+        let ptr = Box::into_raw(Box::new(string));
+        ptr as *const ()
     }
 
-    pub fn get_hashmap(&self) -> *const HashMap<RegisterVal, RegisterVal> {
-        unsafe { self.ptr as *const HashMap<RegisterVal, RegisterVal> }
+    pub fn get_array(&self) -> Result<&Vec<RegisterVal>, VMRuntimeError> {
+        let ptr = unsafe { self.ptr } as *mut Vec<RegisterVal>;
+        unsafe { ptr.as_ref().ok_or(VMRuntimeError::NullPtrDeref) }
     }
 
-    pub fn get_hashset(&self) -> *const HashSet<RegisterVal> {
-        unsafe { self.ptr as *const HashSet<RegisterVal> }
+    pub fn set_array(array: Vec<RegisterVal>) -> *const () {
+        let ptr = Box::into_raw(Box::new(array));
+        ptr as *const ()
+    }
+
+    pub fn get_hashmap(&self) -> &HashMap<RegisterVal, RegisterVal> {
+        let ptr = unsafe { self.ptr } as *mut HashMap<RegisterVal, RegisterVal>;
+        unsafe { &*ptr }
+    }
+
+    pub fn set_hashmap(hashmap: HashMap<RegisterVal, RegisterVal>) -> *const () {
+        let ptr = Box::into_raw(Box::new(hashmap));
+        ptr as *const ()
+    }
+
+    pub fn get_hashset(&self) -> &HashSet<RegisterVal> {
+        let ptr = unsafe { self.ptr } as *mut HashSet<RegisterVal>;
+        unsafe { &*ptr }
+    }
+
+    pub fn set_hashset(hashset: HashSet<RegisterVal>) -> *const () {
+        let ptr = Box::into_raw(Box::new(hashset));
+        ptr as *const ()
     }
 }
 
@@ -967,7 +991,7 @@ impl VMThread {
         let argsbx = get_argsbx(inst);
         let offset = self.current_offset();
 
-        if unsafe { self.get_register_ref(arga as usize, offset)?.bool } == true {
+        if unsafe { self.get_register_ref(arga as usize, offset)?.bool } {
             self.program_counter = (self.program_counter as i32 + argsbx) as usize;
         }
 
@@ -980,7 +1004,7 @@ impl VMThread {
         let argsbx = get_argsbx(inst);
         let offset = self.current_offset();
 
-        if unsafe { self.get_register_ref(arga as usize, offset)?.bool } == false {
+        if !unsafe { self.get_register_ref(arga as usize, offset)?.bool } {
             self.program_counter = (self.program_counter as i32 + argsbx) as usize;
         }
 
@@ -1030,7 +1054,7 @@ impl VMThread {
         // Args = (offset + argc + 1) to (offset + argb + argc)
         let mut args = Vec::with_capacity(argc as usize + 1);
         for i in ((argc as usize) + offset + 1)..=(((argc + argb) as usize) + offset) {
-            args.push(self.registers[i].clone());
+            args.push(self.registers[i]);
         }
 
         self.vm.call_qffi_native(arga as usize, &args)?;
@@ -1239,19 +1263,14 @@ impl VMThread {
             self.get_register_clone(argc as usize)?
         };
 
-        let b_val_str = unsafe { b_val.get_string().as_ref() }
-            .ok_or(VMRuntimeError::NullPtrDeref(unsafe { b_val.int }, argb))?;
-        let c_val_str = unsafe { c_val.get_string().as_ref() }
-            .ok_or(VMRuntimeError::NullPtrDeref(unsafe { c_val.int }, argc))?;
+        let b_val_str = b_val.get_string()?;
+        let c_val_str = c_val.get_string()?;
 
         // Concatenate the strings
         let concatenated = format!("{}{}", b_val_str, c_val_str);
 
-        // Create a `Box` to manage the memory for the concatenated string
-        let boxed_str = Box::new(concatenated);
-
         // Obtain a raw pointer to the boxed string
-        let ptr = Box::into_raw(boxed_str) as *const ();
+        let ptr = RegisterVal::set_string(concatenated);
 
         self.set_register(arga as usize, RegisterVal { ptr })?;
 
@@ -1419,9 +1438,7 @@ impl VMThread {
 
         let string = format!("{}", unsafe { value.int });
 
-        let boxed_str = Box::new(string);
-
-        let ptr = Box::into_raw(boxed_str) as *const ();
+        let ptr = RegisterVal::set_string(string);
 
         self.set_register(arga as usize, RegisterVal { ptr })?;
 
@@ -1437,9 +1454,7 @@ impl VMThread {
 
         let string = format!("{}", unsafe { value.float });
 
-        let boxed_str = Box::new(string);
-
-        let ptr = Box::into_raw(boxed_str) as *const ();
+        let ptr = RegisterVal::set_string(string);
 
         self.set_register(arga as usize, RegisterVal { ptr })?;
 

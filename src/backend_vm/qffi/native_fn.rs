@@ -27,13 +27,10 @@ lazy_static! {
 
 pub(super) fn println(args: &[RegisterVal]) -> Result<RegisterVal, VMRuntimeError> {
     // Input is a string (A pointer to the string in the heap)
-    let arg = args[0];
-    println!("{}", unsafe {
-        args[0]
-            .get_string()
-            .as_ref()
-            .ok_or(VMRuntimeError::NullPtrDeref(arg.int, -1))? // Null pointer dereference
-    });
+    println!(
+        "{}",
+        args[0].get_string()? // Null pointer dereference on error
+    );
     Ok(RegisterVal { null: () })
 }
 
