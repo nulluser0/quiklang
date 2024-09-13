@@ -4,13 +4,14 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     backend_vm::instructions::{
-        rk_ask, ABx, ASBx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_FLOAT_ADD, OP_FLOAT_DIV,
-        OP_FLOAT_EQ, OP_FLOAT_GE, OP_FLOAT_GT, OP_FLOAT_LE, OP_FLOAT_LT, OP_FLOAT_MOD,
-        OP_FLOAT_MUL, OP_FLOAT_NE, OP_FLOAT_NEG, OP_FLOAT_POSITIVE, OP_FLOAT_SUB, OP_FLOAT_TO_INT,
-        OP_FLOAT_TO_STRING, OP_INT_ADD, OP_INT_DIV, OP_INT_EQ, OP_INT_GE, OP_INT_GT, OP_INT_LE,
-        OP_INT_LT, OP_INT_MOD, OP_INT_MUL, OP_INT_NE, OP_INT_NEG, OP_INT_POSITIVE, OP_INT_SUB,
-        OP_INT_TO_FLOAT, OP_INT_TO_STRING, OP_JUMP, OP_JUMP_IF_FALSE, OP_LOADBOOL, OP_LOADCONST,
-        OP_LOADNULL, OP_LOGICAL_AND, OP_LOGICAL_NOT, OP_LOGICAL_OR, OP_MOVE, OP_NATIVE_CALL,
+        rk_ask, ABx, ASBx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_CONCAT, OP_FLOAT_ADD,
+        OP_FLOAT_DIV, OP_FLOAT_EQ, OP_FLOAT_GE, OP_FLOAT_GT, OP_FLOAT_LE, OP_FLOAT_LT,
+        OP_FLOAT_MOD, OP_FLOAT_MUL, OP_FLOAT_NE, OP_FLOAT_NEG, OP_FLOAT_POSITIVE, OP_FLOAT_SUB,
+        OP_FLOAT_TO_INT, OP_FLOAT_TO_STRING, OP_INT_ADD, OP_INT_DIV, OP_INT_EQ, OP_INT_GE,
+        OP_INT_GT, OP_INT_LE, OP_INT_LT, OP_INT_MOD, OP_INT_MUL, OP_INT_NE, OP_INT_NEG,
+        OP_INT_POSITIVE, OP_INT_SUB, OP_INT_TO_FLOAT, OP_INT_TO_STRING, OP_JUMP, OP_JUMP_IF_FALSE,
+        OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LOGICAL_AND, OP_LOGICAL_NOT, OP_LOGICAL_OR,
+        OP_MOVE, OP_NATIVE_CALL,
     },
     errors::VMCompileError,
     frontend::ast::{BinaryOp, Expr, Literal, Stmt, Type, UnaryOp},
@@ -74,7 +75,7 @@ impl Compiler {
                 left,
                 right,
                 defined_type,
-            } => todo!(),
+            } => self.compile_concat_op(*left, *right, defined_type, symbol_table, type_table),
             Expr::BinaryOp {
                 op,
                 left,
@@ -237,6 +238,34 @@ impl Compiler {
             .safe_unwrap();
         self.add_instruction(Abc(OP_CLONE, reg as i32, reassigned as i32, 0));
         Ok(ReturnValue::Normal(reg))
+    }
+
+    fn compile_concat_op(
+        &mut self,
+        left: Expr,
+        right: Expr,
+        defined_type: Type,
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+        type_table: &Rc<RefCell<TypeTable>>,
+    ) -> Result<ReturnValue, VMCompileError> {
+        let reg = self.allocate_register();
+        let b = self
+            .compile_expression(left, false, true, None, symbol_table, type_table)?
+            .safe_unwrap() as i32;
+        let c = self
+            .compile_expression(right, false, true, None, symbol_table, type_table)?
+            .safe_unwrap() as i32;
+        match defined_type {
+            Type::String => self.add_instruction(Abc(OP_CONCAT, reg as i32, b, c)),
+            e => {
+                // TODO: Handle other types when (custom) types can implement their own binary op traits.
+                return Err(VMCompileError::UndefinedType(format!(
+                    "Concat OP type mismatch. {:?}",
+                    e
+                )));
+            }
+        }
+        Ok(ReturnValue::Normal(reg as isize))
     }
 
     fn compile_binary_op(

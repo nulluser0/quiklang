@@ -184,7 +184,22 @@ impl ParsetimeType for Expr {
                     .collect(),
             )),
             Expr::AssignmentExpr { expr, .. } => expr.get_type(type_env, line, col),
-            Expr::ConcatOp { .. } => Ok(Type::String),
+            Expr::ConcatOp { left, right, .. } => {
+                let left_type = left.get_type(type_env, line, col)?;
+                let right_type = right.get_type(type_env, line, col)?;
+                if left_type == Type::String && right_type == Type::String {
+                    Ok(left_type)
+                } else {
+                    // TODO: In the future, we can allow for concatenation of other types.
+                    Err(ParserError::TypeError {
+                        expected: Type::String,
+                        found: Type::Mismatch,
+                        line,
+                        col,
+                        message: "Concatenation can only take in strings.".to_string(),
+                    })
+                }
+            }
             Expr::BinaryOp {
                 op,
                 left,
