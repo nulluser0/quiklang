@@ -306,6 +306,9 @@ pub enum VMRuntimeError {
     #[error("Invalid thread ID: {0}")]
     InvalidThreadId(usize),
 
+    #[error("Division by zero.")]
+    DivideByZero,
+
     #[error("Null Pointer Dereference.")]
     NullPtrDeref, // Pointer represented as 8 bytes, Register represented as 4 bytes from instruction
 

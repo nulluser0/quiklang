@@ -348,8 +348,8 @@ impl VM {
                     TaggedConstantValue::Int(int) => RegisterVal { int: *int },
                     TaggedConstantValue::Float(float) => RegisterVal { float: *float },
                     TaggedConstantValue::Bool(bool) => RegisterVal { bool: *bool },
-                    TaggedConstantValue::Str(str) => RegisterVal {
-                        ptr: str.clone().as_ptr() as *const (),
+                    TaggedConstantValue::Str(string) => RegisterVal {
+                        ptr: RegisterVal::set_string(string.to_string()),
                     },
                 })
                 .collect(),
@@ -760,6 +760,9 @@ impl VMThread {
 
     #[inline(always)]
     fn op_int_div(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        if get_argc(inst) == 0 {
+            return Err(VMRuntimeError::DivideByZero);
+        }
         self.perform_int_op(inst, |left, right| left.wrapping_div(right))
     }
 
@@ -1324,7 +1327,7 @@ impl VMThread {
 
     #[inline(always)]
     fn op_float_div(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_float_op(inst, |left, right| left - right)
+        self.perform_float_op(inst, |left, right| left / right)
     }
 
     #[inline(always)]
