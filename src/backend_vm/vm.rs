@@ -123,6 +123,16 @@ impl std::fmt::Display for RegisterVal {
 }
 
 impl RegisterVal {
+    pub fn drop_value(&self) {
+        let ptr = unsafe { self.ptr } as *mut ();
+        if ptr.is_null() {
+            return;
+        }
+        unsafe {
+            let _ = Box::from_raw(ptr); // Drop the value
+        };
+    }
+
     pub fn get_string(&self) -> Result<&String, VMRuntimeError> {
         let ptr = unsafe { self.ptr } as *mut String;
         unsafe { ptr.as_ref().ok_or(VMRuntimeError::NullPtrDeref) }
