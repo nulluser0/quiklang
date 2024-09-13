@@ -745,35 +745,37 @@ impl VMThread {
 
     #[inline(always)]
     fn op_int_add(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_int_op(inst, |left, right| left.wrapping_add(right))
+        self.perform_int_op(inst, |left, right| Ok(left.wrapping_add(right)))
     }
 
     #[inline(always)]
     fn op_int_sub(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_int_op(inst, |left, right| left.wrapping_sub(right))
+        self.perform_int_op(inst, |left, right| Ok(left.wrapping_sub(right)))
     }
 
     #[inline(always)]
     fn op_int_mul(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_int_op(inst, |left, right| left.wrapping_mul(right))
+        self.perform_int_op(inst, |left, right| Ok(left.wrapping_mul(right)))
     }
 
     #[inline(always)]
     fn op_int_div(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        if get_argc(inst) == 0 {
-            return Err(VMRuntimeError::DivideByZero);
-        }
-        self.perform_int_op(inst, |left, right| left.wrapping_div(right))
+        self.perform_int_op(inst, |left, right| {
+            if right == 0 {
+                return Err(VMRuntimeError::DivideByZero);
+            }
+            Ok(left.wrapping_div(right))
+        })
     }
 
     #[inline(always)]
     fn op_int_mod(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_int_op(inst, |left, right| left.wrapping_rem(right))
+        self.perform_int_op(inst, |left, right| Ok(left.wrapping_rem(right)))
     }
 
     #[inline(always)]
     fn op_int_pow(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_int_op(inst, |left, right| left.wrapping_pow(right as u32))
+        self.perform_int_op(inst, |left, right| Ok(left.wrapping_pow(right as u32)))
     }
 
     #[inline(always)]
@@ -783,7 +785,7 @@ impl VMThread {
         int_op: FInt,
     ) -> Result<(), VMRuntimeError>
     where
-        FInt: FnOnce(i64, i64) -> i64,
+        FInt: FnOnce(i64, i64) -> Result<i64, VMRuntimeError>,
     {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -792,7 +794,7 @@ impl VMThread {
 
         let (b_val, c_val) = self.fetch_values(argb, argc, offset)?;
 
-        let result = int_op(unsafe { b_val.int }, unsafe { c_val.int });
+        let result = int_op(unsafe { b_val.int }, unsafe { c_val.int })?;
 
         self.set_register(arga as usize, RegisterVal { int: result })?;
 
@@ -806,7 +808,7 @@ impl VMThread {
         float_op: FFloat,
     ) -> Result<(), VMRuntimeError>
     where
-        FFloat: FnOnce(f64, f64) -> f64,
+        FFloat: FnOnce(f64, f64) -> Result<f64, VMRuntimeError>,
     {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
@@ -815,7 +817,7 @@ impl VMThread {
 
         let (b_val, c_val) = self.fetch_values(argb, argc, offset)?;
 
-        let result = float_op(unsafe { b_val.float }, unsafe { c_val.float });
+        let result = float_op(unsafe { b_val.float }, unsafe { c_val.float })?;
 
         self.set_register(arga as usize, RegisterVal { float: result })?;
 
@@ -1312,27 +1314,32 @@ impl VMThread {
 
     #[inline(always)]
     fn op_float_add(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_float_op(inst, |left, right| left + right)
+        self.perform_float_op(inst, |left, right| Ok(left + right))
     }
 
     #[inline(always)]
     fn op_float_sub(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_float_op(inst, |left, right| left - right)
+        self.perform_float_op(inst, |left, right| Ok(left - right))
     }
 
     #[inline(always)]
     fn op_float_mul(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_float_op(inst, |left, right| left * right)
+        self.perform_float_op(inst, |left, right| Ok(left * right))
     }
 
     #[inline(always)]
     fn op_float_div(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_float_op(inst, |left, right| left / right)
+        self.perform_float_op(inst, |left, right| {
+            if right == 0.0 {
+                return Err(VMRuntimeError::DivideByZero);
+            }
+            Ok(left / right)
+        })
     }
 
     #[inline(always)]
     fn op_float_pow(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_float_op(inst, |left, right| left.powf(right))
+        self.perform_float_op(inst, |left, right| Ok(left.powf(right)))
     }
 
     #[inline(always)]
@@ -1429,7 +1436,7 @@ impl VMThread {
 
     #[inline(always)]
     fn op_float_mod(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        self.perform_float_op(inst, |left, right| left % right)
+        self.perform_float_op(inst, |left, right| Ok(left % right))
     }
 
     #[inline(always)]
