@@ -244,7 +244,7 @@ impl ByteCode {
                     let lens = cursor.read_u64::<LittleEndian>()? as usize;
                     let mut string: Vec<u8> = vec![0; lens];
                     cursor.read_exact(&mut string)?;
-                    constants.push(TaggedConstantValue::Str(String::from_utf8(string)?.into()));
+                    constants.push(TaggedConstantValue::Str(String::from_utf8(string)?));
                 }
                 _ => return Err(VMBytecodeError::InvalidConstantType(discriminant)),
             }
