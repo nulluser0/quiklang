@@ -684,9 +684,11 @@ impl VMThread {
     fn op_move(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
+        let offset = self.current_offset();
 
-        let value = std::mem::take(self.get_register_mutref(argb as usize)?);
-        self.set_register(arga as usize, value)?;
+        // let value = std::mem::take(self.get_register_mutref(argb as usize)?);
+        let value = self.get_register_ref(argb as usize, offset)?;
+        self.set_register(arga as usize, *value)?;
 
         Ok(())
     }
@@ -838,11 +840,12 @@ impl VMThread {
     fn op_logical_not(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
+        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)?
+            self.get_constant_ref(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)?
+            self.get_register_ref(argb as usize, offset)?
         };
 
         self.set_register(
@@ -860,16 +863,17 @@ impl VMThread {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
+        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)?
+            self.get_constant_ref(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)?
+            self.get_register_ref(argb as usize, offset)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)?
+            self.get_constant_ref(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)?
+            self.get_register_ref(argc as usize, offset)?
         };
 
         self.set_register(
@@ -887,16 +891,17 @@ impl VMThread {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
+        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)?
+            self.get_constant_ref(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)?
+            self.get_register_ref(argb as usize, offset)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)?
+            self.get_constant_ref(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)?
+            self.get_register_ref(argc as usize, offset)?
         };
 
         self.set_register(
@@ -1131,16 +1136,17 @@ impl VMThread {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
+        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)?
+            self.get_constant_ref(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)?
+            self.get_register_ref(argb as usize, offset)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)?
+            self.get_constant_ref(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)?
+            self.get_register_ref(argc as usize, offset)?
         };
 
         self.set_register(
@@ -1158,16 +1164,17 @@ impl VMThread {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
+        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)?
+            self.get_constant_ref(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)?
+            self.get_register_ref(argb as usize, offset)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)?
+            self.get_constant_ref(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)?
+            self.get_register_ref(argc as usize, offset)?
         };
 
         self.set_register(
@@ -1185,16 +1192,17 @@ impl VMThread {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
+        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)?
+            self.get_constant_ref(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)?
+            self.get_register_ref(argb as usize, offset)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)?
+            self.get_constant_ref(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)?
+            self.get_register_ref(argc as usize, offset)?
         };
 
         self.set_register(
@@ -1212,16 +1220,17 @@ impl VMThread {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
+        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)?
+            self.get_constant_ref(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)?
+            self.get_register_ref(argb as usize, offset)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)?
+            self.get_constant_ref(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)?
+            self.get_register_ref(argc as usize, offset)?
         };
 
         self.set_register(
@@ -1239,16 +1248,17 @@ impl VMThread {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
+        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)?
+            self.get_constant_ref(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)?
+            self.get_register_ref(argb as usize, offset)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)?
+            self.get_constant_ref(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)?
+            self.get_register_ref(argc as usize, offset)?
         };
 
         self.set_register(
@@ -1266,16 +1276,17 @@ impl VMThread {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
         let argc = get_argc(inst);
+        let offset = self.current_offset();
 
         let b_val = if is_k(argb) {
-            self.get_constant_clone(rk_to_k(argb) as usize)?
+            self.get_constant_ref(rk_to_k(argb) as usize)?
         } else {
-            self.get_register_clone(argb as usize)?
+            self.get_register_ref(argb as usize, offset)?
         };
         let c_val = if is_k(argc) {
-            self.get_constant_clone(rk_to_k(argc) as usize)?
+            self.get_constant_ref(rk_to_k(argc) as usize)?
         } else {
-            self.get_register_clone(argc as usize)?
+            self.get_register_ref(argc as usize, offset)?
         };
 
         let b_val_str = b_val.get_string()?;
@@ -1310,9 +1321,10 @@ impl VMThread {
     fn op_clone(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let argb = get_argb(inst);
+        let offset = self.current_offset();
 
-        let value = self.get_register_clone(argb as usize)?;
-        self.set_register(arga as usize, value)?;
+        let value = self.get_register_ref(argb as usize, offset)?;
+        self.set_register(arga as usize, *value)?;
 
         Ok(())
     }
