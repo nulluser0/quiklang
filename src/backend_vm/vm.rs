@@ -1231,12 +1231,40 @@ impl VMThread {
 
     #[inline(always)]
     fn op_int_to_float(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_INT_TO_FLOAT")
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let offset = self.current_offset();
+
+        let value = if is_k(argb) {
+            self.get_constant_ref(rk_to_k(argb) as usize)?
+        } else {
+            self.get_register_ref(argb as usize, offset)?
+        };
+
+        let float = unsafe { value.int } as f64;
+
+        self.set_register(arga as usize, RegisterVal { float })?;
+
+        Ok(())
     }
 
     #[inline(always)]
     fn op_float_to_int(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        todo!("OP_FLOAT_TO_INT")
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let offset = self.current_offset();
+
+        let value = if is_k(argb) {
+            self.get_constant_ref(rk_to_k(argb) as usize)?
+        } else {
+            self.get_register_ref(argb as usize, offset)?
+        };
+
+        let int = unsafe { value.float } as i64;
+
+        self.set_register(arga as usize, RegisterVal { int })?;
+
+        Ok(())
     }
 
     #[inline(always)]
