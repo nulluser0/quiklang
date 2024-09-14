@@ -11,7 +11,7 @@ use native_fn::{NativeFunctionEntry, NATIVE_FUNCTION_TABLE};
 
 use crate::errors::VMRuntimeError;
 
-use super::vm::RegisterVal;
+use super::register_val::RegisterVal;
 
 pub type NativeFunction = fn(&[RegisterVal]) -> Result<RegisterVal, VMRuntimeError>;
 pub type ExternFunction = extern "C" fn(*const RegisterVal) -> RegisterVal;

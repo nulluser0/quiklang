@@ -70,13 +70,11 @@ use std::{
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::{
-    backend_vm::{instructions::to_string, vm::to_quiklangc_strings},
+    backend_vm::{instructions::to_string, register_val::to_quiklangc_strings},
     errors::VMBytecodeError,
 };
 
-use super::{
-    bytecode_compiler::compiler::TaggedConstantValue, instructions::Instruction, vm::RegisterVal,
-};
+use super::{bytecode_compiler::compiler::TaggedConstantValue, instructions::Instruction};
 
 #[derive(Debug, Clone)]
 pub struct ByteCode {
