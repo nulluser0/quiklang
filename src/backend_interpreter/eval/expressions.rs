@@ -70,6 +70,8 @@ pub fn evaluate_expr(
         Expr::StructLiteral(_, _) => todo!(),
         Expr::EnumLiteral(_, _, _) => todo!(),
         Expr::TypeCast(_, _, _) => todo!(),
+        Expr::Await(_, _) => todo!(),
+        Expr::Clone(_, _) => todo!(),
     }
 }
 

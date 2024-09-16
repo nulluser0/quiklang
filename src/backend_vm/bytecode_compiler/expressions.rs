@@ -151,6 +151,10 @@ impl Compiler {
                 symbol_table,
                 type_table,
             ),
+            Expr::Await(_, _) => todo!(),
+            Expr::Clone(expr, return_type) => {
+                todo!()
+            }
         }
     }
 

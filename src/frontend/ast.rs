@@ -146,6 +146,8 @@ pub enum Expr {
     StructLiteral(String, Vec<Property>),
     EnumLiteral(String, String, Vec<Expr>),
     TypeCast(Box<Expr>, Type, Type), // Expr, root type, cast to type
+    Await(Box<Expr>, Type),          // Expr, output type
+    Clone(Box<Expr>, Type),          // Expr, output type
 }
 
 impl Expr {
@@ -342,6 +344,8 @@ impl ParsetimeType for Expr {
             Expr::StructLiteral(_, _) => todo!(),
             Expr::EnumLiteral(_, _, _) => todo!(),
             Expr::TypeCast(_, _, cast_into_type) => Ok(cast_into_type.clone()),
+            Expr::Await(_, return_type) => Ok(return_type.clone()),
+            Expr::Clone(_, return_type) => Ok(return_type.clone()),
         }
     }
 }

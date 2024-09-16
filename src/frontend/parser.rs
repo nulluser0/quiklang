@@ -1385,6 +1385,17 @@ impl Parser {
             TokenType::Keyword(Keyword::Block) => {
                 self.parse_block_expr(type_env, root_type_env) as Result<Expr, ParserError>
             }
+            TokenType::Keyword(Keyword::Await) => {
+                self.parse_await_expr(tk.line, tk.col, type_env, root_type_env)
+                    as Result<Expr, ParserError>
+            }
+            TokenType::Keyword(Keyword::Clone) => {
+                self.parse_clone_expr(tk.line, tk.col, type_env, root_type_env)
+                    as Result<Expr, ParserError>
+            }
+            TokenType::Keyword(Keyword::Ref) => {
+                self.parse_ref_expr(type_env, root_type_env) as Result<Expr, ParserError>
+            }
             // Identifier
             TokenType::Identifier(name) => Expr::Identifier(name.to_string())
                 .verify_type(type_env, tk.line, tk.col)
@@ -1714,6 +1725,54 @@ impl Parser {
             "Expected right brace after `block` expression.",
         )?;
         Ok(Expr::BlockExpr(statements))
+    }
+
+    fn parse_await_expr(
+        &mut self,
+        line: usize,
+        col: usize,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let expr = self.parse_expr(type_env, root_type_env)?;
+        let expr_type = expr.get_type(type_env, line, col)?;
+        if !matches!(expr_type, Type::Future(_)) {
+            return Err(ParserError::TypeError {
+                expected: Type::Future(Box::new(Type::Any)),
+                found: expr_type,
+                line,
+                col,
+                message: "Expected future type for await expression.".to_string(),
+            });
+        };
+
+        let return_type = match expr_type {
+            Type::Future(return_type) => *return_type,
+            _ => unreachable!("tf"),
+        };
+
+        Ok(Expr::Await(Box::new(expr), return_type))
+    }
+
+    fn parse_clone_expr(
+        &mut self,
+        line: usize,
+        col: usize,
+        type_env: &Rc<RefCell<TypeEnvironment>>,
+        root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        let expr = self.parse_expr(type_env, root_type_env)?;
+        let expr_type = expr.get_type(type_env, line, col)?;
+
+        Ok(Expr::Await(Box::new(expr), expr_type))
+    }
+
+    fn parse_ref_expr(
+        &mut self,
+        _type_env: &Rc<RefCell<TypeEnvironment>>,
+        _root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Expr, ParserError> {
+        todo!()
     }
 
     fn parse_loop_expr(
