@@ -39,7 +39,7 @@ pub(super) fn println(args: &[RegisterVal]) -> Result<RegisterVal, VMRuntimeErro
 
     println!(
         "{}",
-        args[0].get_string()? // Null pointer dereference on error
+        args[0].get_value_from_ptr::<String>()? // Null pointer dereference on error
     );
     Ok(RegisterVal { null: () })
 }

@@ -81,7 +81,7 @@ impl std::fmt::Display for RegisterVal {
 }
 
 impl RegisterVal {
-    pub fn drop_value(&self) {
+    pub fn drop_value_from_ptr(&self) {
         let ptr = unsafe { self.ptr } as *mut ();
         if ptr.is_null() {
             return;
@@ -90,46 +90,56 @@ impl RegisterVal {
             let _ = Box::from_raw(ptr); // Drop the value
         };
     }
-
-    pub fn get_string(&self) -> Result<&String, VMRuntimeError> {
-        let ptr = unsafe { self.ptr } as *mut String;
+    
+    pub fn set_value_from_ptr<T>(value: T) -> *const () {
+        let ptr = Box::into_raw(Box::new(value));
+        ptr as *const ()
+    }
+    
+    pub fn get_value_from_ptr<T>(&self) -> Result<&T, VMRuntimeError> {
+        let ptr = unsafe { self.ptr } as *const T;
         unsafe { ptr.as_ref().ok_or(VMRuntimeError::NullPtrDeref) }
     }
 
-    pub fn set_string(string: String) -> *const () {
-        let ptr = Box::into_raw(Box::new(string));
-        ptr as *const ()
-    }
-
-    pub fn get_array(&self) -> Result<&Vec<RegisterVal>, VMRuntimeError> {
-        let ptr = unsafe { self.ptr } as *mut Vec<RegisterVal>;
-        unsafe { ptr.as_ref().ok_or(VMRuntimeError::NullPtrDeref) }
-    }
-
-    pub fn set_array(array: Vec<RegisterVal>) -> *const () {
-        let ptr = Box::into_raw(Box::new(array));
-        ptr as *const ()
-    }
-
-    pub fn get_hashmap(&self) -> &HashMap<RegisterVal, RegisterVal> {
-        let ptr = unsafe { self.ptr } as *mut HashMap<RegisterVal, RegisterVal>;
-        unsafe { &*ptr }
-    }
-
-    pub fn set_hashmap(hashmap: HashMap<RegisterVal, RegisterVal>) -> *const () {
-        let ptr = Box::into_raw(Box::new(hashmap));
-        ptr as *const ()
-    }
-
-    pub fn get_hashset(&self) -> &HashSet<RegisterVal> {
-        let ptr = unsafe { self.ptr } as *mut HashSet<RegisterVal>;
-        unsafe { &*ptr }
-    }
-
-    pub fn set_hashset(hashset: HashSet<RegisterVal>) -> *const () {
-        let ptr = Box::into_raw(Box::new(hashset));
-        ptr as *const ()
-    }
+    // pub fn get_string(&self) -> Result<&String, VMRuntimeError> {
+    //     let ptr = unsafe { self.ptr } as *mut String;
+    //     unsafe { ptr.as_ref().ok_or(VMRuntimeError::NullPtrDeref) }
+    // }
+    // 
+    // pub fn set_string(string: String) -> *const () {
+    //     let ptr = Box::into_raw(Box::new(string));
+    //     ptr as *const ()
+    // }
+    // 
+    // pub fn get_array(&self) -> Result<&Vec<RegisterVal>, VMRuntimeError> {
+    //     let ptr = unsafe { self.ptr } as *mut Vec<RegisterVal>;
+    //     unsafe { ptr.as_ref().ok_or(VMRuntimeError::NullPtrDeref) }
+    // }
+    // 
+    // pub fn set_array(array: Vec<RegisterVal>) -> *const () {
+    //     let ptr = Box::into_raw(Box::new(array));
+    //     ptr as *const ()
+    // }
+    // 
+    // pub fn get_hashmap(&self) -> &HashMap<RegisterVal, RegisterVal> {
+    //     let ptr = unsafe { self.ptr } as *mut HashMap<RegisterVal, RegisterVal>;
+    //     unsafe { &*ptr }
+    // }
+    // 
+    // pub fn set_hashmap(hashmap: HashMap<RegisterVal, RegisterVal>) -> *const () {
+    //     let ptr = Box::into_raw(Box::new(hashmap));
+    //     ptr as *const ()
+    // }
+    // 
+    // pub fn get_hashset(&self) -> &HashSet<RegisterVal> {
+    //     let ptr = unsafe { self.ptr } as *mut HashSet<RegisterVal>;
+    //     unsafe { &*ptr }
+    // }
+    // 
+    // pub fn set_hashset(hashset: HashSet<RegisterVal>) -> *const () {
+    //     let ptr = Box::into_raw(Box::new(hashset));
+    //     ptr as *const ()
+    // }
 }
 
 pub fn to_quiklangc_strings(inner: &TaggedConstantValue) -> String {
