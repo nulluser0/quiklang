@@ -41,6 +41,7 @@ lto = "fat"
 codegen-units = 1
 panic = "abort"
 strip = "symbols"
+opt-level = 3
 
 [[bench]]
 name = "tokenize_factorial"
