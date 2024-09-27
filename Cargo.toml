@@ -52,15 +52,7 @@ name = "tokenize_large"
 harness = false
 
 [[bench]]
-name = "run_factorial"
-harness = false
-
-[[bench]]
 name = "rust_factorial"
-harness = false
-
-[[bench]]
-name = "interpret_factorial"
 harness = false
 
 [[bench]]
