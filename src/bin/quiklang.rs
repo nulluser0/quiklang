@@ -1,9 +1,8 @@
-use tokio::{fs::File, io::AsyncReadExt};
+use tokio::io::AsyncReadExt;
 
 use std::{cell::RefCell, process, rc::Rc};
 
 use quiklang::{
-    backend_interpreter::environment::Environment,
     backend_vm::{
         bytecode::ByteCode,
         bytecode_compiler::{
@@ -13,7 +12,7 @@ use quiklang::{
     },
     errors::{self, VMRuntimeError},
     frontend::type_environment::TypeEnvironment,
-    utils::run::{print_e, run_interpreter, run_vm, RunVmReplArgs},
+    utils::run::{print_e, run_vm},
 };
 use rustyline::{error::ReadlineError, Config, Editor};
 
@@ -25,17 +24,11 @@ async fn main() {
         // If no arguments are passed, print usage
         [_] => print_usage(),
 
-        // If "vm" is passed then the file, execute the file using vm mode
-        [_, cmd, file_path] if cmd == "vm" => run_file_vm(file_path).await,
-
         // If "repl" is passed, start the REPL
-        [_, cmd] if cmd == "repl" => repl().await,
-
-        // If "repl_vm" is passed, start the REPL_VM
-        [_, cmd] if cmd == "repl_vm" => repl_vm().await,
+        [_, cmd] if cmd == "repl" => repl_vm().await,
 
         // If a file path is passed, execute the file
-        [_, file_path] => run_file_interpreter(file_path).await,
+        [_, file_path] => run_file_vm(file_path).await,
 
         // Print usage instructions if the input is invalid
         _ => print_usage(),
@@ -47,31 +40,6 @@ fn print_usage() {
     println!("Commands:");
     println!("  repl - Start the QuikLang REPL");
     println!("  <file> - Execute the specified QuikLang script file");
-}
-
-async fn run_file_interpreter(file_path: &str) {
-    let mut file = match File::open(file_path).await {
-        Ok(file) => file,
-        Err(e) => {
-            println!("Error opening file {}: {}", file_path, e);
-            process::exit(1);
-        }
-    };
-
-    let mut content = String::new();
-    if let Err(e) = file.read_to_string(&mut content).await {
-        println!("Error reading file {}: {}", file_path, e);
-        process::exit(1);
-    }
-
-    let env = Rc::new(RefCell::new(Environment::new_with_parent(Rc::new(
-        RefCell::new(Environment::default()),
-    ))));
-    let root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
-    let type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
-        root_type_env.clone(),
-    )));
-    run_interpreter(content, &env, &type_env, &root_type_env)
 }
 
 async fn run_file_vm(file_path: &str) {
@@ -197,66 +165,6 @@ async fn repl_vm() {
                 //     type_table,
                 //     root_type_table,
                 // });
-            }
-            Err(ReadlineError::Interrupted) => {
-                println!("CTRL-C");
-                break;
-            }
-            Err(ReadlineError::Eof) => {
-                println!("CTRL-D");
-                break;
-            }
-            Err(err) => {
-                println!("Error: {:?}", err);
-                break;
-            }
-        }
-    }
-    rl.save_history(".quiklang_history").unwrap();
-}
-
-async fn repl() {
-    println!("QuikLang REPL v{}", env!("CARGO_PKG_VERSION"));
-
-    let env = Rc::new(RefCell::new(Environment::new_with_parent(Rc::new(
-        RefCell::new(Environment::default()),
-    ))));
-
-    let mut root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
-    let mut type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
-        root_type_env.clone(),
-    )));
-
-    let config = Config::builder().build();
-    let mut rl = Editor::<()>::with_config(config);
-
-    if rl.load_history(".quiklang_history").is_err() {
-        println!("No previous history.");
-    }
-
-    loop {
-        let readline = rl.readline("quiklang> ");
-        match readline {
-            Ok(line) => {
-                let trimmed_line = line.trim();
-                // Exit if user enters "exit" or "quit"
-                if trimmed_line == "exit" || trimmed_line == "quit" {
-                    println!("Exiting QuikLang REPL.");
-                    break;
-                }
-
-                rl.add_history_entry(trimmed_line);
-
-                if trimmed_line == "drain" {
-                    println!("Draining variables and functions in both type_env and runtime_env.");
-                    root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
-                    type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
-                        root_type_env.clone(),
-                    )));
-                    continue;
-                }
-
-                run_interpreter(trimmed_line.to_string(), &env, &type_env, &root_type_env);
             }
             Err(ReadlineError::Interrupted) => {
                 println!("CTRL-C");

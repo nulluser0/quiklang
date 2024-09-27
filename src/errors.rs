@@ -36,12 +36,9 @@
 use thiserror::Error;
 use tokio::task::JoinError;
 
-use crate::{
-    backend_interpreter::values::ValueType,
-    frontend::{
-        ast::{BinaryOp, Expr, Type},
-        lexer::TokenType,
-    },
+use crate::frontend::{
+    ast::{Expr, Type},
+    lexer::TokenType,
 };
 
 // Universal Errors used by functions like parser::produce_ast()
@@ -52,10 +49,6 @@ pub enum Error {
 
     #[error("Parser Error: {0}")]
     ParserError(#[from] ParserError),
-
-    // Interpreter Errors:
-    #[error("Interpreter Error: {0}")]
-    InterpreterError(#[from] InterpreterError),
 
     // VM Errors:
     #[error("VM Compile Error: {0}")]
@@ -199,42 +192,6 @@ pub enum ParserError {
 
     #[error("at position {0}:{1}: Function call on non-function identifier '{2}'")]
     FunctionCallOnNonFunction(usize, usize, String),
-}
-
-// Interpreter-specific Errors
-#[derive(Error, Debug)]
-pub enum InterpreterError {
-    // Variables
-    #[error("Cannot resolve non-existent variable '{0}'")]
-    UndefinedVariable(String),
-
-    #[error("Cannot declare already existing variable '{0}'")]
-    DeclaredExistingVariable(String),
-
-    #[error("Cannot assign to immutable variable '{0}'")]
-    ImmutableVariableEdit(String),
-
-    #[error("Type mismatch: {message} - expected {expected}, found {found}")]
-    TypeError {
-        message: String,
-        expected: ValueType,
-        found: ValueType,
-    },
-
-    #[error("Invalid assignee for assignment expression: '{0}'. Did you mean to use '==' instead of '='?")]
-    InvalidAssignExpr(String),
-
-    #[error("Unsupported Binary Operation: {0}")]
-    UnsupportedBinaryOp(BinaryOp),
-
-    // #[error("Index out of bounds: {0}")]
-    // IndexOutOfBounds(usize),
-
-    // #[error("Property '{0}' not found")]
-    // PropertyNotFound(String),
-    //
-    #[error("Other runtime error: {0}")]
-    RuntimeError(String),
 }
 
 // VM Compile specific errors

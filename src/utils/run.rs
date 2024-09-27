@@ -1,7 +1,6 @@
 use std::{cell::RefCell, process, rc::Rc};
 
 use crate::{
-    backend_interpreter::{environment::Environment, interpreter::evaluate},
     backend_vm::{
         bytecode_compiler::{compiler::Compiler, symbol_tracker::SymbolTable, type_table},
         vm::VM,
@@ -101,35 +100,6 @@ pub async fn run_vm(
                 Err(e) => {
                     print_e(errors::Error::VMCompileError(e));
                 }
-            }
-        }
-        Err(e) => print_e(e),
-    }
-}
-
-pub fn run_interpreter(
-    input: String,
-    env: &Rc<RefCell<Environment>>,
-    type_env: &Rc<RefCell<TypeEnvironment>>,
-    root_type_env: &Rc<RefCell<TypeEnvironment>>,
-) {
-    let root_env = env
-        .borrow()
-        .get_parent()
-        .expect("Env should have a root env!");
-    let mut parser = parser::Parser::new();
-    match parser.produce_ast(input, type_env, root_type_env) {
-        Ok(program) => {
-            // println!("{:#?}", program);
-
-            for stmt in program.statements {
-                match evaluate(stmt, env, &root_env) {
-                    Ok(_) => continue,
-                    Err(e) => {
-                        print_e(Error::InterpreterError(e));
-                        break;
-                    }
-                };
             }
         }
         Err(e) => print_e(e),
