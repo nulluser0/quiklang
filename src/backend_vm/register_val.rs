@@ -9,32 +9,6 @@ use crate::errors::VMRuntimeError;
 
 use super::bytecode_compiler::compiler::TaggedConstantValue;
 
-// TODO: Consider using this:
-//      Replace Rc<T> with *const T (raw pointer) for performance reasons.
-//      As a result, carefully manage memory in the parsetime and compiletime.
-//      In Parsetime, variables are dropped after their scope is dropped.
-//      Example
-//      block {
-//          let x = [20]; // x is a pointer to a heap array.
-//          block {
-//              x.push(23); // x, an array, has its push method called. It modifies the heap array by accessing pointer.
-//          }
-//          // more stuff with x
-//      } // x, a pointer to heap allocated array value, is dropped. It should be done by a "destructor" insstruction, which reads register's
-//      //   pointer to the heap object, then destroys the heap object.
-//      x.pop() // Parse error, x no longer exists (dropped) and cannot be accessed.
-//
-//      Issues. What about heap allocated objects in a heap allocated object (like an array)? How do we know all the references to that array don't exist?
-//          Very temporary (bandaid-ahh) solution: pointers and concept of shared variables are not implemented. Theoretically, it should be fine to just
-//          drop the "popped" object in the parent object.
-//      When concepts of pointers/references/shared variables comes up, a solution is to ensure:
-//          let A = B; where A is pointer/reference/share of heap object B (B would be represented as a heap pointer in vm runtime btw).
-//          B must not be dropped/out of scope before A
-//              let b = [123];
-//                  block {
-//                      let a = share b; // Valid, b does not go out of scope when a is alive.
-//                  }
-
 #[repr(C, align(8))]
 #[derive(Clone, Copy)]
 pub union RegisterVal {
@@ -90,12 +64,12 @@ impl RegisterVal {
             let _ = Box::from_raw(ptr); // Drop the value
         };
     }
-    
+
     pub fn set_value_from_ptr<T>(value: T) -> *const () {
         let ptr = Box::into_raw(Box::new(value));
         ptr as *const ()
     }
-    
+
     pub fn get_value_from_ptr<T>(&self) -> Result<&T, VMRuntimeError> {
         let ptr = unsafe { self.ptr } as *const T;
         unsafe { ptr.as_ref().ok_or(VMRuntimeError::NullPtrDeref) }
@@ -105,37 +79,37 @@ impl RegisterVal {
     //     let ptr = unsafe { self.ptr } as *mut String;
     //     unsafe { ptr.as_ref().ok_or(VMRuntimeError::NullPtrDeref) }
     // }
-    // 
+    //
     // pub fn set_string(string: String) -> *const () {
     //     let ptr = Box::into_raw(Box::new(string));
     //     ptr as *const ()
     // }
-    // 
+    //
     // pub fn get_array(&self) -> Result<&Vec<RegisterVal>, VMRuntimeError> {
     //     let ptr = unsafe { self.ptr } as *mut Vec<RegisterVal>;
     //     unsafe { ptr.as_ref().ok_or(VMRuntimeError::NullPtrDeref) }
     // }
-    // 
+    //
     // pub fn set_array(array: Vec<RegisterVal>) -> *const () {
     //     let ptr = Box::into_raw(Box::new(array));
     //     ptr as *const ()
     // }
-    // 
+    //
     // pub fn get_hashmap(&self) -> &HashMap<RegisterVal, RegisterVal> {
     //     let ptr = unsafe { self.ptr } as *mut HashMap<RegisterVal, RegisterVal>;
     //     unsafe { &*ptr }
     // }
-    // 
+    //
     // pub fn set_hashmap(hashmap: HashMap<RegisterVal, RegisterVal>) -> *const () {
     //     let ptr = Box::into_raw(Box::new(hashmap));
     //     ptr as *const ()
     // }
-    // 
+    //
     // pub fn get_hashset(&self) -> &HashSet<RegisterVal> {
     //     let ptr = unsafe { self.ptr } as *mut HashSet<RegisterVal>;
     //     unsafe { &*ptr }
     // }
-    // 
+    //
     // pub fn set_hashset(hashset: HashSet<RegisterVal>) -> *const () {
     //     let ptr = Box::into_raw(Box::new(hashset));
     //     ptr as *const ()
