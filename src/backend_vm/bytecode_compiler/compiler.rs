@@ -17,7 +17,10 @@ use crate::{
     frontend::ast::Stmt,
 };
 
-use super::{symbol_tracker::SymbolTable, type_table::TypeTable};
+use super::{
+    symbol_tracker::{SymbolTable, SymbolTableType},
+    type_table::TypeTable,
+};
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub enum TaggedConstantValue {
@@ -46,13 +49,13 @@ impl Hash for TaggedConstantValue {
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum ReturnValue {
-    Normal(isize), // A standard isize format.
-    Break(isize),  // Standard isize with Break discriminant.
-    Return(isize), // Standard isize with Return discriminant.
+    Normal(SymbolTableType), // A standard isize format.
+    Break(SymbolTableType),  // Standard isize with Break discriminant.
+    Return(SymbolTableType), // Standard isize with Return discriminant.
 }
 
 impl ReturnValue {
-    pub(super) fn safe_unwrap(&self) -> isize {
+    pub(super) fn safe_unwrap(&self) -> SymbolTableType {
         match self {
             ReturnValue::Normal(i) => *i,
             ReturnValue::Break(i) => *i,

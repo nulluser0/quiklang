@@ -4,7 +4,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     backend_vm::instructions::{
-        rk_ask, ABx, ASBx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_CONCAT, OP_FLOAT_ADD,
+        rk_ask, ABx, ASBx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_CONCAT, OP_DROP, OP_FLOAT_ADD,
         OP_FLOAT_DIV, OP_FLOAT_EQ, OP_FLOAT_GE, OP_FLOAT_GT, OP_FLOAT_LE, OP_FLOAT_LT,
         OP_FLOAT_MOD, OP_FLOAT_MUL, OP_FLOAT_NE, OP_FLOAT_NEG, OP_FLOAT_POSITIVE, OP_FLOAT_SUB,
         OP_FLOAT_TO_INT, OP_FLOAT_TO_STRING, OP_INT_ADD, OP_INT_DIV, OP_INT_EQ, OP_INT_GE,
@@ -19,7 +19,7 @@ use crate::{
 
 use super::{
     compiler::{Compiler, ReturnValue, TaggedConstantValue},
-    symbol_tracker::SymbolTable,
+    symbol_tracker::{SymbolTable, SymbolTableType},
     type_table::TypeTable,
 };
 
@@ -29,7 +29,7 @@ struct IfArgs<'a> {
     then: Vec<Stmt>,
     else_stmt: Option<Vec<Stmt>>,
     require_result: bool,
-    fn_return: Option<usize>,
+    fn_return: Option<SymbolTableType>,
     symbol_table: &'a Rc<RefCell<SymbolTable>>,
     type_table: &'a Rc<RefCell<TypeTable>>,
 }
@@ -51,7 +51,7 @@ impl Compiler {
         expr: Expr,
         require_constant_as_register: bool, // true = allocates register to a constant.
         require_result: bool, // true = certain exprs will return a result, like ifs, loops, fors, whiles, blocks.
-        fn_return: Option<usize>,
+        fn_return: Option<SymbolTableType>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
         type_table: &Rc<RefCell<TypeTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
@@ -96,8 +96,8 @@ impl Compiler {
             Expr::UnaryOp(op, expr, output_type) => {
                 self.compile_unary_op(op, *expr, output_type, symbol_table, type_table)
             }
-            Expr::FunctionCall(args, caller) => {
-                self.compile_function_call(args, *caller, symbol_table, type_table)
+            Expr::FunctionCall(args, caller, return_type) => {
+                self.compile_function_call(args, *caller, return_type, symbol_table, type_table)
             }
             Expr::Member(_, _) => todo!(),
             Expr::IfExpr {
@@ -164,20 +164,38 @@ impl Compiler {
         require_constant_as_register: bool,
     ) -> Result<ReturnValue, VMCompileError> {
         let constant = match literal {
-            Literal::Integer(integer) => TaggedConstantValue::Int(integer),
-            Literal::Float(float) => TaggedConstantValue::Float(float),
-            Literal::String(string) => TaggedConstantValue::Str(string.into()),
+            Literal::Integer(integer) => &TaggedConstantValue::Int(integer),
+            Literal::Float(float) => &TaggedConstantValue::Float(float),
+            Literal::String(string) => &TaggedConstantValue::Str(string),
             Literal::Object(_) => todo!(),
         };
-        let index = self.add_constant(constant);
+        let index = self.add_constant(constant.clone());
 
         if require_constant_as_register {
             let reg = self.allocate_register();
             self.add_instruction(ABx(OP_LOADCONST, reg as i32, index as i32));
-            return Ok(ReturnValue::Normal(reg as isize));
+            match constant {
+                TaggedConstantValue::Str(_) => {
+                    return Ok(ReturnValue::Normal(SymbolTableType::HeapAllocated(
+                        reg as isize,
+                    )));
+                }
+                _ => {
+                    return Ok(ReturnValue::Normal(SymbolTableType::Primitive(
+                        reg as isize,
+                    )));
+                }
+            }
         }
 
-        Ok(ReturnValue::Normal((rk_ask(index as i32)) as isize))
+        match constant {
+            TaggedConstantValue::Str(_) => Ok(ReturnValue::Normal(SymbolTableType::HeapAllocated(
+                (rk_ask(index as i32)) as isize,
+            ))),
+            _ => Ok(ReturnValue::Normal(SymbolTableType::Primitive(
+                (rk_ask(index as i32)) as isize,
+            ))),
+        }
     }
 
     fn compile_identifier(
@@ -191,28 +209,40 @@ impl Compiler {
                 if require_constant_as_register {
                     let reg = self.allocate_register();
                     self.add_instruction(Abc(OP_LOADNULL, reg as i32, reg as i32, 0));
-                    return Ok(ReturnValue::Normal(reg as isize));
+                    return Ok(ReturnValue::Normal(SymbolTableType::Primitive(
+                        reg as isize,
+                    )));
                 }
                 let index = self.add_constant(TaggedConstantValue::Null);
-                Ok(ReturnValue::Normal((rk_ask(index as i32)) as isize))
+                Ok(ReturnValue::Normal(SymbolTableType::Primitive(
+                    (rk_ask(index as i32)) as isize,
+                )))
             }
             "true" => {
                 if require_constant_as_register {
                     let reg = self.allocate_register();
                     self.add_instruction(Abc(OP_LOADBOOL, reg as i32, 1, 0));
-                    return Ok(ReturnValue::Normal(reg as isize));
+                    return Ok(ReturnValue::Normal(SymbolTableType::Primitive(
+                        reg as isize,
+                    )));
                 }
                 let index = self.add_constant(TaggedConstantValue::Bool(true));
-                Ok(ReturnValue::Normal((rk_ask(index as i32)) as isize))
+                Ok(ReturnValue::Normal(SymbolTableType::Primitive(
+                    (rk_ask(index as i32)) as isize,
+                )))
             }
             "false" => {
                 if require_constant_as_register {
                     let reg = self.allocate_register();
                     self.add_instruction(Abc(OP_LOADBOOL, reg as i32, 0, 0));
-                    return Ok(ReturnValue::Normal(reg as isize));
+                    return Ok(ReturnValue::Normal(SymbolTableType::Primitive(
+                        reg as isize,
+                    )));
                 }
                 let index = self.add_constant(TaggedConstantValue::Bool(false));
-                Ok(ReturnValue::Normal((rk_ask(index as i32)) as isize))
+                Ok(ReturnValue::Normal(SymbolTableType::Primitive(
+                    (rk_ask(index as i32)) as isize,
+                )))
             }
             other => {
                 // No special ident_keyword. Instead, match symbol table.
@@ -240,7 +270,12 @@ impl Compiler {
         let reassigned = self
             .compile_expression(expr, true, true, None, symbol_table, type_table)?
             .safe_unwrap();
-        self.add_instruction(Abc(OP_CLONE, reg as i32, reassigned as i32, 0));
+        self.add_instruction(Abc(
+            OP_CLONE,
+            reg.safe_unwrap() as i32,
+            reassigned.safe_unwrap() as i32,
+            0,
+        ));
         Ok(ReturnValue::Normal(reg))
     }
 
@@ -255,9 +290,11 @@ impl Compiler {
         let reg = self.allocate_register();
         let b = self
             .compile_expression(left, false, true, None, symbol_table, type_table)?
+            .safe_unwrap()
             .safe_unwrap() as i32;
         let c = self
             .compile_expression(right, false, true, None, symbol_table, type_table)?
+            .safe_unwrap()
             .safe_unwrap() as i32;
         match defined_type {
             Type::String => self.add_instruction(Abc(OP_CONCAT, reg as i32, b, c)),
@@ -269,7 +306,9 @@ impl Compiler {
                 )));
             }
         }
-        Ok(ReturnValue::Normal(reg as isize))
+        Ok(ReturnValue::Normal(SymbolTableType::HeapAllocated(
+            reg as isize,
+        )))
     }
 
     fn compile_binary_op(
@@ -288,9 +327,11 @@ impl Compiler {
         let reg = self.allocate_register();
         let b = self
             .compile_expression(left, false, true, None, symbol_table, type_table)?
+            .safe_unwrap()
             .safe_unwrap() as i32;
         let c = self
             .compile_expression(right, false, true, None, symbol_table, type_table)?
+            .safe_unwrap()
             .safe_unwrap() as i32;
         let opcode = match output_type {
             Type::Integer => match op {
@@ -388,7 +429,9 @@ impl Compiler {
             }
         };
         self.add_instruction(Abc(opcode, reg as i32, b, c));
-        Ok(ReturnValue::Normal(reg as isize))
+        Ok(ReturnValue::Normal(SymbolTableType::Primitive(
+            reg as isize,
+        )))
     }
 
     fn compile_unary_op(
@@ -402,6 +445,7 @@ impl Compiler {
         let reg = self.allocate_register();
         let b = self
             .compile_expression(expr.clone(), false, true, None, symbol_table, type_table)?
+            .safe_unwrap()
             .safe_unwrap() as i32;
         let opcode = match op {
             UnaryOp::LogicalNot => OP_LOGICAL_NOT,
@@ -430,13 +474,17 @@ impl Compiler {
             UnaryOp::BitwiseNot => OP_BITNOT,
         };
         self.add_instruction(Abc(opcode, reg as i32, b, 0));
-        Ok(ReturnValue::Normal(reg as isize))
+
+        Ok(ReturnValue::Normal(SymbolTableType::Primitive(
+            reg as isize,
+        )))
     }
 
     fn compile_function_call(
         &mut self,
         args: Vec<(Expr, bool)>,
         caller: Expr,
+        return_type: Type,
         symbol_table: &Rc<RefCell<SymbolTable>>,
         type_table: &Rc<RefCell<TypeTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
@@ -446,8 +494,8 @@ impl Compiler {
 
         let mut native_fn = -1;
 
-        if function.safe_unwrap() < 0 {
-            native_fn = -1 - function.safe_unwrap()
+        if let SymbolTableType::QFFIFunction(val) = function.safe_unwrap() {
+            native_fn = val
         }
 
         // Function result (and function run base)
@@ -462,8 +510,8 @@ impl Compiler {
             let reg = self
                 .compile_expression(arg.0, true, true, None, symbol_table, type_table)?
                 .safe_unwrap();
-            if arg_reg as isize != reg {
-                self.add_instruction(Abc(OP_CLONE, arg_reg as i32, reg as i32, 0))
+            if arg_reg as isize != reg.safe_unwrap() {
+                self.add_instruction(Abc(OP_CLONE, arg_reg as i32, reg.safe_unwrap() as i32, 0))
             }
             self.allocate_register();
         }
@@ -476,17 +524,35 @@ impl Compiler {
                 arg_lens,
                 result as i32,
             ));
-            return Ok(ReturnValue::Normal(result as isize));
+            match return_type {
+                Type::String | Type::Array(_) | Type::Range(_) => {
+                    return Ok(ReturnValue::Normal(SymbolTableType::HeapAllocated(
+                        result as isize,
+                    )));
+                }
+                _ => {
+                    return Ok(ReturnValue::Normal(SymbolTableType::Primitive(
+                        result as isize,
+                    )));
+                }
+            }
         }
 
         self.add_instruction(Abc(
             OP_CALL,
-            function.safe_unwrap() as i32,
+            function.safe_unwrap().safe_unwrap() as i32,
             arg_lens,
             result as i32,
         ));
 
-        Ok(ReturnValue::Normal(result as isize))
+        match return_type {
+            Type::String | Type::Array(_) | Type::Range(_) => Ok(ReturnValue::Normal(
+                SymbolTableType::HeapAllocated(result as isize),
+            )),
+            _ => Ok(ReturnValue::Normal(SymbolTableType::Primitive(
+                result as isize,
+            ))),
+        }
     }
 
     fn compile_if_expr(
@@ -526,7 +592,11 @@ impl Compiler {
 
         // Add instruction to jump to else/endif if false
         let jump_to_end_or_else = self.instructions_len(); // Index of the JUMP_IF_ELSE inst
-        self.add_instruction(ASBx(OP_JUMP_IF_FALSE, condition_result as i32, 0)); // Placeholder for now
+        self.add_instruction(ASBx(
+            OP_JUMP_IF_FALSE,
+            condition_result.safe_unwrap() as i32,
+            0,
+        )); // Placeholder for now
 
         // Now we compile the 'then' area.
         // Create a new symbol table since we are entering a child scope.
@@ -535,7 +605,7 @@ impl Compiler {
         )));
 
         // Track the result of the then block
-        let mut result = ReturnValue::Normal(0);
+        let mut result = ReturnValue::Normal(SymbolTableType::Primitive(0));
         for stmt in then {
             result = self.compile_statement(
                 stmt,
@@ -546,11 +616,19 @@ impl Compiler {
                 type_table,
             )?;
         }
+
+        // Drop heap allocated registers
+        for (_, reg) in child_symbol_table.borrow().vars.iter() {
+            if let SymbolTableType::HeapAllocated(_) = reg {
+                self.add_instruction(Abc(OP_DROP, reg.safe_unwrap() as i32, 0, 0));
+            }
+        }
+
         if require_result && !result.is_return() {
             self.add_instruction(Abc(
                 OP_MOVE,
                 result_register as i32,
-                result.safe_unwrap() as i32,
+                result.safe_unwrap().safe_unwrap() as i32,
                 0,
             ));
         }
@@ -568,15 +646,54 @@ impl Compiler {
                 jump_to_end_or_else,
                 ASBx(
                     OP_JUMP_IF_FALSE,
-                    condition_result as i32,
+                    condition_result.safe_unwrap() as i32,
                     (jump_to_end - jump_to_end_or_else - 1) as i32,
                 ),
             );
 
             return match result {
-                ReturnValue::Normal(_) => Ok(ReturnValue::Normal(result_register as isize)),
-                ReturnValue::Break(_) => Ok(ReturnValue::Break(result_register as isize)),
-                ReturnValue::Return(_) => Ok(ReturnValue::Return(result_register as isize)),
+                ReturnValue::Normal(_) => Ok(ReturnValue::Normal(match result.safe_unwrap() {
+                    SymbolTableType::QFFIFunction(_) => {
+                        SymbolTableType::QFFIFunction(result_register as isize)
+                    }
+                    SymbolTableType::Function(_) => {
+                        SymbolTableType::Function(result_register as isize)
+                    }
+                    SymbolTableType::Primitive(_) => {
+                        SymbolTableType::Primitive(result_register as isize)
+                    }
+                    SymbolTableType::HeapAllocated(_) => {
+                        SymbolTableType::HeapAllocated(result_register as isize)
+                    }
+                })),
+                ReturnValue::Break(_) => Ok(ReturnValue::Break(match result.safe_unwrap() {
+                    SymbolTableType::QFFIFunction(_) => {
+                        SymbolTableType::QFFIFunction(result_register as isize)
+                    }
+                    SymbolTableType::Function(_) => {
+                        SymbolTableType::Function(result_register as isize)
+                    }
+                    SymbolTableType::Primitive(_) => {
+                        SymbolTableType::Primitive(result_register as isize)
+                    }
+                    SymbolTableType::HeapAllocated(_) => {
+                        SymbolTableType::HeapAllocated(result_register as isize)
+                    }
+                })),
+                ReturnValue::Return(_) => Ok(ReturnValue::Return(match result.safe_unwrap() {
+                    SymbolTableType::QFFIFunction(_) => {
+                        SymbolTableType::QFFIFunction(result_register as isize)
+                    }
+                    SymbolTableType::Function(_) => {
+                        SymbolTableType::Function(result_register as isize)
+                    }
+                    SymbolTableType::Primitive(_) => {
+                        SymbolTableType::Primitive(result_register as isize)
+                    }
+                    SymbolTableType::HeapAllocated(_) => {
+                        SymbolTableType::HeapAllocated(result_register as isize)
+                    }
+                })),
             };
         }
 
@@ -599,11 +716,19 @@ impl Compiler {
                 type_table,
             )?;
         }
+
+        // Drop heap allocated registers
+        for (_, reg) in child_symbol_table.borrow().vars.iter() {
+            if let SymbolTableType::HeapAllocated(_) = reg {
+                self.add_instruction(Abc(OP_DROP, reg.safe_unwrap() as i32, 0, 0));
+            }
+        }
+
         if require_result && !result.is_return() {
             self.add_instruction(Abc(
                 OP_MOVE,
                 result_register as i32,
-                result.safe_unwrap() as i32,
+                result.safe_unwrap().safe_unwrap() as i32,
                 0,
             ));
         }
@@ -616,7 +741,7 @@ impl Compiler {
             jump_to_end_or_else,
             ASBx(
                 OP_JUMP_IF_FALSE,
-                condition_result as i32,
+                condition_result.safe_unwrap() as i32,
                 (jump_to_end - jump_to_end_or_else) as i32,
             ),
         );
@@ -631,9 +756,42 @@ impl Compiler {
         self.manually_change_register_count(current_reg_top);
 
         match result {
-            ReturnValue::Normal(_) => Ok(ReturnValue::Normal(result_register as isize)),
-            ReturnValue::Break(_) => Ok(ReturnValue::Break(result_register as isize)),
-            ReturnValue::Return(_) => Ok(ReturnValue::Return(result_register as isize)),
+            ReturnValue::Normal(_) => Ok(ReturnValue::Normal(match result.safe_unwrap() {
+                SymbolTableType::QFFIFunction(_) => {
+                    SymbolTableType::QFFIFunction(result_register as isize)
+                }
+                SymbolTableType::Function(_) => SymbolTableType::Function(result_register as isize),
+                SymbolTableType::Primitive(_) => {
+                    SymbolTableType::Primitive(result_register as isize)
+                }
+                SymbolTableType::HeapAllocated(_) => {
+                    SymbolTableType::HeapAllocated(result_register as isize)
+                }
+            })),
+            ReturnValue::Break(_) => Ok(ReturnValue::Break(match result.safe_unwrap() {
+                SymbolTableType::QFFIFunction(_) => {
+                    SymbolTableType::QFFIFunction(result_register as isize)
+                }
+                SymbolTableType::Function(_) => SymbolTableType::Function(result_register as isize),
+                SymbolTableType::Primitive(_) => {
+                    SymbolTableType::Primitive(result_register as isize)
+                }
+                SymbolTableType::HeapAllocated(_) => {
+                    SymbolTableType::HeapAllocated(result_register as isize)
+                }
+            })),
+            ReturnValue::Return(_) => Ok(ReturnValue::Return(match result.safe_unwrap() {
+                SymbolTableType::QFFIFunction(_) => {
+                    SymbolTableType::QFFIFunction(result_register as isize)
+                }
+                SymbolTableType::Function(_) => SymbolTableType::Function(result_register as isize),
+                SymbolTableType::Primitive(_) => {
+                    SymbolTableType::Primitive(result_register as isize)
+                }
+                SymbolTableType::HeapAllocated(_) => {
+                    SymbolTableType::HeapAllocated(result_register as isize)
+                }
+            })),
         }
     }
 
@@ -642,7 +800,7 @@ impl Compiler {
         condition: Expr,
         then: Vec<Stmt>,
         require_result: bool,
-        fn_return: Option<usize>,
+        fn_return: Option<SymbolTableType>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
         type_table: &Rc<RefCell<TypeTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
@@ -651,7 +809,7 @@ impl Compiler {
         if require_result {
             self.allocate_register();
         }
-        let mut result = ReturnValue::Normal(0);
+        let mut result = ReturnValue::Normal(SymbolTableType::Primitive(0));
         // Save current top register to restore later
         let current_reg_top = self.reg_top();
 
@@ -665,7 +823,11 @@ impl Compiler {
 
         // Add instruction to jump to end if condition is false
         let jump_to_end = self.instructions_len();
-        self.add_instruction(ASBx(OP_JUMP_IF_FALSE, condition_result as i32, 0)); // Placeholder for now
+        self.add_instruction(ASBx(
+            OP_JUMP_IF_FALSE,
+            condition_result.safe_unwrap() as i32,
+            0,
+        )); // Placeholder for now
 
         // Track break positions to backtrack later
         let mut break_positions: Vec<usize> = Vec::new();
@@ -685,18 +847,31 @@ impl Compiler {
             )?;
             if let ReturnValue::Break(inner) = result {
                 if require_result {
-                    self.add_instruction(Abc(OP_MOVE, result_register as i32, inner as i32, 0));
+                    self.add_instruction(Abc(
+                        OP_MOVE,
+                        result_register as i32,
+                        inner.safe_unwrap() as i32,
+                        0,
+                    ));
                 }
                 let break_pos = self.instructions_len();
                 self.add_instruction(ASBx(OP_JUMP, 0, 0)); // Placeholder
                 break_positions.push(break_pos);
             }
         }
+
+        // Drop heap allocated registers
+        for (_, reg) in child_symbol_table.borrow().vars.iter() {
+            if let SymbolTableType::HeapAllocated(_) = reg {
+                self.add_instruction(Abc(OP_DROP, reg.safe_unwrap() as i32, 0, 0));
+            }
+        }
+
         if require_result {
             self.add_instruction(Abc(
                 OP_MOVE,
                 result_register as i32,
-                result.safe_unwrap() as i32,
+                result.safe_unwrap().safe_unwrap() as i32,
                 0,
             ));
         }
@@ -715,7 +890,7 @@ impl Compiler {
             jump_to_end,
             ASBx(
                 OP_JUMP_IF_FALSE,
-                condition_result as i32,
+                condition_result.safe_unwrap() as i32,
                 (loop_end - jump_to_end - 1) as i32,
             ),
         );
@@ -731,14 +906,23 @@ impl Compiler {
         // Restore the register count to the state before the loop
         self.manually_change_register_count(current_reg_top);
 
-        Ok(ReturnValue::Normal(result_register as isize))
+        Ok(ReturnValue::Normal(match result.safe_unwrap() {
+            SymbolTableType::QFFIFunction(_) => {
+                SymbolTableType::QFFIFunction(result_register as isize)
+            }
+            SymbolTableType::Function(_) => SymbolTableType::Function(result_register as isize),
+            SymbolTableType::Primitive(_) => SymbolTableType::Primitive(result_register as isize),
+            SymbolTableType::HeapAllocated(_) => {
+                SymbolTableType::HeapAllocated(result_register as isize)
+            }
+        }))
     }
 
     fn compile_block_expr(
         &mut self,
         block: Vec<Stmt>,
         require_result: bool,
-        fn_return: Option<usize>,
+        fn_return: Option<SymbolTableType>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
         type_table: &Rc<RefCell<TypeTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
@@ -747,7 +931,7 @@ impl Compiler {
         if require_result {
             self.allocate_register();
         }
-        let mut result = ReturnValue::Normal(0);
+        let mut result = ReturnValue::Normal(SymbolTableType::Primitive(0));
         // Save current top register to restore later
         let current_reg_top = self.reg_top();
 
@@ -765,11 +949,17 @@ impl Compiler {
                 type_table,
             )?;
         }
+        // Drop heap allocated registers
+        for (_, reg) in child_symbol_table.borrow().vars.iter() {
+            if let SymbolTableType::HeapAllocated(_) = reg {
+                self.add_instruction(Abc(OP_DROP, reg.safe_unwrap() as i32, 0, 0));
+            }
+        }
         if require_result {
             self.add_instruction(Abc(
                 OP_MOVE,
                 result_register as i32,
-                result.safe_unwrap() as i32,
+                result.safe_unwrap().safe_unwrap() as i32,
                 0,
             ));
         }
@@ -778,9 +968,42 @@ impl Compiler {
         self.manually_change_register_count(current_reg_top);
 
         match result {
-            ReturnValue::Normal(_) => Ok(ReturnValue::Normal(result_register as isize)),
-            ReturnValue::Break(_) => Ok(ReturnValue::Break(result_register as isize)),
-            ReturnValue::Return(_) => Ok(ReturnValue::Return(result_register as isize)),
+            ReturnValue::Normal(_) => Ok(ReturnValue::Normal(match result.safe_unwrap() {
+                SymbolTableType::QFFIFunction(_) => {
+                    SymbolTableType::QFFIFunction(result_register as isize)
+                }
+                SymbolTableType::Function(_) => SymbolTableType::Function(result_register as isize),
+                SymbolTableType::Primitive(_) => {
+                    SymbolTableType::Primitive(result_register as isize)
+                }
+                SymbolTableType::HeapAllocated(_) => {
+                    SymbolTableType::HeapAllocated(result_register as isize)
+                }
+            })),
+            ReturnValue::Break(_) => Ok(ReturnValue::Break(match result.safe_unwrap() {
+                SymbolTableType::QFFIFunction(_) => {
+                    SymbolTableType::QFFIFunction(result_register as isize)
+                }
+                SymbolTableType::Function(_) => SymbolTableType::Function(result_register as isize),
+                SymbolTableType::Primitive(_) => {
+                    SymbolTableType::Primitive(result_register as isize)
+                }
+                SymbolTableType::HeapAllocated(_) => {
+                    SymbolTableType::HeapAllocated(result_register as isize)
+                }
+            })),
+            ReturnValue::Return(_) => Ok(ReturnValue::Return(match result.safe_unwrap() {
+                SymbolTableType::QFFIFunction(_) => {
+                    SymbolTableType::QFFIFunction(result_register as isize)
+                }
+                SymbolTableType::Function(_) => SymbolTableType::Function(result_register as isize),
+                SymbolTableType::Primitive(_) => {
+                    SymbolTableType::Primitive(result_register as isize)
+                }
+                SymbolTableType::HeapAllocated(_) => {
+                    SymbolTableType::HeapAllocated(result_register as isize)
+                }
+            })),
         }
     }
 
@@ -788,7 +1011,7 @@ impl Compiler {
         &mut self,
         block: Vec<Stmt>,
         require_result: bool,
-        fn_return: Option<usize>,
+        fn_return: Option<SymbolTableType>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
         type_table: &Rc<RefCell<TypeTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
@@ -797,6 +1020,8 @@ impl Compiler {
         if require_result {
             self.allocate_register();
         }
+        let mut result = ReturnValue::Normal(SymbolTableType::Primitive(0));
+
         // Save current top register to restore later
         let current_reg_top = self.reg_top();
 
@@ -811,7 +1036,7 @@ impl Compiler {
             symbol_table.clone(),
         )));
         for stmt in block {
-            let result = self.compile_statement(
+            result = self.compile_statement(
                 stmt,
                 true,
                 true,
@@ -821,11 +1046,23 @@ impl Compiler {
             )?;
             if let ReturnValue::Break(inner) = result {
                 if require_result {
-                    self.add_instruction(Abc(OP_MOVE, result_register as i32, inner as i32, 0));
+                    self.add_instruction(Abc(
+                        OP_MOVE,
+                        result_register as i32,
+                        inner.safe_unwrap() as i32,
+                        0,
+                    ));
                 }
                 let break_pos = self.instructions_len();
                 self.add_instruction(ASBx(OP_JUMP, 0, 0)); // Placeholder
                 break_positions.push(break_pos);
+            }
+        }
+
+        // Drop heap allocated registers
+        for (_, reg) in child_symbol_table.borrow().vars.iter() {
+            if let SymbolTableType::HeapAllocated(_) = reg {
+                self.add_instruction(Abc(OP_DROP, reg.safe_unwrap() as i32, 0, 0));
             }
         }
 
@@ -851,7 +1088,16 @@ impl Compiler {
         // Restore the register count to the state before the loop
         self.manually_change_register_count(current_reg_top);
 
-        Ok(ReturnValue::Normal(result_register as isize))
+        Ok(ReturnValue::Normal(match result.safe_unwrap() {
+            SymbolTableType::QFFIFunction(_) => {
+                SymbolTableType::QFFIFunction(result_register as isize)
+            }
+            SymbolTableType::Function(_) => SymbolTableType::Function(result_register as isize),
+            SymbolTableType::Primitive(_) => SymbolTableType::Primitive(result_register as isize),
+            SymbolTableType::HeapAllocated(_) => {
+                SymbolTableType::HeapAllocated(result_register as isize)
+            }
+        }))
     }
 
     fn compile_type_cast(
@@ -867,6 +1113,7 @@ impl Compiler {
         let reg = self.allocate_register();
         let b = self
             .compile_expression(expr, false, true, None, symbol_table, type_table)?
+            .safe_unwrap()
             .safe_unwrap() as i32;
         match expr_type {
             Type::Integer => match cast_into_type {
@@ -904,6 +1151,9 @@ impl Compiler {
                 )));
             }
         }
-        Ok(ReturnValue::Normal(reg as isize))
+        Ok(ReturnValue::Normal(match cast_into_type {
+            Type::String => SymbolTableType::HeapAllocated(reg as isize),
+            _ => SymbolTableType::Primitive(reg as isize),
+        }))
     }
 }

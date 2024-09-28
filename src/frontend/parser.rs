@@ -281,14 +281,17 @@ impl Parser {
         }
         if self.at().token == TokenType::Symbol(Symbol::Semicolon) {
             self.eat();
-            return Ok(Stmt::BreakStmt(None));
+            return Ok(Stmt::BreakStmt(None, Type::Null));
         }
         let expr = self.parse_expr(type_env, root_type_env)?;
         self.expect(
             TokenType::Symbol(Symbol::Semicolon),
             "break declaration is a statement. It must end with a semicolon.",
         )?;
-        Ok(Stmt::BreakStmt(Some(expr)))
+        Ok(Stmt::BreakStmt(
+            Some(expr.clone()),
+            expr.get_type(type_env, break_declaration.line, break_declaration.col)?,
+        ))
     }
 
     fn parse_return_declaration(
@@ -305,14 +308,17 @@ impl Parser {
         }
         if self.at().token == TokenType::Symbol(Symbol::Semicolon) {
             self.eat();
-            return Ok(Stmt::ReturnStmt(None));
+            return Ok(Stmt::ReturnStmt(None, Type::Null));
         }
         let expr = self.parse_expr(type_env, root_type_env)?;
         self.expect(
             TokenType::Symbol(Symbol::Semicolon),
             "return declaration is a statement. It must end with a semicolon.",
         )?;
-        Ok(Stmt::ReturnStmt(Some(expr)))
+        Ok(Stmt::ReturnStmt(
+            Some(expr.clone()),
+            expr.get_type(type_env, return_declaration.line, return_declaration.col)?,
+        ))
     }
 
     fn parse_extern_fn_declaration(
@@ -446,7 +452,7 @@ impl Parser {
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
             let stmt = self.parse_stmt(&fn_type_env, root_type_env)?;
             match stmt {
-                Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
+                Stmt::ReturnStmt(_, _) | Stmt::BreakStmt(_, _) => {
                     body.push(stmt);
                     while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace)
                     {
@@ -1140,6 +1146,7 @@ impl Parser {
         let mut call_expr: Expr = Expr::FunctionCall(
             self.parse_args(type_env, root_type_env)?,
             Box::new(caller.clone()),
+            caller.get_type(type_env, 0, 0)?,
         );
         if self.at().token == TokenType::Symbol(Symbol::LeftParen) {
             call_expr = self.parse_call_expr(call_expr, type_env, root_type_env)?;
@@ -1149,7 +1156,7 @@ impl Parser {
         if let Expr::Identifier(fn_name) = &caller {
             if let Some(Type::Function(param_types, _)) = type_env.borrow().lookup_fn(fn_name) {
                 let args = match &call_expr {
-                    Expr::FunctionCall(args, _) => args,
+                    Expr::FunctionCall(args, _, _) => args,
                     _ => unreachable!(),
                 };
                 if args.len() != param_types.len() {
@@ -1609,7 +1616,7 @@ impl Parser {
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
             let stmt = self.parse_stmt(&for_type_env, root_type_env)?;
             match stmt {
-                Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
+                Stmt::ReturnStmt(_, _) | Stmt::BreakStmt(_, _) => {
                     then.push(stmt);
                     while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace)
                     {
@@ -1667,7 +1674,7 @@ impl Parser {
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
             let stmt = self.parse_stmt(&while_type_env, root_type_env)?;
             match stmt {
-                Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
+                Stmt::ReturnStmt(_, _) | Stmt::BreakStmt(_, _) => {
                     statements.push(stmt);
                     while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace)
                     {
@@ -1707,7 +1714,7 @@ impl Parser {
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
             let stmt = self.parse_stmt(&block_type_env, root_type_env)?;
             match stmt {
-                Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
+                Stmt::ReturnStmt(_, _) | Stmt::BreakStmt(_, _) => {
                     statements.push(stmt);
                     while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace)
                     {
@@ -1793,7 +1800,7 @@ impl Parser {
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
             let stmt = self.parse_stmt(&loop_type_env, root_type_env)?;
             match stmt {
-                Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
+                Stmt::ReturnStmt(_, _) | Stmt::BreakStmt(_, _) => {
                     statements.push(stmt);
                     while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace)
                     {
@@ -1843,7 +1850,7 @@ impl Parser {
         while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
             let stmt = self.parse_stmt(&if_type_env, root_type_env)?;
             match stmt {
-                Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
+                Stmt::ReturnStmt(_, _) | Stmt::BreakStmt(_, _) => {
                     consequent.push(stmt);
                     while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace)
                     {
@@ -1883,7 +1890,7 @@ impl Parser {
                 while self.not_eof() && self.at().token != TokenType::Symbol(Symbol::RightBrace) {
                     let stmt = self.parse_stmt(&else_type_env, root_type_env)?;
                     match stmt {
-                        Stmt::ReturnStmt(_) | Stmt::BreakStmt(_) => {
+                        Stmt::ReturnStmt(_, _) | Stmt::BreakStmt(_, _) => {
                             else_block.push(stmt);
                             while self.not_eof()
                                 && self.at().token != TokenType::Symbol(Symbol::RightBrace)

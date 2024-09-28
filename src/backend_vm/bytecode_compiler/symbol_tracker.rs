@@ -4,10 +4,29 @@ use std::{borrow::BorrowMut, cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::backend_vm::qffi::native_fn::NATIVE_FUNCTION_TABLE;
 
+#[derive(Debug, Clone, Copy)]
+pub enum SymbolTableType {
+    QFFIFunction(isize),
+    Function(isize),
+    Primitive(isize),
+    HeapAllocated(isize),
+}
+
+impl SymbolTableType {
+    pub fn safe_unwrap(&self) -> isize {
+        match self {
+            SymbolTableType::QFFIFunction(i) => *i,
+            SymbolTableType::Function(i) => *i,
+            SymbolTableType::Primitive(i) => *i,
+            SymbolTableType::HeapAllocated(i) => *i,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SymbolTable {
-    vars: HashMap<String, isize>, // Symbol name, register location. -ve values indicate QFFI function.
-    parent: Option<Rc<RefCell<SymbolTable>>>,
+    pub vars: HashMap<String, SymbolTableType>, // Symbol name, register location.
+    pub parent: Option<Rc<RefCell<SymbolTable>>>,
 }
 
 impl SymbolTable {
@@ -17,7 +36,7 @@ impl SymbolTable {
             parent: None,
         };
         for (i, native_fn) in NATIVE_FUNCTION_TABLE.clone().iter().enumerate() {
-            let index = -1 - (i as isize);
+            let index = SymbolTableType::QFFIFunction(i as isize);
             symbol_table
                 .borrow_mut()
                 .declare_var(native_fn.name.to_string(), index);
@@ -32,7 +51,7 @@ impl SymbolTable {
         }
     }
 
-    pub(super) fn declare_var(&mut self, name: String, reg: isize) {
+    pub(super) fn declare_var(&mut self, name: String, reg: SymbolTableType) {
         if let "_" = name.as_str() {
             // _ means intentionally ignored
             return;
@@ -40,7 +59,7 @@ impl SymbolTable {
         self.vars.insert(name.to_string(), reg);
     }
 
-    pub(super) fn lookup_var(&self, name: &str) -> Option<isize> {
+    pub(super) fn lookup_var(&self, name: &str) -> Option<SymbolTableType> {
         if let Some(reg) = self.vars.get(name) {
             return Some(*reg);
         }

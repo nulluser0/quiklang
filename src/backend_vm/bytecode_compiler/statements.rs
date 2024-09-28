@@ -3,14 +3,14 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    backend_vm::instructions::{Abc, OP_MOVE, OP_RETURN},
+    backend_vm::instructions::{Abc, OP_DROP, OP_MOVE, OP_RETURN},
     errors::VMCompileError,
     frontend::ast::{Expr, FromType, Stmt, Type},
 };
 
 use super::{
     compiler::{Compiler, ReturnValue},
-    symbol_tracker::SymbolTable,
+    symbol_tracker::{SymbolTable, SymbolTableType},
     type_table::{self, TypeTableEntry, VMCompilerType},
 };
 
@@ -18,7 +18,7 @@ use super::{
 struct FunctionDeclarationArgs<'a> {
     parameters: Vec<(String, Type, bool)>,
     name: String,
-    _return_type: Type,
+    return_type: Type,
     body: Vec<Stmt>,
     _is_async: bool,
     symbol_table: &'a Rc<RefCell<SymbolTable>>,
@@ -31,7 +31,7 @@ impl Compiler {
         stmt: Stmt,
         require_constant_as_register: bool,
         require_result: bool,
-        fn_return: Option<usize>,
+        fn_return: Option<SymbolTableType>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
         type_table: &Rc<RefCell<type_table::TypeTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
@@ -51,10 +51,10 @@ impl Compiler {
                 var_type: _,
                 expr,
             } => self.compile_declare_stmt(name, is_global, expr, symbol_table, type_table),
-            Stmt::ReturnStmt(expr) => {
+            Stmt::ReturnStmt(expr, _) => {
                 self.compile_return_stmt(expr, fn_return, symbol_table, type_table)
             }
-            Stmt::BreakStmt(expr) => self.compile_break_stmt(expr, symbol_table, type_table),
+            Stmt::BreakStmt(expr, _) => self.compile_break_stmt(expr, symbol_table, type_table),
             Stmt::FunctionDeclaration {
                 parameters,
                 name,
@@ -64,7 +64,7 @@ impl Compiler {
             } => self.compile_function_declaration(FunctionDeclarationArgs {
                 parameters,
                 name,
-                _return_type: return_type,
+                return_type,
                 body,
                 _is_async: is_async,
                 symbol_table,
@@ -98,7 +98,7 @@ impl Compiler {
                 .compile_expression(inner, true, true, None, symbol_table, type_table)?
                 .safe_unwrap();
         } else {
-            reg = self.allocate_register() as isize;
+            reg = SymbolTableType::Primitive(self.allocate_register() as isize);
         }
         symbol_table.borrow_mut().declare_var(name, reg);
         Ok(ReturnValue::Normal(reg))
@@ -109,6 +109,7 @@ impl Compiler {
         FunctionDeclarationArgs {
             parameters,
             name,
+            return_type,
             body,
             symbol_table,
             type_table,
@@ -118,22 +119,45 @@ impl Compiler {
         let mut function_compiler = self.new_fake_compiler();
         let function_symbol_table = &Rc::new(RefCell::new(SymbolTable::new()));
 
-        function_symbol_table
-            .borrow_mut()
-            .declare_var(name.clone(), self.function_len() as isize);
+        function_symbol_table.borrow_mut().declare_var(
+            name.clone(),
+            SymbolTableType::Function(self.function_len() as isize),
+        );
 
         // Allocate result register
-        let result_register = function_compiler.allocate_register();
+        let result_register: SymbolTableType = match return_type {
+            Type::String | Type::Array(_) | Type::Range(_) => {
+                SymbolTableType::HeapAllocated(function_compiler.allocate_register() as isize)
+            }
+            Type::Function(_, _) => {
+                SymbolTableType::Function(function_compiler.allocate_register() as isize)
+            }
+            _ => SymbolTableType::Primitive(function_compiler.allocate_register() as isize),
+        };
 
         // Allocate registers for the parameters in the function's symbol table
         for param in parameters {
             let reg = function_compiler.allocate_register();
-            function_symbol_table
-                .borrow_mut()
-                .declare_var(param.0, reg as isize);
+            match param.1 {
+                Type::String | Type::Array(_) | Type::Range(_) => {
+                    function_symbol_table
+                        .borrow_mut()
+                        .declare_var(param.0, SymbolTableType::HeapAllocated(reg as isize));
+                }
+                Type::Function(_, _) => {
+                    function_symbol_table
+                        .borrow_mut()
+                        .declare_var(param.0, SymbolTableType::Function(reg as isize));
+                }
+                _ => {
+                    function_symbol_table
+                        .borrow_mut()
+                        .declare_var(param.0, SymbolTableType::Primitive(reg as isize));
+                }
+            }
         }
 
-        let mut result = ReturnValue::Normal(0);
+        let mut result = ReturnValue::Normal(SymbolTableType::Primitive(0));
 
         // Compile body
         for stmt in body {
@@ -147,12 +171,19 @@ impl Compiler {
             )?;
         }
 
+        // Drop heap allocated registers
+        for (_, reg) in function_symbol_table.borrow().vars.iter() {
+            if let SymbolTableType::HeapAllocated(_) = reg {
+                function_compiler.add_instruction(Abc(OP_DROP, reg.safe_unwrap() as i32, 0, 0));
+            }
+        }
+
         if !result.is_return() {
             // Move body result into function result
             function_compiler.add_instruction(Abc(
                 OP_MOVE,
-                result_register as i32,
-                result.safe_unwrap() as i32,
+                result_register.safe_unwrap() as i32,
+                result.safe_unwrap().safe_unwrap() as i32,
                 0,
             ));
 
@@ -165,9 +196,11 @@ impl Compiler {
         let index = self.add_function(&mut function_compiler);
 
         // Add function to symbol table
-        symbol_table.borrow_mut().declare_var(name, index as isize);
+        symbol_table
+            .borrow_mut()
+            .declare_var(name, SymbolTableType::Function(index as isize));
 
-        Ok(ReturnValue::Normal(0))
+        Ok(ReturnValue::Normal(SymbolTableType::Primitive(0)))
     }
 
     fn compile_struct_def_stmt(
@@ -194,13 +227,13 @@ impl Compiler {
 
         type_table.borrow_mut().declare_type(ident, entry);
 
-        Ok(ReturnValue::Normal(0))
+        Ok(ReturnValue::Normal(SymbolTableType::Primitive(0)))
     }
 
     fn compile_return_stmt(
         &mut self,
         expr: Option<Expr>,
-        fn_return: Option<usize>,
+        fn_return: Option<SymbolTableType>,
         symbol_table: &Rc<RefCell<SymbolTable>>,
         type_table: &Rc<RefCell<type_table::TypeTable>>,
     ) -> Result<ReturnValue, VMCompileError> {
@@ -209,14 +242,19 @@ impl Compiler {
                 .compile_expression(inner, true, true, None, symbol_table, type_table)?
                 .safe_unwrap();
             if let Some(fn_reg) = fn_return {
-                self.add_instruction(Abc(OP_MOVE, fn_reg as i32, reg as i32, 0));
+                self.add_instruction(Abc(
+                    OP_MOVE,
+                    fn_reg.safe_unwrap() as i32,
+                    reg.safe_unwrap() as i32,
+                    0,
+                ));
                 self.add_instruction(Abc(OP_RETURN, 0, 0, 0));
-                return Ok(ReturnValue::Return(fn_reg as isize));
+                return Ok(ReturnValue::Return(fn_reg));
             }
             // Return when fn return not required???
             return Ok(ReturnValue::Return(reg));
         }
-        Ok(ReturnValue::Return(0))
+        Ok(ReturnValue::Return(SymbolTableType::Primitive(0)))
     }
 
     fn compile_break_stmt(
@@ -231,6 +269,6 @@ impl Compiler {
                 .safe_unwrap();
             return Ok(ReturnValue::Break(reg));
         }
-        Ok(ReturnValue::Break(0))
+        Ok(ReturnValue::Break(SymbolTableType::Primitive(0)))
     }
 }

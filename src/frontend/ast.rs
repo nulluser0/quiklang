@@ -124,7 +124,7 @@ pub enum Expr {
         output_type: Type,
     },
     UnaryOp(UnaryOp, Box<Expr>, Type), // Op, Expr, Output Type
-    FunctionCall(Vec<(Expr, bool)>, Box<Expr>), // Args, Caller
+    FunctionCall(Vec<(Expr, bool)>, Box<Expr>, Type), // Args, Caller, Return type
     Member(Box<Expr>, Box<Expr>),      // Object, Property
     IfExpr {
         condition: Box<Expr>,
@@ -287,7 +287,7 @@ impl ParsetimeType for Expr {
                     Ok(Type::Integer)
                 }
             },
-            Expr::FunctionCall(_, caller) => {
+            Expr::FunctionCall(_, caller, _) => {
                 if let Expr::Identifier(fn_name) = &**caller {
                     if let Some(Type::Function(_, return_type)) =
                         type_env.borrow().lookup_fn(fn_name)
@@ -369,8 +369,8 @@ pub enum Stmt {
         var_type: Type,
         expr: Option<Expr>,
     },
-    ReturnStmt(Option<Expr>),
-    BreakStmt(Option<Expr>),
+    ReturnStmt(Option<Expr>, Type),
+    BreakStmt(Option<Expr>, Type),
     FunctionDeclaration {
         parameters: Vec<(String, Type, bool)>,
         name: String,
@@ -407,11 +407,11 @@ impl ParsetimeType for Stmt {
         match self {
             Stmt::ExprStmt(expr) => expr.get_type(type_env, line, col),
             Stmt::DeclareStmt { .. } => Ok(Type::Null),
-            Stmt::ReturnStmt(expr) => match expr {
+            Stmt::ReturnStmt(expr, _) => match expr {
                 Some(expr) => expr.get_type(type_env, line, col),
                 None => Ok(Type::Null),
             },
-            Stmt::BreakStmt(expr) => match expr {
+            Stmt::BreakStmt(expr, _) => match expr {
                 Some(expr) => expr.get_type(type_env, line, col),
                 None => Ok(Type::Null),
             },
