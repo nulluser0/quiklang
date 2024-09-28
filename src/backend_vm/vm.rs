@@ -870,8 +870,10 @@ impl VMThread {
             args.push(self.registers[i]);
         }
 
-        self.vm.call_qffi_native(arga as usize, &args)?;
-        Ok(())
+        self.set_register(
+            arga as usize,
+            self.vm.call_qffi_native(arga as usize, &args)?,
+        )
     }
 
     #[inline(always)]

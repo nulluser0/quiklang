@@ -62,6 +62,7 @@ impl RegisterVal {
         if ptr.is_null() {
             return;
         }
+        println!("Dropping register {:?}", ptr);
         unsafe {
             drop(Arc::from_raw(ptr)); // Drop the value
         };

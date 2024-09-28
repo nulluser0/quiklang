@@ -271,7 +271,7 @@ impl Compiler {
             .compile_expression(expr, true, true, None, symbol_table, type_table)?
             .safe_unwrap();
         self.add_instruction(Abc(
-            OP_CLONE,
+            OP_MOVE,
             reg.safe_unwrap() as i32,
             reassigned.safe_unwrap() as i32,
             0,
@@ -511,7 +511,7 @@ impl Compiler {
                 .compile_expression(arg.0, true, true, None, symbol_table, type_table)?
                 .safe_unwrap();
             if arg_reg as isize != reg.safe_unwrap() {
-                self.add_instruction(Abc(OP_CLONE, arg_reg as i32, reg.safe_unwrap() as i32, 0))
+                self.add_instruction(Abc(OP_MOVE, arg_reg as i32, reg.safe_unwrap() as i32, 0))
             }
             self.allocate_register();
         }
