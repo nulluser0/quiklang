@@ -3,6 +3,8 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
+    ptr,
+    sync::Arc,
 };
 
 use crate::errors::VMRuntimeError;
@@ -55,24 +57,44 @@ impl std::fmt::Display for RegisterVal {
 }
 
 impl RegisterVal {
-    pub fn drop_value_from_ptr(&self) {
+    pub fn drop_ptr(&self) {
         let ptr = unsafe { self.ptr } as *mut ();
         if ptr.is_null() {
             return;
         }
         unsafe {
-            let _ = Box::from_raw(ptr); // Drop the value
+            drop(Arc::from_raw(ptr)); // Drop the value
         };
     }
 
-    pub fn set_value_from_ptr<T>(value: T) -> *const () {
-        let ptr = Box::into_raw(Box::new(value));
+    pub fn set_ptr_from_value<T>(value: T) -> *const () {
+        let ptr = Arc::into_raw(Arc::new(value));
         ptr as *const ()
     }
 
     pub fn get_value_from_ptr<T>(&self) -> Result<&T, VMRuntimeError> {
         let ptr = unsafe { self.ptr } as *const T;
         unsafe { ptr.as_ref().ok_or(VMRuntimeError::NullPtrDeref) }
+    }
+
+    pub fn set_ptr_from_ref(&self) -> Result<*const (), VMRuntimeError> {
+        // Get the pointer from the union
+        let ptr = unsafe { self.ptr };
+
+        // Check if the pointer is null
+        if ptr.is_null() {
+            return Err(VMRuntimeError::NullPtrDeref);
+        }
+
+        // Convert the raw pointer back to an Arc
+        // Safety: The caller must ensure that this pointer was created by set_ptr_from_value
+        let arc = unsafe { Arc::from_raw(ptr as *mut ()) };
+
+        // Clone the Arc, which will increment the reference count
+        let new_ptr = Arc::into_raw(arc.clone());
+
+        // Return the new raw pointer
+        Ok(new_ptr)
     }
 
     // pub fn get_string(&self) -> Result<&String, VMRuntimeError> {

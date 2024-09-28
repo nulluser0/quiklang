@@ -152,7 +152,7 @@ impl VM {
                     TaggedConstantValue::Float(float) => RegisterVal { float: *float },
                     TaggedConstantValue::Bool(bool) => RegisterVal { bool: *bool },
                     TaggedConstantValue::Str(string) => RegisterVal {
-                        ptr: RegisterVal::set_value_from_ptr::<String>(string.to_string()),
+                        ptr: RegisterVal::set_ptr_from_value::<String>(string.to_string()),
                     },
                 })
                 .collect(),
@@ -1089,7 +1089,7 @@ impl VMThread {
         let concatenated = format!("{}{}", b_val_str, c_val_str);
 
         // Obtain a raw pointer to the boxed string
-        let ptr = RegisterVal::set_value_from_ptr::<String>(concatenated);
+        let ptr = RegisterVal::set_ptr_from_value::<String>(concatenated);
 
         self.set_register(arga as usize, RegisterVal { ptr })?;
 
@@ -1105,7 +1105,7 @@ impl VMThread {
         let value = self.get_register_ref(arga as usize, offset)?;
 
         // Drop the value
-        value.drop_value_from_ptr();
+        value.drop_ptr();
 
         Ok(())
     }
@@ -1303,7 +1303,7 @@ impl VMThread {
 
         let string = format!("{}", unsafe { value.int });
 
-        let ptr = RegisterVal::set_value_from_ptr::<String>(string);
+        let ptr = RegisterVal::set_ptr_from_value::<String>(string);
 
         self.set_register(arga as usize, RegisterVal { ptr })?;
 
@@ -1324,7 +1324,7 @@ impl VMThread {
 
         let string = format!("{}", unsafe { value.float });
 
-        let ptr = RegisterVal::set_value_from_ptr::<String>(string);
+        let ptr = RegisterVal::set_ptr_from_value::<String>(string);
 
         self.set_register(arga as usize, RegisterVal { ptr })?;
 
