@@ -1097,10 +1097,17 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_drop(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
-        // destroy heap objs, where A is a pointer to the heap obj flagged for destruction.
-        // TODO!
-        todo!()
+    fn op_drop(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        let arga = get_arga(inst);
+        let offset = self.current_offset();
+
+        // Get the value in the register
+        let value = self.get_register_ref(arga as usize, offset)?;
+
+        // Drop the value
+        value.drop_value_from_ptr();
+
+        Ok(())
     }
 
     #[inline(always)]
