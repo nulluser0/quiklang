@@ -2,14 +2,14 @@
 
 use std::{borrow::BorrowMut, cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::backend_vm::qffi::native_fn::NATIVE_FUNCTION_TABLE;
+use crate::{backend_vm::qffi::native_fn::NATIVE_FUNCTION_TABLE, frontend::ast::Type};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum SymbolTableType {
     QFFIFunction(isize),
     Function(isize),
     Primitive(isize),
-    HeapAllocated(isize),
+    HeapAllocated(isize, Type),
 }
 
 impl SymbolTableType {
@@ -18,7 +18,7 @@ impl SymbolTableType {
             SymbolTableType::QFFIFunction(i) => *i,
             SymbolTableType::Function(i) => *i,
             SymbolTableType::Primitive(i) => *i,
-            SymbolTableType::HeapAllocated(i) => *i,
+            SymbolTableType::HeapAllocated(i, _) => *i,
         }
     }
 }
@@ -61,7 +61,7 @@ impl SymbolTable {
 
     pub(super) fn lookup_var(&self, name: &str) -> Option<SymbolTableType> {
         if let Some(reg) = self.vars.get(name) {
-            return Some(*reg);
+            return Some(reg.clone());
         }
         if let Some(ref parent) = self.parent {
             return parent.borrow().lookup_var(name);

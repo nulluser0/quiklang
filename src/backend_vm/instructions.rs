@@ -535,9 +535,9 @@ define_opcodes! {
     OP_INT_BITOR =>     (30,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
     OP_INT_BITXOR =>    (31,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
     OP_INT_SHL =>       (32,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_INT_SHR =>           (33,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
+    OP_INT_SHR =>       (33,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
     OP_CONCAT =>        (34,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
-    OP_DROP =>    (35,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
+    OP_DROP_STRING =>   (35,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
     OP_EXIT =>          (36,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
     OP_CLONE =>         (37,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
     OP_BITNOT =>        (38,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
@@ -563,7 +563,9 @@ define_opcodes! {
     OP_FLOAT_MOD =>     (58,    false,  true,   OpArgMode::ConstantOrRegisterConstant, OpArgMode::ConstantOrRegisterConstant, OpType::Abc),
     OP_INT_TO_STRING => (59,    false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
     OP_FLOAT_TO_STRING=>(60,  false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
-    OP_NOP =>           (61,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::AsBx),
+    OP_DROP_ARRAY =>    (61,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
+    OP_DROP_RANGE =>    (62,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
+    OP_NOP =>           (63,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::AsBx),
 }
 
 pub fn op_to_string(op: i32) -> String {
@@ -890,7 +892,7 @@ pub fn to_string(inst: Instruction) -> String {
         OP_INT_SHL => format!("{} | R({}) := R({}) << R({})", ops, arga, argb, argc),
         OP_INT_SHR => format!("{} | R({}) := R({}) >> R({})", ops, arga, argb, argc),
         OP_CONCAT => format!("{} | R({}) := R({}) & R({})", ops, arga, argb, argc),
-        OP_DROP => format!("{} | R({}) -> destructor", ops, arga),
+        OP_DROP_STRING => format!("{} | R({}) -> destructor (string)", ops, arga),
         OP_EXIT => format!("{} | std::process::exit({})", ops, arga),
         OP_CLONE => format!("{} | R({}) := R({}).clone()", ops, arga, argb),
         OP_BITNOT => format!("{} | R({}) := ~R({})", ops, arga, argb),
@@ -988,6 +990,8 @@ pub fn to_string(inst: Instruction) -> String {
         ),
         OP_INT_TO_STRING => format!("{} | R({}) := R({}).to_string()", ops, arga, argb),
         OP_FLOAT_TO_STRING => format!("{} | R({}) := R({}).to_string()", ops, arga, argb),
+        OP_DROP_ARRAY => format!("{} | R({}) -> destructor (array)", ops, arga),
+        OP_DROP_RANGE => format!("{} | R({}) -> destructor (range)", ops, arga),
         OP_NOP => ops.to_string(),
         _ => unreachable!(),
     }

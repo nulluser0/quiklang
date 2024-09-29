@@ -3,7 +3,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    backend_vm::instructions::{Abc, OP_DROP, OP_MOVE, OP_RETURN},
+    backend_vm::instructions::{
+        Abc, OP_DROP_ARRAY, OP_DROP_RANGE, OP_DROP_STRING, OP_MOVE, OP_RETURN,
+    },
     errors::VMCompileError,
     frontend::ast::{Expr, FromType, Stmt, Type},
 };
@@ -100,7 +102,7 @@ impl Compiler {
         } else {
             reg = SymbolTableType::Primitive(self.allocate_register() as isize);
         }
-        symbol_table.borrow_mut().declare_var(name, reg);
+        symbol_table.borrow_mut().declare_var(name, reg.clone());
         Ok(ReturnValue::Normal(reg))
     }
 
@@ -126,9 +128,10 @@ impl Compiler {
 
         // Allocate result register
         let result_register: SymbolTableType = match return_type {
-            Type::String | Type::Array(_) | Type::Range(_) => {
-                SymbolTableType::HeapAllocated(function_compiler.allocate_register() as isize)
-            }
+            Type::String | Type::Array(_) | Type::Range(_) => SymbolTableType::HeapAllocated(
+                function_compiler.allocate_register() as isize,
+                return_type,
+            ),
             Type::Function(_, _) => {
                 SymbolTableType::Function(function_compiler.allocate_register() as isize)
             }
@@ -140,9 +143,10 @@ impl Compiler {
             let reg = function_compiler.allocate_register();
             match param.1 {
                 Type::String | Type::Array(_) | Type::Range(_) => {
-                    function_symbol_table
-                        .borrow_mut()
-                        .declare_var(param.0, SymbolTableType::HeapAllocated(reg as isize));
+                    function_symbol_table.borrow_mut().declare_var(
+                        param.0,
+                        SymbolTableType::HeapAllocated(reg as isize, param.1),
+                    );
                 }
                 Type::Function(_, _) => {
                     function_symbol_table
@@ -165,7 +169,7 @@ impl Compiler {
                 stmt,
                 true,
                 true,
-                Some(result_register),
+                Some(result_register.clone()),
                 function_symbol_table,
                 type_table,
             )?;
@@ -173,8 +177,20 @@ impl Compiler {
 
         // Drop heap allocated registers
         for (_, reg) in function_symbol_table.borrow().vars.iter() {
-            if let SymbolTableType::HeapAllocated(_) = reg {
-                function_compiler.add_instruction(Abc(OP_DROP, reg.safe_unwrap() as i32, 0, 0));
+            if let SymbolTableType::HeapAllocated(_, htype) = reg {
+                // Add drop instruction which is dependent on the type of the heap allocated register
+                match htype {
+                    Type::String => {
+                        self.add_instruction(Abc(OP_DROP_STRING, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    Type::Array(_) => {
+                        self.add_instruction(Abc(OP_DROP_ARRAY, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    Type::Range(_) => {
+                        self.add_instruction(Abc(OP_DROP_RANGE, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    _ => (),
+                }
             }
         }
 

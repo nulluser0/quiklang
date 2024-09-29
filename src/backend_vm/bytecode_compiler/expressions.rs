@@ -4,14 +4,14 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     backend_vm::instructions::{
-        rk_ask, ABx, ASBx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_CONCAT, OP_DROP, OP_FLOAT_ADD,
-        OP_FLOAT_DIV, OP_FLOAT_EQ, OP_FLOAT_GE, OP_FLOAT_GT, OP_FLOAT_LE, OP_FLOAT_LT,
-        OP_FLOAT_MOD, OP_FLOAT_MUL, OP_FLOAT_NE, OP_FLOAT_NEG, OP_FLOAT_POSITIVE, OP_FLOAT_SUB,
-        OP_FLOAT_TO_INT, OP_FLOAT_TO_STRING, OP_INT_ADD, OP_INT_DIV, OP_INT_EQ, OP_INT_GE,
-        OP_INT_GT, OP_INT_LE, OP_INT_LT, OP_INT_MOD, OP_INT_MUL, OP_INT_NE, OP_INT_NEG,
-        OP_INT_POSITIVE, OP_INT_SUB, OP_INT_TO_FLOAT, OP_INT_TO_STRING, OP_JUMP, OP_JUMP_IF_FALSE,
-        OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LOGICAL_AND, OP_LOGICAL_NOT, OP_LOGICAL_OR,
-        OP_MOVE, OP_NATIVE_CALL,
+        rk_ask, ABx, ASBx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_CONCAT, OP_DROP_ARRAY,
+        OP_DROP_RANGE, OP_DROP_STRING, OP_FLOAT_ADD, OP_FLOAT_DIV, OP_FLOAT_EQ, OP_FLOAT_GE,
+        OP_FLOAT_GT, OP_FLOAT_LE, OP_FLOAT_LT, OP_FLOAT_MOD, OP_FLOAT_MUL, OP_FLOAT_NE,
+        OP_FLOAT_NEG, OP_FLOAT_POSITIVE, OP_FLOAT_SUB, OP_FLOAT_TO_INT, OP_FLOAT_TO_STRING,
+        OP_INT_ADD, OP_INT_DIV, OP_INT_EQ, OP_INT_GE, OP_INT_GT, OP_INT_LE, OP_INT_LT, OP_INT_MOD,
+        OP_INT_MUL, OP_INT_NE, OP_INT_NEG, OP_INT_POSITIVE, OP_INT_SUB, OP_INT_TO_FLOAT,
+        OP_INT_TO_STRING, OP_JUMP, OP_JUMP_IF_FALSE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL,
+        OP_LOGICAL_AND, OP_LOGICAL_NOT, OP_LOGICAL_OR, OP_MOVE, OP_NATIVE_CALL,
     },
     errors::VMCompileError,
     frontend::ast::{BinaryOp, Expr, Literal, Stmt, Type, UnaryOp},
@@ -178,6 +178,7 @@ impl Compiler {
                 TaggedConstantValue::Str(_) => {
                     return Ok(ReturnValue::Normal(SymbolTableType::HeapAllocated(
                         reg as isize,
+                        Type::String,
                     )));
                 }
                 _ => {
@@ -191,6 +192,7 @@ impl Compiler {
         match constant {
             TaggedConstantValue::Str(_) => Ok(ReturnValue::Normal(SymbolTableType::HeapAllocated(
                 (rk_ask(index as i32)) as isize,
+                Type::String,
             ))),
             _ => Ok(ReturnValue::Normal(SymbolTableType::Primitive(
                 (rk_ask(index as i32)) as isize,
@@ -308,6 +310,7 @@ impl Compiler {
         }
         Ok(ReturnValue::Normal(SymbolTableType::HeapAllocated(
             reg as isize,
+            Type::String,
         )))
     }
 
@@ -528,6 +531,7 @@ impl Compiler {
                 Type::String | Type::Array(_) | Type::Range(_) => {
                     return Ok(ReturnValue::Normal(SymbolTableType::HeapAllocated(
                         result as isize,
+                        return_type,
                     )));
                 }
                 _ => {
@@ -547,7 +551,7 @@ impl Compiler {
 
         match return_type {
             Type::String | Type::Array(_) | Type::Range(_) => Ok(ReturnValue::Normal(
-                SymbolTableType::HeapAllocated(result as isize),
+                SymbolTableType::HeapAllocated(result as isize, return_type),
             )),
             _ => Ok(ReturnValue::Normal(SymbolTableType::Primitive(
                 result as isize,
@@ -611,7 +615,7 @@ impl Compiler {
                 stmt,
                 true,
                 true,
-                fn_return,
+                fn_return.clone(),
                 child_symbol_table,
                 type_table,
             )?;
@@ -619,8 +623,20 @@ impl Compiler {
 
         // Drop heap allocated registers
         for (_, reg) in child_symbol_table.borrow().vars.iter() {
-            if let SymbolTableType::HeapAllocated(_) = reg {
-                self.add_instruction(Abc(OP_DROP, reg.safe_unwrap() as i32, 0, 0));
+            if let SymbolTableType::HeapAllocated(_, htype) = reg {
+                // Add drop instruction which is dependent on the type of the heap allocated register
+                match htype {
+                    Type::String => {
+                        self.add_instruction(Abc(OP_DROP_STRING, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    Type::Array(_) => {
+                        self.add_instruction(Abc(OP_DROP_ARRAY, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    Type::Range(_) => {
+                        self.add_instruction(Abc(OP_DROP_RANGE, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    _ => (),
+                }
             }
         }
 
@@ -662,8 +678,8 @@ impl Compiler {
                     SymbolTableType::Primitive(_) => {
                         SymbolTableType::Primitive(result_register as isize)
                     }
-                    SymbolTableType::HeapAllocated(_) => {
-                        SymbolTableType::HeapAllocated(result_register as isize)
+                    SymbolTableType::HeapAllocated(_, t) => {
+                        SymbolTableType::HeapAllocated(result_register as isize, t)
                     }
                 })),
                 ReturnValue::Break(_) => Ok(ReturnValue::Break(match result.safe_unwrap() {
@@ -676,8 +692,8 @@ impl Compiler {
                     SymbolTableType::Primitive(_) => {
                         SymbolTableType::Primitive(result_register as isize)
                     }
-                    SymbolTableType::HeapAllocated(_) => {
-                        SymbolTableType::HeapAllocated(result_register as isize)
+                    SymbolTableType::HeapAllocated(_, t) => {
+                        SymbolTableType::HeapAllocated(result_register as isize, t)
                     }
                 })),
                 ReturnValue::Return(_) => Ok(ReturnValue::Return(match result.safe_unwrap() {
@@ -690,8 +706,8 @@ impl Compiler {
                     SymbolTableType::Primitive(_) => {
                         SymbolTableType::Primitive(result_register as isize)
                     }
-                    SymbolTableType::HeapAllocated(_) => {
-                        SymbolTableType::HeapAllocated(result_register as isize)
+                    SymbolTableType::HeapAllocated(_, t) => {
+                        SymbolTableType::HeapAllocated(result_register as isize, t)
                     }
                 })),
             };
@@ -711,7 +727,7 @@ impl Compiler {
                 stmt,
                 true,
                 true,
-                fn_return,
+                fn_return.clone(),
                 child_symbol_table,
                 type_table,
             )?;
@@ -719,8 +735,20 @@ impl Compiler {
 
         // Drop heap allocated registers
         for (_, reg) in child_symbol_table.borrow().vars.iter() {
-            if let SymbolTableType::HeapAllocated(_) = reg {
-                self.add_instruction(Abc(OP_DROP, reg.safe_unwrap() as i32, 0, 0));
+            if let SymbolTableType::HeapAllocated(_, htype) = reg {
+                // Add drop instruction which is dependent on the type of the heap allocated register
+                match htype {
+                    Type::String => {
+                        self.add_instruction(Abc(OP_DROP_STRING, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    Type::Array(_) => {
+                        self.add_instruction(Abc(OP_DROP_ARRAY, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    Type::Range(_) => {
+                        self.add_instruction(Abc(OP_DROP_RANGE, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    _ => (),
+                }
             }
         }
 
@@ -764,8 +792,8 @@ impl Compiler {
                 SymbolTableType::Primitive(_) => {
                     SymbolTableType::Primitive(result_register as isize)
                 }
-                SymbolTableType::HeapAllocated(_) => {
-                    SymbolTableType::HeapAllocated(result_register as isize)
+                SymbolTableType::HeapAllocated(_, t) => {
+                    SymbolTableType::HeapAllocated(result_register as isize, t)
                 }
             })),
             ReturnValue::Break(_) => Ok(ReturnValue::Break(match result.safe_unwrap() {
@@ -776,8 +804,8 @@ impl Compiler {
                 SymbolTableType::Primitive(_) => {
                     SymbolTableType::Primitive(result_register as isize)
                 }
-                SymbolTableType::HeapAllocated(_) => {
-                    SymbolTableType::HeapAllocated(result_register as isize)
+                SymbolTableType::HeapAllocated(_, t) => {
+                    SymbolTableType::HeapAllocated(result_register as isize, t)
                 }
             })),
             ReturnValue::Return(_) => Ok(ReturnValue::Return(match result.safe_unwrap() {
@@ -788,8 +816,8 @@ impl Compiler {
                 SymbolTableType::Primitive(_) => {
                     SymbolTableType::Primitive(result_register as isize)
                 }
-                SymbolTableType::HeapAllocated(_) => {
-                    SymbolTableType::HeapAllocated(result_register as isize)
+                SymbolTableType::HeapAllocated(_, t) => {
+                    SymbolTableType::HeapAllocated(result_register as isize, t)
                 }
             })),
         }
@@ -841,11 +869,11 @@ impl Compiler {
                 stmt,
                 true,
                 true,
-                fn_return,
+                fn_return.clone(),
                 child_symbol_table,
                 type_table,
             )?;
-            if let ReturnValue::Break(inner) = result {
+            if let ReturnValue::Break(inner) = result.clone() {
                 if require_result {
                     self.add_instruction(Abc(
                         OP_MOVE,
@@ -862,8 +890,20 @@ impl Compiler {
 
         // Drop heap allocated registers
         for (_, reg) in child_symbol_table.borrow().vars.iter() {
-            if let SymbolTableType::HeapAllocated(_) = reg {
-                self.add_instruction(Abc(OP_DROP, reg.safe_unwrap() as i32, 0, 0));
+            if let SymbolTableType::HeapAllocated(_, htype) = reg {
+                // Add drop instruction which is dependent on the type of the heap allocated register
+                match htype {
+                    Type::String => {
+                        self.add_instruction(Abc(OP_DROP_STRING, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    Type::Array(_) => {
+                        self.add_instruction(Abc(OP_DROP_ARRAY, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    Type::Range(_) => {
+                        self.add_instruction(Abc(OP_DROP_RANGE, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    _ => (),
+                }
             }
         }
 
@@ -912,8 +952,8 @@ impl Compiler {
             }
             SymbolTableType::Function(_) => SymbolTableType::Function(result_register as isize),
             SymbolTableType::Primitive(_) => SymbolTableType::Primitive(result_register as isize),
-            SymbolTableType::HeapAllocated(_) => {
-                SymbolTableType::HeapAllocated(result_register as isize)
+            SymbolTableType::HeapAllocated(_, t) => {
+                SymbolTableType::HeapAllocated(result_register as isize, t)
             }
         }))
     }
@@ -944,15 +984,27 @@ impl Compiler {
                 stmt,
                 true,
                 true,
-                fn_return,
+                fn_return.clone(),
                 child_symbol_table,
                 type_table,
             )?;
         }
         // Drop heap allocated registers
         for (_, reg) in child_symbol_table.borrow().vars.iter() {
-            if let SymbolTableType::HeapAllocated(_) = reg {
-                self.add_instruction(Abc(OP_DROP, reg.safe_unwrap() as i32, 0, 0));
+            if let SymbolTableType::HeapAllocated(_, htype) = reg {
+                // Add drop instruction which is dependent on the type of the heap allocated register
+                match htype {
+                    Type::String => {
+                        self.add_instruction(Abc(OP_DROP_STRING, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    Type::Array(_) => {
+                        self.add_instruction(Abc(OP_DROP_ARRAY, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    Type::Range(_) => {
+                        self.add_instruction(Abc(OP_DROP_RANGE, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    _ => (),
+                }
             }
         }
         if require_result {
@@ -976,8 +1028,8 @@ impl Compiler {
                 SymbolTableType::Primitive(_) => {
                     SymbolTableType::Primitive(result_register as isize)
                 }
-                SymbolTableType::HeapAllocated(_) => {
-                    SymbolTableType::HeapAllocated(result_register as isize)
+                SymbolTableType::HeapAllocated(_, t) => {
+                    SymbolTableType::HeapAllocated(result_register as isize, t)
                 }
             })),
             ReturnValue::Break(_) => Ok(ReturnValue::Break(match result.safe_unwrap() {
@@ -988,8 +1040,8 @@ impl Compiler {
                 SymbolTableType::Primitive(_) => {
                     SymbolTableType::Primitive(result_register as isize)
                 }
-                SymbolTableType::HeapAllocated(_) => {
-                    SymbolTableType::HeapAllocated(result_register as isize)
+                SymbolTableType::HeapAllocated(_, t) => {
+                    SymbolTableType::HeapAllocated(result_register as isize, t)
                 }
             })),
             ReturnValue::Return(_) => Ok(ReturnValue::Return(match result.safe_unwrap() {
@@ -1000,8 +1052,8 @@ impl Compiler {
                 SymbolTableType::Primitive(_) => {
                     SymbolTableType::Primitive(result_register as isize)
                 }
-                SymbolTableType::HeapAllocated(_) => {
-                    SymbolTableType::HeapAllocated(result_register as isize)
+                SymbolTableType::HeapAllocated(_, t) => {
+                    SymbolTableType::HeapAllocated(result_register as isize, t)
                 }
             })),
         }
@@ -1040,11 +1092,11 @@ impl Compiler {
                 stmt,
                 true,
                 true,
-                fn_return,
+                fn_return.clone(),
                 child_symbol_table,
                 type_table,
             )?;
-            if let ReturnValue::Break(inner) = result {
+            if let ReturnValue::Break(inner) = result.clone() {
                 if require_result {
                     self.add_instruction(Abc(
                         OP_MOVE,
@@ -1061,8 +1113,20 @@ impl Compiler {
 
         // Drop heap allocated registers
         for (_, reg) in child_symbol_table.borrow().vars.iter() {
-            if let SymbolTableType::HeapAllocated(_) = reg {
-                self.add_instruction(Abc(OP_DROP, reg.safe_unwrap() as i32, 0, 0));
+            if let SymbolTableType::HeapAllocated(_, htype) = reg {
+                // Add drop instruction which is dependent on the type of the heap allocated register
+                match htype {
+                    Type::String => {
+                        self.add_instruction(Abc(OP_DROP_STRING, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    Type::Array(_) => {
+                        self.add_instruction(Abc(OP_DROP_ARRAY, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    Type::Range(_) => {
+                        self.add_instruction(Abc(OP_DROP_RANGE, reg.safe_unwrap() as i32, 0, 0));
+                    }
+                    _ => (),
+                }
             }
         }
 
@@ -1094,8 +1158,8 @@ impl Compiler {
             }
             SymbolTableType::Function(_) => SymbolTableType::Function(result_register as isize),
             SymbolTableType::Primitive(_) => SymbolTableType::Primitive(result_register as isize),
-            SymbolTableType::HeapAllocated(_) => {
-                SymbolTableType::HeapAllocated(result_register as isize)
+            SymbolTableType::HeapAllocated(_, t) => {
+                SymbolTableType::HeapAllocated(result_register as isize, t)
             }
         }))
     }
@@ -1152,7 +1216,7 @@ impl Compiler {
             }
         }
         Ok(ReturnValue::Normal(match cast_into_type {
-            Type::String => SymbolTableType::HeapAllocated(reg as isize),
+            Type::String => SymbolTableType::HeapAllocated(reg as isize, Type::String),
             _ => SymbolTableType::Primitive(reg as isize),
         }))
     }

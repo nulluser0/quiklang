@@ -57,27 +57,54 @@ impl std::fmt::Display for RegisterVal {
 }
 
 impl RegisterVal {
-    pub fn drop_ptr(&self) {
-        let ptr = unsafe { self.ptr } as *mut ();
+    /// Drop the value stored in the pointer. The pointer is then set to null.
+    /// Safety: The caller must ensure that the pointer is not null.
+    pub fn drop_ptr<T>(&self) {
+        let ptr = unsafe { self.ptr } as *mut T;
         if ptr.is_null() {
             return;
         }
-        println!("Dropping register {:?}", ptr);
         unsafe {
-            drop(Arc::from_raw(ptr)); // Drop the value
+            // let _ = Arc::from_raw(ptr); // Drop the value
+            Arc::decrement_strong_count(ptr as *const T);
         };
     }
 
+    /// Returns the pointer of a heap allocated object (T).
     pub fn set_ptr_from_value<T>(value: T) -> *const () {
         let ptr = Arc::into_raw(Arc::new(value));
         ptr as *const ()
     }
 
+    /// Returns the value of a heap allocated object (T) from its pointer.
     pub fn get_value_from_ptr<T>(&self) -> Result<&T, VMRuntimeError> {
         let ptr = unsafe { self.ptr } as *const T;
         unsafe { ptr.as_ref().ok_or(VMRuntimeError::NullPtrDeref) }
     }
 
+    /// Increments the reference count of the heap allocated object.
+    pub fn inc_arc_ptr<T>(&self) {
+        let ptr = unsafe { self.ptr } as *mut T;
+        if ptr.is_null() {
+            return;
+        }
+        unsafe {
+            Arc::increment_strong_count(ptr as *const T);
+        }
+    }
+
+    /// Decrements the reference count of the heap allocated object.
+    pub fn dec_arc_ptr<T>(&self) {
+        let ptr = unsafe { self.ptr } as *mut T;
+        if ptr.is_null() {
+            return;
+        }
+        unsafe {
+            Arc::decrement_strong_count(ptr as *const T);
+        }
+    }
+
+    /// Equivalent to `Arc::clone` but for a raw pointer.
     pub fn set_ptr_from_ref(&self) -> Result<*const (), VMRuntimeError> {
         // Get the pointer from the union
         let ptr = unsafe { self.ptr };

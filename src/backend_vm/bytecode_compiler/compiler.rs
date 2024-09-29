@@ -47,7 +47,7 @@ impl Hash for TaggedConstantValue {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(super) enum ReturnValue {
     Normal(SymbolTableType), // A standard isize format.
     Break(SymbolTableType),  // Standard isize with Break discriminant.
@@ -57,9 +57,9 @@ pub(super) enum ReturnValue {
 impl ReturnValue {
     pub(super) fn safe_unwrap(&self) -> SymbolTableType {
         match self {
-            ReturnValue::Normal(i) => *i,
-            ReturnValue::Break(i) => *i,
-            ReturnValue::Return(i) => *i,
+            ReturnValue::Normal(i) => i.clone(),
+            ReturnValue::Break(i) => i.clone(),
+            ReturnValue::Return(i) => i.clone(),
         }
     }
 

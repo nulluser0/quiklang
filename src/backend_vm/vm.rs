@@ -63,7 +63,7 @@ const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
         VMThread::op_int_shl,
         VMThread::op_int_shr,
         VMThread::op_concat,
-        VMThread::op_drop,
+        VMThread::op_drop_string,
         VMThread::op_exit,
         VMThread::op_clone,
         VMThread::op_bitnot,
@@ -89,6 +89,8 @@ const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
         VMThread::op_float_mod,
         VMThread::op_int_to_string,
         VMThread::op_float_to_string,
+        VMThread::op_drop_array,
+        VMThread::op_drop_range,
         VMThread::op_nop,
     ]
 }
@@ -151,9 +153,16 @@ impl VM {
                     TaggedConstantValue::Int(int) => RegisterVal { int: *int },
                     TaggedConstantValue::Float(float) => RegisterVal { float: *float },
                     TaggedConstantValue::Bool(bool) => RegisterVal { bool: *bool },
-                    TaggedConstantValue::Str(string) => RegisterVal {
-                        ptr: RegisterVal::set_ptr_from_value::<String>(string.to_string()),
-                    },
+                    TaggedConstantValue::Str(string) => {
+                        let ptr = RegisterVal {
+                            ptr: RegisterVal::set_ptr_from_value::<String>(string.to_string()),
+                        };
+
+                        // Increment the reference count to ensure the string is not deallocated, since the VM is the owner
+                        ptr.inc_arc_ptr::<String>();
+
+                        ptr
+                    }
                 })
                 .collect(),
             bytecode
@@ -871,7 +880,7 @@ impl VMThread {
         }
 
         self.set_register(
-            arga as usize,
+            argc as usize,
             self.vm.call_qffi_native(arga as usize, &args)?,
         )
     }
@@ -1099,7 +1108,7 @@ impl VMThread {
     }
 
     #[inline(always)]
-    fn op_drop(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+    fn op_drop_string(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
         let offset = self.current_offset();
 
@@ -1107,7 +1116,7 @@ impl VMThread {
         let value = self.get_register_ref(arga as usize, offset)?;
 
         // Drop the value
-        value.drop_ptr();
+        value.drop_ptr::<String>();
 
         Ok(())
     }
@@ -1331,6 +1340,22 @@ impl VMThread {
         self.set_register(arga as usize, RegisterVal { ptr })?;
 
         Ok(())
+    }
+
+    #[inline(always)]
+    fn op_drop_array(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        let arga = get_arga(inst);
+
+        let value = self.get_register_ref(arga as usize, 0)?;
+
+        value.drop_ptr::<Vec<RegisterVal>>();
+
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn op_drop_range(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
+        todo!("OP_DROP_RANGE")
     }
 
     #[inline(always)]
