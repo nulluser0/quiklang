@@ -294,12 +294,12 @@ impl VMThread {
             thread_id: 0,
             program_counter: 0,
             vm,
-            registers: Box::new([ARRAY_REPEAT_VALUE; 20000]),
+            registers: Box::new([ARRAY_REPEAT_VALUE; 20000]), // DefaultL 20000
             call_stack: Box::new(
                 [CallFrame {
                     return_pc: 0,
                     base: 0,
-                }; 30000],
+                }; 30000], // Default: 30000
             ),
             call_stack_pointer: 0,
         }
