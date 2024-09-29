@@ -66,6 +66,11 @@ async fn run_file_vm(file_path: &str) {
         });
 
         let vm = VM::from_bytecode(bytecode);
+
+        // For memory efficiency, we can discard unused stuff
+        drop(content);
+        drop(file);
+
         match vm.execute().await {
             Ok(_) => {}
             Err(VMRuntimeError::Exit(code)) => process::exit(code),
@@ -86,7 +91,7 @@ async fn run_file_vm(file_path: &str) {
             root_type_env.clone(),
         )));
 
-        run_vm(content, &type_env, &root_type_env).await;
+        run_vm(content, type_env, root_type_env).await;
     }
 }
 

@@ -79,16 +79,22 @@ pub struct RunVmReplArgs<'a> {
 
 pub async fn run_vm(
     input: String,
-    type_env: &Rc<RefCell<TypeEnvironment>>,
-    root_type_env: &Rc<RefCell<TypeEnvironment>>,
+    type_env: Rc<RefCell<TypeEnvironment>>,
+    root_type_env: Rc<RefCell<TypeEnvironment>>,
 ) {
     let mut parser = parser::Parser::new();
-    match parser.produce_ast(input, type_env, root_type_env) {
+    match parser.produce_ast(input, &type_env, &root_type_env) {
         Ok(program) => {
             let mut compiler = Compiler::new();
             match compiler.compile_no_symbol_table_input(program.statements) {
                 Ok(bytecode) => {
                     let vm = VM::from_bytecode(bytecode);
+
+                    // For memory efficiency, we can discard unused stuff
+                    drop(parser);
+                    drop(type_env);
+                    drop(root_type_env);
+
                     match vm.execute().await {
                         Ok(_) => {}
                         Err(VMRuntimeError::Exit(code)) => process::exit(code),
