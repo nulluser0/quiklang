@@ -7,3 +7,5 @@ flamegraph.svg
 .quiklang_history
 test.qlbc
 test.quik
+test.py
+test.lua
