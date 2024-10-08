@@ -478,6 +478,7 @@ impl VMThread {
         let inst_len = self.vm.get_instruction_len();
         while self.program_counter < inst_len {
             let inst = self.fetch_instruction();
+            self.program_counter += 1;
             let opcode = get_opcode(inst);
             if opcode as usize >= DISPATCH_TABLE.len() {
                 return Err(VMRuntimeError::InvalidOpcode(opcode, self.program_counter));
@@ -493,7 +494,6 @@ impl VMThread {
                 // The thread failed, so we should unwind the callstack and clean up the memory
                 Err(e) => return Err(self.on_thread_failure(e)),
             };
-            self.program_counter += 1;
         }
         Ok(*self.registers.first().unwrap_or(&RegisterVal { null: () }))
     }
@@ -816,9 +816,9 @@ impl VMThread {
 
     #[inline(always)]
     fn op_jump(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
-        let argsbx = get_argsbx(inst);
+        let argbx = get_argbx(inst);
 
-        self.program_counter = (self.program_counter as i32 + argsbx) as usize;
+        self.program_counter = argbx as usize;
 
         Ok(())
     }
@@ -826,11 +826,11 @@ impl VMThread {
     #[inline(always)]
     fn op_jump_if_true(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
-        let argsbx = get_argsbx(inst);
+        let argbx = get_argbx(inst);
         let offset = self.current_offset();
 
         if unsafe { self.get_register_ref(arga as usize, offset)?.bool } {
-            self.program_counter = (self.program_counter as i32 + argsbx) as usize;
+            self.program_counter = argbx as usize;
         }
 
         Ok(())
@@ -839,11 +839,11 @@ impl VMThread {
     #[inline(always)]
     fn op_jump_if_false(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
         let arga = get_arga(inst);
-        let argsbx = get_argsbx(inst);
+        let argbx = get_argbx(inst);
         let offset = self.current_offset();
 
         if !unsafe { self.get_register_ref(arga as usize, offset)?.bool } {
-            self.program_counter = (self.program_counter as i32 + argsbx) as usize;
+            self.program_counter = argbx as usize;
         }
 
         Ok(())
@@ -872,8 +872,6 @@ impl VMThread {
         // Set the program counter to the function's starting instruction
         if (arga as usize) < self.vm.get_function_index_len() {
             self.program_counter = *self.vm.get_function_index(arga as usize).unwrap();
-            // return; TODO: Fix to possibly avoid pc --1
-            self.program_counter -= 1;
         } else {
             panic!("Invalid function index: {}", arga);
         }

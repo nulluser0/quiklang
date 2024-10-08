@@ -11,7 +11,10 @@ use std::{
 use crate::{
     backend_vm::{
         bytecode::{BCIntegrityInfo, BCMetadata, ByteCode},
-        instructions::{ASBx, Abc, Instruction, OP_EXIT, OP_NOP},
+        instructions::{
+            get_arga, get_argbx, get_opcode, ABx, ASBx, Abc, Instruction, OP_EXIT, OP_JUMP,
+            OP_JUMP_IF_FALSE, OP_JUMP_IF_TRUE, OP_NOP,
+        },
     },
     errors::VMCompileError,
     frontend::ast::Stmt,
@@ -231,6 +234,31 @@ impl Compiler {
         let mut qlang_functions: Vec<u64> = Vec::new();
         for fn_inst in &mut self.function_insts {
             let fn_index = self.instructions.len();
+            // Modify jump instructions to point to the correct location
+            let mut modified_insts = Vec::new();
+            for (i, inst) in fn_inst.iter().enumerate() {
+                match get_opcode(*inst) {
+                    OP_JUMP => {
+                        let a = get_arga(*inst);
+                        let bx = get_argbx(*inst);
+                        modified_insts.push((i, ABx(OP_JUMP, a, bx + fn_index as i32)));
+                    }
+                    OP_JUMP_IF_FALSE => {
+                        let a = get_arga(*inst);
+                        let bx = get_argbx(*inst);
+                        modified_insts.push((i, ABx(OP_JUMP_IF_FALSE, a, bx + fn_index as i32)));
+                    }
+                    OP_JUMP_IF_TRUE => {
+                        let a = get_arga(*inst);
+                        let bx = get_argbx(*inst);
+                        modified_insts.push((i, ABx(OP_JUMP_IF_TRUE, a, bx + fn_index as i32)));
+                    }
+                    _ => {}
+                }
+            }
+            for (i, new_inst) in modified_insts {
+                fn_inst[i] = new_inst;
+            }
             self.instructions.append(fn_inst);
             qlang_functions.push(fn_index as u64);
         }

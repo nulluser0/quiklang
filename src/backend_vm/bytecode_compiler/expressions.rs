@@ -4,14 +4,14 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     backend_vm::instructions::{
-        rk_ask, ABx, ASBx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_CONCAT, OP_DROP_ARRAY,
-        OP_DROP_RANGE, OP_DROP_STRING, OP_FLOAT_ADD, OP_FLOAT_DIV, OP_FLOAT_EQ, OP_FLOAT_GE,
-        OP_FLOAT_GT, OP_FLOAT_LE, OP_FLOAT_LT, OP_FLOAT_MOD, OP_FLOAT_MUL, OP_FLOAT_NE,
-        OP_FLOAT_NEG, OP_FLOAT_POSITIVE, OP_FLOAT_SUB, OP_FLOAT_TO_INT, OP_FLOAT_TO_STRING,
-        OP_INT_ADD, OP_INT_DIV, OP_INT_EQ, OP_INT_GE, OP_INT_GT, OP_INT_LE, OP_INT_LT, OP_INT_MOD,
-        OP_INT_MUL, OP_INT_NE, OP_INT_NEG, OP_INT_POSITIVE, OP_INT_SUB, OP_INT_TO_FLOAT,
-        OP_INT_TO_STRING, OP_JUMP, OP_JUMP_IF_FALSE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL,
-        OP_LOGICAL_AND, OP_LOGICAL_NOT, OP_LOGICAL_OR, OP_MOVE, OP_NATIVE_CALL,
+        rk_ask, ABx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_CONCAT, OP_DROP_ARRAY, OP_DROP_RANGE,
+        OP_DROP_STRING, OP_FLOAT_ADD, OP_FLOAT_DIV, OP_FLOAT_EQ, OP_FLOAT_GE, OP_FLOAT_GT,
+        OP_FLOAT_LE, OP_FLOAT_LT, OP_FLOAT_MOD, OP_FLOAT_MUL, OP_FLOAT_NE, OP_FLOAT_NEG,
+        OP_FLOAT_POSITIVE, OP_FLOAT_SUB, OP_FLOAT_TO_INT, OP_FLOAT_TO_STRING, OP_INT_ADD,
+        OP_INT_DIV, OP_INT_EQ, OP_INT_GE, OP_INT_GT, OP_INT_LE, OP_INT_LT, OP_INT_MOD, OP_INT_MUL,
+        OP_INT_NE, OP_INT_NEG, OP_INT_POSITIVE, OP_INT_SUB, OP_INT_TO_FLOAT, OP_INT_TO_STRING,
+        OP_JUMP, OP_JUMP_IF_FALSE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LOGICAL_AND,
+        OP_LOGICAL_NOT, OP_LOGICAL_OR, OP_MOVE, OP_NATIVE_CALL,
     },
     errors::VMCompileError,
     frontend::ast::{BinaryOp, Expr, Literal, Stmt, Type, UnaryOp},
@@ -597,7 +597,7 @@ impl Compiler {
 
         // Add instruction to jump to else/endif if false
         let jump_to_end_or_else = self.instructions_len(); // Index of the JUMP_IF_ELSE inst
-        self.add_instruction(ASBx(
+        self.add_instruction(ABx(
             OP_JUMP_IF_FALSE,
             condition_result.safe_unwrap() as i32,
             0,
@@ -661,10 +661,10 @@ impl Compiler {
             // Update jump_if_false
             self.replace_instruction(
                 jump_to_end_or_else,
-                ASBx(
+                ABx(
                     OP_JUMP_IF_FALSE,
                     condition_result.safe_unwrap() as i32,
-                    (jump_to_end - jump_to_end_or_else - 1) as i32,
+                    jump_to_end as i32,
                 ),
             );
 
@@ -717,7 +717,7 @@ impl Compiler {
         // There is an else stmt.
         // Create jump to endif after the then block
         // Using jump_to_end var from before.
-        self.add_instruction(ASBx(OP_JUMP, 0, 0)); // Placeholder for now
+        self.add_instruction(ABx(OP_JUMP, 0, 0)); // Placeholder for now
 
         // Compile 'else' area.
         let child_symbol_table = &Rc::new(RefCell::new(SymbolTable::new_with_parent(
@@ -768,18 +768,15 @@ impl Compiler {
         // Jump to else stmt
         self.replace_instruction(
             jump_to_end_or_else,
-            ASBx(
+            ABx(
                 OP_JUMP_IF_FALSE,
                 condition_result.safe_unwrap() as i32,
-                (jump_to_end - jump_to_end_or_else) as i32,
+                jump_to_end_or_else as i32,
             ),
         );
 
         // Jump to end from then block
-        self.replace_instruction(
-            jump_to_end,
-            ASBx(OP_JUMP, 0, (end - jump_to_end - 1) as i32),
-        );
+        self.replace_instruction(jump_to_end, ABx(OP_JUMP, 0, end as i32));
 
         // Reset register count back to normal in preparation for endif
         self.manually_change_register_count(current_reg_top);
@@ -852,7 +849,7 @@ impl Compiler {
 
         // Add instruction to jump to end if condition is false
         let jump_to_end = self.instructions_len();
-        self.add_instruction(ASBx(
+        self.add_instruction(ABx(
             OP_JUMP_IF_FALSE,
             condition_result.safe_unwrap() as i32,
             0,
@@ -884,7 +881,7 @@ impl Compiler {
                     ));
                 }
                 let break_pos = self.instructions_len();
-                self.add_instruction(ASBx(OP_JUMP, 0, 0)); // Placeholder
+                self.add_instruction(ABx(OP_JUMP, 0, 0)); // Placeholder
                 break_positions.push(break_pos);
             }
         }
@@ -918,30 +915,22 @@ impl Compiler {
         }
 
         // Add instruction to jump back to the start of the loop
-        let jump_back_to_start = self.instructions_len();
-        self.add_instruction(ASBx(
-            OP_JUMP,
-            0,
-            loop_start as i32 - jump_back_to_start as i32 - 1,
-        ));
+        self.add_instruction(ABx(OP_JUMP, 0, loop_start as i32));
 
         // Update the jump to end instruction with the correct offset
         let loop_end = self.instructions_len();
         self.replace_instruction(
             jump_to_end,
-            ASBx(
+            ABx(
                 OP_JUMP_IF_FALSE,
                 condition_result.safe_unwrap() as i32,
-                (loop_end - jump_to_end - 1) as i32,
+                loop_end as i32,
             ),
         );
 
         // Backpatch break positions to point to the end of the loop
         for break_pos in break_positions {
-            self.replace_instruction(
-                break_pos,
-                ASBx(OP_JUMP, 0, (loop_end - break_pos - 1) as i32),
-            );
+            self.replace_instruction(break_pos, ABx(OP_JUMP, 0, loop_end as i32));
         }
 
         // Restore the register count to the state before the loop
@@ -1107,7 +1096,7 @@ impl Compiler {
                     ));
                 }
                 let break_pos = self.instructions_len();
-                self.add_instruction(ASBx(OP_JUMP, 0, 0)); // Placeholder
+                self.add_instruction(ABx(OP_JUMP, 0, 0)); // Placeholder
                 break_positions.push(break_pos);
             }
         }
@@ -1132,22 +1121,14 @@ impl Compiler {
         }
 
         // Add instruction to jump back to the start of the loop
-        let jump_back_to_start = self.instructions_len();
-        self.add_instruction(ASBx(
-            OP_JUMP,
-            0,
-            loop_start as i32 - jump_back_to_start as i32 - 1,
-        ));
+        self.add_instruction(ABx(OP_JUMP, 0, loop_start as i32));
 
         // Save end of loop pos
         let loop_end = self.instructions_len();
 
         // Backpatch break positions to point to the end of the loop
         for break_pos in break_positions {
-            self.replace_instruction(
-                break_pos,
-                ASBx(OP_JUMP, 0, (loop_end - break_pos - 1) as i32),
-            );
+            self.replace_instruction(break_pos, ABx(OP_JUMP, 0, loop_end as i32));
         }
 
         // Restore the register count to the state before the loop
