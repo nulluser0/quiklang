@@ -1,8 +1,11 @@
 // VM (Register-based)
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{oneshot, Mutex, OnceCell};
 
 use crate::errors::VMRuntimeError;
 
@@ -101,14 +104,15 @@ static DISPATCH_TABLE: [VmHandler; OP_NOP as usize + 1] = create_dispatch_table(
 #[derive(Debug)]
 #[repr(C)]
 pub struct VM {
-    constant_pool: Vec<RegisterVal>, // Constant pool
-    function_indexes: Vec<usize>,    // Function indexes
-    instructions: Vec<Instruction>,  // Instructions
-    qffi: QFFI,                      // QFFI instance
+    constant_pool: Box<[RegisterVal]>,   // Constant pool
+    constant_ptrs: HashSet<RegisterVal>, // Pointers to heap allocated objects
+    function_indexes: Vec<usize>,        // Function indexes
+    instructions: Vec<Instruction>,      // Instructions
+    qffi: QFFI,                          // QFFI instance
     threads: Mutex<HashMap<usize, tokio::task::JoinHandle<()>>>, // Active threads
-    thread_id_counter: Mutex<usize>, // For assigning unique thread IDs
-                                     // TODO: Add a symbol table for global variables
-                                     // TODO: MPSC channel for inter-thread communication
+    thread_id_counter: Mutex<usize>,     // For assigning unique thread IDs
+                                         // TODO: Add a symbol table for global variables
+                                         // TODO: MPSC channel for inter-thread communication
 }
 
 pub struct VMThread {
@@ -127,11 +131,13 @@ impl VM {
     pub fn new(
         instructions: Vec<Instruction>,
         constant_pool: Vec<RegisterVal>,
+        constant_ptrs: HashSet<RegisterVal>,
         function_indexes: Vec<usize>,
         // main_fn_max_reg: usize,
     ) -> Self {
         VM {
-            constant_pool,
+            constant_pool: constant_pool.into_boxed_slice(),
+            constant_ptrs,
             instructions,
             function_indexes,
             qffi: QFFI::new(),
@@ -142,29 +148,33 @@ impl VM {
 
     // Create a new VM instance from a bytecode
     pub fn from_bytecode(bytecode: ByteCode) -> Self {
+        let mut constant_ptrs: HashSet<RegisterVal> = HashSet::new();
+        let constant_pool = bytecode
+            .constant_pool()
+            .clone()
+            .iter()
+            .map(|f| match f {
+                TaggedConstantValue::Null => RegisterVal { null: () },
+                TaggedConstantValue::Int(int) => RegisterVal { int: *int },
+                TaggedConstantValue::Float(float) => RegisterVal { float: *float },
+                TaggedConstantValue::Bool(bool) => RegisterVal { bool: *bool },
+                TaggedConstantValue::Str(string) => {
+                    let ptr = RegisterVal {
+                        ptr: RegisterVal::set_ptr_from_value::<String>(string.to_string()),
+                    };
+
+                    // Add the pointer to the constant_ptrs set
+                    constant_ptrs.insert(ptr);
+
+                    ptr
+                }
+            })
+            .collect();
+
         VM::new(
             bytecode.instructions().clone(),
-            bytecode
-                .constant_pool()
-                .clone()
-                .iter()
-                .map(|f| match f {
-                    TaggedConstantValue::Null => RegisterVal { null: () },
-                    TaggedConstantValue::Int(int) => RegisterVal { int: *int },
-                    TaggedConstantValue::Float(float) => RegisterVal { float: *float },
-                    TaggedConstantValue::Bool(bool) => RegisterVal { bool: *bool },
-                    TaggedConstantValue::Str(string) => {
-                        let ptr = RegisterVal {
-                            ptr: RegisterVal::set_ptr_from_value::<String>(string.to_string()),
-                        };
-
-                        // Increment the reference count to ensure the string is not deallocated, since the VM is the owner
-                        ptr.inc_arc_ptr::<String>();
-
-                        ptr
-                    }
-                })
-                .collect(),
+            constant_pool,
+            constant_ptrs,
             bytecode
                 .qlang_functions
                 .iter()
@@ -211,6 +221,12 @@ impl VM {
         } else {
             Err(VMRuntimeError::InvalidThreadId(thread_id))
         }
+    }
+
+    // API to see if a pointer is a constant pointer
+    #[inline(always)]
+    pub fn is_constant_ptr(&self, ptr: &RegisterVal) -> bool {
+        self.constant_ptrs.contains(ptr)
     }
 
     // API to fetch a constant from the constant pool
@@ -1115,7 +1131,12 @@ impl VMThread {
         // Get the value in the register
         let value = self.get_register_ref(arga as usize, offset)?;
 
-        // Drop the value
+        // Check if the pointer is a constant
+        if self.vm.is_constant_ptr(value) {
+            return Ok(());
+        }
+
+        // Pointer is not a constant, so we need to drop it
         value.drop_ptr::<String>();
 
         Ok(())

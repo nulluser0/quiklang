@@ -1,11 +1,6 @@
 // RegisterVal, and alloc
 
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Debug,
-    ptr,
-    sync::Arc,
-};
+use std::{fmt::Debug, hash::Hash, sync::Arc};
 
 use crate::errors::VMRuntimeError;
 
@@ -30,6 +25,20 @@ impl Default for RegisterVal {
 // Implement Send and Sync for RegisterVal
 unsafe impl Send for RegisterVal {}
 unsafe impl Sync for RegisterVal {}
+
+impl PartialEq for RegisterVal {
+    fn eq(&self, other: &Self) -> bool {
+        unsafe { self.int == other.int }
+    }
+}
+
+impl Eq for RegisterVal {}
+
+impl Hash for RegisterVal {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        unsafe { self.int.hash(state) }
+    }
+}
 
 impl Debug for RegisterVal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

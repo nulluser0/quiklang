@@ -532,6 +532,7 @@ impl Compiler {
                     return Ok(ReturnValue::Normal(SymbolTableType::HeapAllocated(
                         result as isize,
                         return_type,
+                        // How to determine if the result is a constant?
                     )));
                 }
                 _ => {

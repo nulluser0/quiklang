@@ -9,7 +9,7 @@ pub enum SymbolTableType {
     QFFIFunction(isize),
     Function(isize),
     Primitive(isize),
-    HeapAllocated(isize, Type),
+    HeapAllocated(isize, Type), // Register location, type, is_const
 }
 
 impl SymbolTableType {

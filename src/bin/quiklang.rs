@@ -1,6 +1,6 @@
 use tokio::io::AsyncReadExt;
 
-use std::{cell::RefCell, process, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, process, rc::Rc};
 
 use quiklang::{
     backend_vm::{
@@ -100,7 +100,7 @@ async fn repl_vm() {
     println!("Running experimental VM backend mode. Some things may be broken.");
 
     let mut compiler = Compiler::new();
-    let mut vm = VM::new(vec![], vec![], vec![]);
+    let mut vm = VM::new(vec![], vec![], HashSet::new(), vec![]);
 
     let mut root_type_env = Rc::new(RefCell::new(TypeEnvironment::default()));
     let mut type_env = Rc::new(RefCell::new(TypeEnvironment::new_with_parent(
@@ -144,7 +144,7 @@ async fn repl_vm() {
                         root_type_env.clone(),
                     )));
                     compiler = Compiler::new();
-                    vm = VM::new(vec![], vec![], vec![]);
+                    vm = VM::new(vec![], vec![], HashSet::new(), vec![]);
                     continue;
                 }
 
