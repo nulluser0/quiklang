@@ -192,7 +192,7 @@ pub enum Operator {
     Equal,          // ==
     NotEqual,       // !=
     LogicalNot,     // !
-    Concat,         // &
+    BitwiseAnd,     // &
     And,            // &&
     Or,             // ||
     Pipe,           // >
@@ -200,6 +200,8 @@ pub enum Operator {
     BitwiseNot,     // ~
     RangeExclusive, // ..
     RangeInclusive, // ..=
+    BitwiseOr,      // |
+    BitwiseXor,     // ^
 }
 
 impl std::fmt::Display for Operator {
@@ -217,7 +219,7 @@ impl std::fmt::Display for Operator {
             Operator::Equal => write!(f, "Operator Equal '=='"),
             Operator::NotEqual => write!(f, "Operator Not Equal '!='"),
             Operator::LogicalNot => write!(f, "Operator Logical Not '!'"),
-            Operator::Concat => write!(f, "Operator Concat '&'"),
+            Operator::BitwiseAnd => write!(f, "Operator Concat '&'"),
             Operator::And => write!(f, "Operator And '&&'"),
             Operator::Or => write!(f, "Operator Or '||'"),
             Operator::Pipe => write!(f, "Operator Pipe '|'"),
@@ -225,6 +227,8 @@ impl std::fmt::Display for Operator {
             Operator::BitwiseNot => write!(f, "Operator Bitwise Not '~'"),
             Operator::RangeExclusive => write!(f, "Operator Range Exclusive '..'"),
             Operator::RangeInclusive => write!(f, "Operator Range Inclusive '..='"),
+            Operator::BitwiseOr => write!(f, "Operator Bitwise Or '|'"),
+            Operator::BitwiseXor => write!(f, "Operator Bitwise Xor '^'"),
         }
     }
 }
@@ -238,7 +242,6 @@ pub enum Symbol {
     RightBrace,   // }
     LeftBracket,  // [
     RightBracket, // ]
-    DataBracket,  // |
     Comma,        // ,
     Semicolon,    // ;
     Colon,        // :
@@ -320,7 +323,7 @@ pub fn tokenize(source_code: &str) -> Result<Vec<Token>, LexerError> {
 
         match c {
             '(' | ')' | '{' | '}' | '[' | ']' | ',' | ';' | ':' | '.' | '~' | '+' | '*' | '%'
-            | '!' | '=' | '-' | '>' | '<' | '&' | '|' | '@' => {
+            | '!' | '=' | '-' | '>' | '<' | '&' | '|' | '@' | '^' => {
                 tokenize_operator_or_symbol(c, &mut chars, &mut tokens)?;
             }
             '"' => {
@@ -477,6 +480,11 @@ fn tokenize_operator_or_symbol(
             line: chars.line,
             col: chars.col,
         }),
+        '^' => tokens.push(Token {
+            token: TokenType::Operator(Operator::BitwiseXor),
+            line: chars.line,
+            col: chars.col,
+        }),
         '!' | '=' | '-' | '>' | '<' | '&' | '|' | '.' => {
             chars.next();
             handle_complex_operators(c, chars, tokens)?;
@@ -607,7 +615,7 @@ fn handle_complex_operators(
                 Ok(())
             } else {
                 tokens.push(Token {
-                    token: TokenType::Operator(Operator::Concat),
+                    token: TokenType::Operator(Operator::BitwiseAnd),
                     line: chars.line,
                     col: chars.col,
                 });
@@ -625,7 +633,7 @@ fn handle_complex_operators(
                 Ok(())
             } else {
                 tokens.push(Token {
-                    token: TokenType::Symbol(Symbol::DataBracket),
+                    token: TokenType::Operator(Operator::BitwiseOr),
                     line: chars.line,
                     col: chars.col,
                 });

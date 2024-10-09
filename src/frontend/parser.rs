@@ -860,7 +860,7 @@ impl Parser {
     ) -> Result<Expr, ParserError> {
         let mut left = self.parse_additive_expr(type_env, root_type_env)?;
 
-        while matches!(self.at().token, TokenType::Operator(Operator::Concat)) {
+        while matches!(self.at().token, TokenType::Operator(Operator::BitwiseAnd)) {
             let op = self.eat();
             let right = self.parse_additive_expr(type_env, root_type_env)?;
             left = Expr::ConcatOp {
