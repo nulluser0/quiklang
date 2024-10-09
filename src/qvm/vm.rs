@@ -5,7 +5,7 @@ use std::{
     sync::Arc,
 };
 
-use tokio::sync::{oneshot, Mutex, OnceCell};
+use tokio::sync::{oneshot, Mutex};
 
 use crate::errors::VMRuntimeError;
 
@@ -13,8 +13,7 @@ use super::{
     bytecode::ByteCode,
     bytecode_compiler::compiler::TaggedConstantValue,
     instructions::{
-        get_arga, get_argb, get_argbx, get_argc, get_argsbx, get_opcode, is_k, rk_to_k,
-        Instruction, OP_NOP,
+        get_arga, get_argb, get_argbx, get_argc, get_opcode, is_k, rk_to_k, Instruction, OP_NOP,
     },
     qffi::QFFI,
     register_val::RegisterVal,
@@ -94,6 +93,10 @@ const fn create_dispatch_table() -> [VmHandler; OP_NOP as usize + 1] {
         VMThread::op_float_to_string,
         VMThread::op_drop_array,
         VMThread::op_drop_range,
+        VMThread::op_move_2x,
+        VMThread::op_move_4x,
+        VMThread::op_move_8x,
+        VMThread::op_move_16x,
         VMThread::op_nop,
     ]
 }
@@ -422,6 +425,24 @@ impl VMThread {
     }
 
     #[inline(always)]
+    fn set_multiple_registers(
+        &mut self,
+        base_register: usize,
+        values: &[RegisterVal],
+        offset: usize,
+    ) -> Result<(), VMRuntimeError> {
+        if base_register + offset + values.len() >= self.registers.len() {
+            return Err(VMRuntimeError::InvalidRegisterAccess(
+                base_register + offset,
+            ));
+        }
+        for (i, value) in values.iter().enumerate() {
+            self.registers[base_register + offset + i] = *value;
+        }
+        Ok(())
+    }
+
+    #[inline(always)]
     fn get_register_mutref(&mut self, register: usize) -> Result<&mut RegisterVal, VMRuntimeError> {
         let offset = self.current_offset();
         if register + offset >= self.registers.len() {
@@ -440,6 +461,21 @@ impl VMThread {
             return Err(VMRuntimeError::InvalidRegisterAccess(register + offset));
         }
         Ok(&self.registers[register + offset])
+    }
+
+    #[inline(always)]
+    fn get_multiple_registers_ref(
+        &self,
+        base_register: usize,
+        count: usize,
+        offset: usize,
+    ) -> Result<&[RegisterVal], VMRuntimeError> {
+        if base_register + offset + count >= self.registers.len() {
+            return Err(VMRuntimeError::InvalidRegisterAccess(
+                base_register + offset,
+            ));
+        }
+        Ok(&self.registers[base_register + offset..base_register + offset + count])
     }
 
     #[inline(always)]
@@ -1375,6 +1411,66 @@ impl VMThread {
     #[inline(always)]
     fn op_drop_range(&mut self, _inst: Instruction) -> Result<(), VMRuntimeError> {
         todo!("OP_DROP_RANGE")
+    }
+
+    #[inline(always)]
+    fn op_move_2x(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let offset = self.current_offset();
+
+        let values = self
+            .get_multiple_registers_ref(argb as usize, 2, offset)?
+            .to_vec();
+
+        self.set_multiple_registers(arga as usize, &values, offset)?;
+
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn op_move_4x(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let offset = self.current_offset();
+
+        let values = self
+            .get_multiple_registers_ref(argb as usize, 4, offset)?
+            .to_vec();
+
+        self.set_multiple_registers(arga as usize, &values, offset)?;
+
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn op_move_8x(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let offset = self.current_offset();
+
+        let values = self
+            .get_multiple_registers_ref(argb as usize, 8, offset)?
+            .to_vec();
+
+        self.set_multiple_registers(arga as usize, &values, offset)?;
+
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn op_move_16x(&mut self, inst: Instruction) -> Result<(), VMRuntimeError> {
+        let arga = get_arga(inst);
+        let argb = get_argb(inst);
+        let offset = self.current_offset();
+
+        let values = self
+            .get_multiple_registers_ref(argb as usize, 16, offset)?
+            .to_vec();
+
+        self.set_multiple_registers(arga as usize, &values, offset)?;
+
+        Ok(())
     }
 
     #[inline(always)]

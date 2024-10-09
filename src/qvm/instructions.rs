@@ -573,7 +573,11 @@ define_opcodes! {
     OP_FLOAT_TO_STRING=>(60,  false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
     OP_DROP_ARRAY =>    (61,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
     OP_DROP_RANGE =>    (62,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::Abc),
-    OP_NOP =>           (63,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::AsBx),
+    OP_MOVE_2X =>       (63,     false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_MOVE_4X =>       (64,     false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_MOVE_8X =>       (65,     false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_MOVE_16X =>      (66,     false,  true,   OpArgMode::RegisterOrJumpOffset, OpArgMode::NotUsed, OpType::Abc),
+    OP_NOP =>           (67,    false,  true,   OpArgMode::NotUsed, OpArgMode::NotUsed, OpType::AsBx),
 }
 
 pub fn op_to_string(op: i32) -> String {
@@ -1000,6 +1004,38 @@ pub fn to_string(inst: Instruction) -> String {
         OP_FLOAT_TO_STRING => format!("{} | R({}) := R({}).to_string()", ops, arga, argb),
         OP_DROP_ARRAY => format!("{} | R({}) -> destructor (array)", ops, arga),
         OP_DROP_RANGE => format!("{} | R({}) -> destructor (range)", ops, arga),
+        OP_MOVE_2X => format!(
+            "{} | R({}) ..= R({}) := R({}) ..= R({})",
+            ops,
+            arga,
+            arga + 1,
+            argb,
+            argb + 1
+        ),
+        OP_MOVE_4X => format!(
+            "{} | R({}) ..= R({}) := R({}) ..= R({})",
+            ops,
+            arga,
+            arga + 3,
+            argb,
+            argb + 3
+        ),
+        OP_MOVE_8X => format!(
+            "{} | R({}) ..= R({}) := R({}) ..= R({})",
+            ops,
+            arga,
+            arga + 7,
+            argb,
+            argb + 7
+        ),
+        OP_MOVE_16X => format!(
+            "{} | R({}) ..= R({}) := R({}) ..= R({})",
+            ops,
+            arga,
+            arga + 15,
+            argb,
+            argb + 15
+        ),
         OP_NOP => ops.to_string(),
         _ => unreachable!(),
     }
