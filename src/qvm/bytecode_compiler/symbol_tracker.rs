@@ -2,7 +2,7 @@
 
 use std::{borrow::BorrowMut, cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{backend_vm::qffi::native_fn::NATIVE_FUNCTION_TABLE, frontend::ast::Type};
+use crate::{frontend::ast::Type, qvm::qffi::native_fn::NATIVE_FUNCTION_TABLE};
 
 #[derive(Debug, Clone)]
 pub enum SymbolTableType {

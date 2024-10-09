@@ -1,12 +1,12 @@
 use std::{cell::RefCell, process, rc::Rc};
 
 use crate::{
-    backend_vm::{
+    errors::{self, Error, VMRuntimeError},
+    frontend::{parser, type_environment::TypeEnvironment},
+    qvm::{
         bytecode_compiler::{compiler::Compiler, symbol_tracker::SymbolTable, type_table},
         vm::VM,
     },
-    errors::{self, Error, VMRuntimeError},
-    frontend::{parser, type_environment::TypeEnvironment},
 };
 
 // To also shut up clippy

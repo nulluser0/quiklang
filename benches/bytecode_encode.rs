@@ -1,6 +1,6 @@
 use byteorder::{LittleEndian, WriteBytesExt};
 use criterion::{criterion_group, criterion_main, Criterion};
-use quiklang::backend_vm::{
+use quiklang::qvm::{
     bytecode::ByteCode,
     instructions::{ABx, Abc, OP_LOADBOOL, OP_LOADCONST, OP_MOVE},
 };

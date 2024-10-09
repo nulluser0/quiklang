@@ -70,8 +70,8 @@ use std::{
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::{
-    backend_vm::{instructions::to_string, register_val::to_quiklangc_strings},
     errors::VMBytecodeError,
+    qvm::{instructions::to_string, register_val::to_quiklangc_strings},
 };
 
 use super::{bytecode_compiler::compiler::TaggedConstantValue, instructions::Instruction};
@@ -353,7 +353,7 @@ impl ByteCode {
 
 #[cfg(test)]
 mod tests {
-    use crate::backend_vm::instructions::{ABx, Abc, OP_LOADBOOL, OP_LOADCONST, OP_MOVE};
+    use crate::qvm::instructions::{ABx, Abc, OP_LOADBOOL, OP_LOADCONST, OP_MOVE};
 
     use super::*;
     use byteorder::{LittleEndian, WriteBytesExt};

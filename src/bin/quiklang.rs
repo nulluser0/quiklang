@@ -3,15 +3,15 @@ use tokio::io::AsyncReadExt;
 use std::{cell::RefCell, collections::HashSet, process, rc::Rc};
 
 use quiklang::{
-    backend_vm::{
+    errors::{self, VMRuntimeError},
+    frontend::type_environment::TypeEnvironment,
+    qvm::{
         bytecode::ByteCode,
         bytecode_compiler::{
             compiler::Compiler, symbol_tracker::SymbolTable, type_table::TypeTable,
         },
         vm::VM,
     },
-    errors::{self, VMRuntimeError},
-    frontend::type_environment::TypeEnvironment,
     utils::run::{print_e, run_vm},
 };
 use rustyline::{error::ReadlineError, Config, Editor};

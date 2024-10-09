@@ -1386,7 +1386,7 @@ impl VMThread {
 
 #[cfg(test)]
 mod tests {
-    use crate::backend_vm::vm::{VMThread, VM};
+    use crate::qvm::vm::{VMThread, VM};
 
     #[tokio::test]
     async fn sizes() {

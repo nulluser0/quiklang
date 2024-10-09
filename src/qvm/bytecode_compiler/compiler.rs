@@ -9,15 +9,15 @@ use std::{
 };
 
 use crate::{
-    backend_vm::{
+    errors::VMCompileError,
+    frontend::ast::Stmt,
+    qvm::{
         bytecode::{BCIntegrityInfo, BCMetadata, ByteCode},
         instructions::{
             get_arga, get_argbx, get_opcode, ABx, ASBx, Abc, Instruction, OP_EXIT, OP_JUMP,
             OP_JUMP_IF_FALSE, OP_JUMP_IF_TRUE, OP_NOP,
         },
     },
-    errors::VMCompileError,
-    frontend::ast::Stmt,
 };
 
 use super::{

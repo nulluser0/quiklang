@@ -3,11 +3,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    backend_vm::instructions::{
-        Abc, OP_DROP_ARRAY, OP_DROP_RANGE, OP_DROP_STRING, OP_MOVE, OP_RETURN,
-    },
     errors::VMCompileError,
     frontend::ast::{Expr, FromType, Stmt, Type},
+    qvm::instructions::{Abc, OP_DROP_ARRAY, OP_DROP_RANGE, OP_DROP_STRING, OP_MOVE, OP_RETURN},
 };
 
 use super::{

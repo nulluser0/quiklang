@@ -3,7 +3,9 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    backend_vm::instructions::{
+    errors::VMCompileError,
+    frontend::ast::{BinaryOp, Expr, Literal, Stmt, Type, UnaryOp},
+    qvm::instructions::{
         rk_ask, ABx, Abc, OP_BITNOT, OP_CALL, OP_CLONE, OP_CONCAT, OP_DROP_ARRAY, OP_DROP_RANGE,
         OP_DROP_STRING, OP_FLOAT_ADD, OP_FLOAT_DIV, OP_FLOAT_EQ, OP_FLOAT_GE, OP_FLOAT_GT,
         OP_FLOAT_LE, OP_FLOAT_LT, OP_FLOAT_MOD, OP_FLOAT_MUL, OP_FLOAT_NE, OP_FLOAT_NEG,
@@ -13,8 +15,6 @@ use crate::{
         OP_JUMP, OP_JUMP_IF_FALSE, OP_LOADBOOL, OP_LOADCONST, OP_LOADNULL, OP_LOGICAL_AND,
         OP_LOGICAL_NOT, OP_LOGICAL_OR, OP_MOVE, OP_NATIVE_CALL,
     },
-    errors::VMCompileError,
-    frontend::ast::{BinaryOp, Expr, Literal, Stmt, Type, UnaryOp},
 };
 
 use super::{

@@ -7,8 +7,8 @@ use std::{
 };
 
 use quiklang::{
-    backend_vm::{bytecode::ByteCode, bytecode_compiler::compiler::Compiler},
     frontend::{parser::Parser, type_environment::TypeEnvironment},
+    qvm::{bytecode::ByteCode, bytecode_compiler::compiler::Compiler},
 };
 
 fn main() {
