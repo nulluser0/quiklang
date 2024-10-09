@@ -1,4 +1,12 @@
-// AST logic
+//! # AST
+//!
+//! The AST module contains the Abstract Syntax Tree data structures for the Quiklang project.
+//!
+//! [`Return to Frontend Module`](../index.html)
+//!
+//! ## List of AST Structures
+//!
+//! TODO: Add list of AST structures.
 
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 

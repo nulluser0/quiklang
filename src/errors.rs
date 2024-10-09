@@ -1,4 +1,12 @@
-//! This module contains the error types used in the application.
+//! # Errors
+//!
+//! The errors module contains the error handling and error types for the Quiklang project.
+//!
+//! Errors are done by using the `thiserror` crate, which allows for easy generation of error types with custom error messages.
+//!
+//! [`Return to Quiklang Crate`](../index.html)
+//!
+//! ## Error Types
 //!
 //! The error types are organized into different enums based on their usage:
 //! - `Error`: Universal errors used by functions like `produce_ast()`.

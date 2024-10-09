@@ -1,10 +1,18 @@
+//! # Instructions
+//!
+//! Instructions that are used in the QVM.
+//!
+//! [`Return to QVM Module`](../index.html)
+//!
+//! ## Instruction Set
+//! TODO: Add instruction set here.
+
 // Instructions
 
 // Rx[n]   : usize = Register n
 // Kx[n]   : usize = Constant n
 // sBx     : isize = Signed Displacement
 // PC      : usize = Program
-
 use std::fmt::Display;
 
 use super::qffi::native_fn::NATIVE_FUNCTION_TABLE;

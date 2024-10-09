@@ -1,4 +1,20 @@
-// Lexer
+//! # Lexer
+//!
+//! The lexer is responsible for converting the source code into a stream of tokens.
+//!
+//! [`Return to Frontend Module`](../index.html)
+//!
+//! ## Logic
+//!
+//! The lexer works by iterating over the source code character by character.
+//!
+//! The lexer recognizes different types of tokens:
+//! - Keywords
+//! - Identifiers
+//! - Literals
+//! - Operators
+//! - Symbols/Delimiters
+//! - End of File
 
 use std::{
     iter::Peekable,

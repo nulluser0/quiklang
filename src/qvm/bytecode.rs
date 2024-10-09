@@ -1,64 +1,79 @@
-// Bytecode
-
-// The typical structure of the bytecode follows:
-// 1. Magic Number QLBC (0x514C4243)
-// 2. Metadata                              -- Can be edited but shouldn't
-//      - QuikLang Version:
-//          - Which QuikLang Compiler compiled the code
-//          - Qlang VM Runtime Version, must be the same number to run
-//      - Flags
-// 3. Setup and Integrity information:      -- Read only
-//      - Register count
-//      - Const count
-//      - QL Functions count
-//      - Instruction count
-// 4. Constant pool/list                    -- Read only
-// 5. QLang Functions list                  -- Read only
-// 6. QFFI (extern/foreign) Functions list  -- Read only
-// 7. Instructions (List of OpCodes, 32-bit/OpCode in size)    -- Read only
-
-// Low-level overview:
-// 1. Magic Number
-//      Offset      Size (bytes)        Description
-//          0           4                   Magic number indicating QLang Bytecode (QLBC - 0x514C4243)
-//
-// 2. Metadata
-//      Offset      Size (bytes)        Description
-//          4           8                   Qlang Version - 8 byte fixed size string, 8 chars (e.g. 'v1.0.0  ')
-//          12          4                   QLang VM Runtime Version - i32 number, different numbers mean incompatible.
-//          16          8                   Flags - 64 bits representing flags
-//
-// 3. Setup and Integrity information:
-//      Offset      Size (bytes)        Description
-//          24          4                   Register count - i32 number
-//          28          4                   Constant count - i32 number
-//          32          4                   QL Functions count - i32 number
-//          36          4                   Instruction count - i32 number
-//          40          4                   String indication pool - i32 number
-//
-// 4. Constant pool:
-//      Offset      Size (bytes)        Description
-//          -           9 each              64-bits (u64, 8-bytes) representing a constant, after a 1-byte discriminant. Note, alignment is very important here.
-//                                              Discriminant:
-//                                                  0 - Integer
-//                                                  1 - Float
-//                                                  2 - Bool
-//                                                  3 - Null
-//                                                  4 - String
-//          -          1 + len * 8          For strings specifically: If identified as a string from (4), it will be treated as a string.
-//                                              String would be from: `(current offset) -> (current offset + len * 8).
-//
-// 5. QLang Functions:
-//      Offset      Size (bytes)        Description
-//          -           8                   8-byte numbers representing u64 number, pointing to the PC of the function.
-//
-// 5. QFFI (extern/foreign) Functions:
-//      Offset      Size (bytes)        Description
-//          -           TODO!
-// 6. Instructions:
-//      Offset      Size (bytes)        Description
-// After 4. offset      4 each              32-bit (u32) representing an instruction, with each segments of the u32 representing opcodes and args.
-//                                          Check instructions.rs for more info.
+//! # Bytecode
+//!
+//! The bytecode module is responsible for encoding and decoding the bytecode format of QuikLang.
+//!
+//! [`Return to QVM Module`](../index.html)
+//!
+//! ## Specification
+//!
+//! The typical structure of the bytecode follows:
+//! 1. Magic Number `QLBC` `(0x514C4243)`
+//! 2. Metadata                              -- Can be edited but shouldn't
+//!      - QuikLang Version:
+//!          - Which QuikLang Compiler compiled the code
+//!          - Qlang VM Runtime Version, must be the same number to run
+//!      - Flags
+//! 3. Setup and Integrity information:      -- Read only
+//!      - Register count
+//!      - Const count
+//!      - QL Functions count
+//!      - Instruction count
+//! 4. Constant pool/list                    -- Read only
+//! 5. QLang Functions list                  -- Read only
+//! 6. QFFI (extern/foreign) Functions list  -- Read only
+//! 7. Instructions (List of OpCodes, 32-bit/OpCode in size)    -- Read only
+//!
+//! ## Low-level overview:
+//!
+//!
+//! 1. Magic Number
+//!      |Offset|      Size (bytes)|        Description|
+//!      |------|------------------|-------------------|
+//!          |0|           4|                   Magic number indicating QLang Bytecode (QLBC - 0x514C4243)|
+//!
+//! 2. Metadata
+//!      |Offset|      Size (bytes)|        Description|
+//!      |------|------------------|-------------------|
+//!          |4|           8|                   Qlang Version - 8 byte fixed size string, 8 chars (e.g. 'v1.0.0  ')|
+//!          |12|          4|                   QLang VM Runtime Version - i32 number, different numbers mean incompatible.|
+//!          |16|          8|                   Flags - 64 bits representing flags|
+//!
+//! 3. Setup and Integrity information:
+//!      |Offset|      Size (bytes)|        Description|
+//!      |------|------------------|-------------------|
+//!          |24|          4|                   Register count - i32 number|
+//!          |28|          4|                   Constant count - i32 number|
+//!          |32|          4|                   QL Functions count - i32 number|
+//!          |36|          4|                   Instruction count - i32 number|
+//!          |40|          4|                   String indication pool - i32 number|
+//!
+//! 4. Constant pool:
+//!      |Offset|      Size (bytes)|        Description|
+//!      |------|------------------|-------------------|
+//!          |-|           9 each     |         64-bits (u64, 8-bytes) representing a constant, after a 1-byte discriminant. Note, alignment is very important here.|
+//!          | |                      |             Discriminant:|
+//!          | |                      |                 0 - Integer|
+//!          | |                      |                 1 - Float|
+//!          | |                      |                 2 - Bool|
+//!          | |                      |                 3 - Null|
+//!          | |                      |                 4 - String|
+//!          |-|          1 + len * 8 |         For strings specifically: If identified as a string from (4), it will be treated as a string.|
+//!          | |                      |         String would be from: `(current offset) -> (current offset + len * 8).|
+//!
+//! 5. QLang Functions:
+//!      |Offset|      Size (bytes)|        Description|
+//!      |------|------------------|-------------------|
+//!          |-|           8|                   8-byte numbers representing u64 number, pointing to the PC of the function.|
+//!
+//! 5. QFFI (extern/foreign) Functions:
+//!      |Offset|      Size (bytes)|        Description|
+//!      |------|------------------|-------------------|
+//!          |-|           TODO!| |
+//! 6. Instructions:
+//!      |Offset|            Size (bytes)|        Description|
+//!      |------|------------------|-------------------|
+//!      | After 4. offset |      4 each |              32-bit (u32) representing an instruction, with each segment of the u32 representing opcodes and args. |
+//!      |  |  |              Check instructions.rs for more info.|
 
 use core::str;
 use std::{
@@ -76,6 +91,7 @@ use crate::{
 
 use super::{bytecode_compiler::compiler::TaggedConstantValue, instructions::Instruction};
 
+/// Represents the Quiklang Bytecode.
 #[derive(Debug, Clone)]
 pub struct ByteCode {
     pub metadata: BCMetadata,
@@ -85,6 +101,7 @@ pub struct ByteCode {
     pub instructions: Vec<Instruction>,
 }
 
+/// Represents the metadata of the Quiklang Bytecode.
 #[derive(Debug, Clone)]
 pub struct BCMetadata {
     pub ql_version: [u8; 8],
@@ -92,6 +109,7 @@ pub struct BCMetadata {
     pub flags: u64,
 }
 
+/// Represents the integrity information of the Quiklang Bytecode.
 #[derive(Debug, Clone)]
 pub struct BCIntegrityInfo {
     pub num_register: i32,
@@ -100,6 +118,7 @@ pub struct BCIntegrityInfo {
     pub num_inst: i32,
 }
 
+/// Implementing Display for ByteCode
 impl Display for ByteCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let version_as_string: &str = match str::from_utf8(&self.metadata.ql_version) {
@@ -159,6 +178,7 @@ Instructions:
 }
 
 impl ByteCode {
+    /// Creates a new ByteCode instance.
     pub fn new(metadata: BCMetadata, integrity_info: BCIntegrityInfo) -> Self {
         Self {
             metadata,
@@ -272,6 +292,7 @@ impl ByteCode {
         })
     }
 
+    /// Encodes the bytecode into a binary format.
     pub fn encode(bytecode: &ByteCode) -> Result<Vec<u8>, VMBytecodeError> {
         // Calculating the encoded bytecode's size:
         //      4                                       - Magic number              - fixed size
@@ -338,14 +359,17 @@ impl ByteCode {
         Ok(encoded_bytecode)
     }
 
+    /// Returns the instructions of the bytecode.
     pub fn instructions(&self) -> &Vec<Instruction> {
         &self.instructions
     }
 
+    /// Returns the register count of the bytecode.
     pub fn register_count(&self) -> &i32 {
         &self.integrity_info.num_register
     }
 
+    /// Returns the constants of the bytecode.
     pub fn constant_pool(&self) -> &Vec<TaggedConstantValue> {
         &self.constants
     }
