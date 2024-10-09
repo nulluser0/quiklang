@@ -99,6 +99,7 @@ pub enum Keyword {
     As,     // as
     Clone,  // clone
     Ref,    // ref
+    MutRef, // mutref
 }
 
 impl FromStr for Keyword {
@@ -134,6 +135,7 @@ impl FromStr for Keyword {
             "as" => Ok(Keyword::As),
             "clone" => Ok(Keyword::Clone),
             "ref" => Ok(Keyword::Ref),
+            "mutref" => Ok(Keyword::MutRef),
             _ => Err(format!("{} is not a keyword.", s)),
         }
     }
@@ -170,6 +172,7 @@ impl std::fmt::Display for Keyword {
             Keyword::As => write!(f, "Keyword 'as'"),
             Keyword::Clone => write!(f, "Keyword 'clone'"),
             Keyword::Ref => write!(f, "Keyword 'ref'"),
+            Keyword::MutRef => write!(f, "Keyword 'mutref'"),
         }
     }
 }

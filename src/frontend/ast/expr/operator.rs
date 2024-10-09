@@ -99,7 +99,7 @@ pub enum BinaryOperator {
 /// - `~` Bitwise NOT
 /// - `*` Dereference
 /// - `ref` Reference
-/// - `mut ref` Mutable reference
+/// - `mutref` Mutable reference
 #[derive(Debug, Clone)]
 pub struct UnaryOperatorExpr {
     /// The unary operator.
