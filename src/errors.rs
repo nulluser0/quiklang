@@ -84,6 +84,9 @@ pub enum LexerError {
     #[error("at position {line}:{col}: Unexpected end of file")]
     UnexpectedEOF { line: usize, col: usize },
 
+    #[error("errror during string interpolation: {0}")]
+    StringInterpolationError(Box<LexerError>),
+
     #[error("Internal error. Please report this!: {0}")]
     InternalError(String),
 }
