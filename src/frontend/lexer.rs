@@ -100,6 +100,7 @@ pub enum Keyword {
     Clone,  // clone
     Ref,    // ref
     MutRef, // mutref
+    Extend, // extend
 }
 
 impl FromStr for Keyword {
@@ -136,6 +137,7 @@ impl FromStr for Keyword {
             "clone" => Ok(Keyword::Clone),
             "ref" => Ok(Keyword::Ref),
             "mutref" => Ok(Keyword::MutRef),
+            "extend" => Ok(Keyword::Extend),
             _ => Err(format!("{} is not a keyword.", s)),
         }
     }
@@ -173,6 +175,7 @@ impl std::fmt::Display for Keyword {
             Keyword::Clone => write!(f, "Keyword 'clone'"),
             Keyword::Ref => write!(f, "Keyword 'ref'"),
             Keyword::MutRef => write!(f, "Keyword 'mutref'"),
+            Keyword::Extend => write!(f, "Keyword 'extend'"),
         }
     }
 }
@@ -219,7 +222,7 @@ impl std::fmt::Display for Operator {
             Operator::Equal => write!(f, "Operator Equal '=='"),
             Operator::NotEqual => write!(f, "Operator Not Equal '!='"),
             Operator::LogicalNot => write!(f, "Operator Logical Not '!'"),
-            Operator::BitwiseAnd => write!(f, "Operator Concat '&'"),
+            Operator::BitwiseAnd => write!(f, "Operator Bitwise And '&'"),
             Operator::And => write!(f, "Operator And '&&'"),
             Operator::Or => write!(f, "Operator Or '||'"),
             Operator::Pipe => write!(f, "Operator Pipe '|'"),
@@ -311,40 +314,47 @@ impl<'a> CharStream<'a> {
 }
 
 pub fn tokenize(source_code: &str) -> Result<Vec<Token>, LexerError> {
-    let estimated_capacity = source_code.len() / 5; // The number can be changed depending.
-                                                    // A bigger number results in a smaller initial allocation size.
-    let mut tokens: Vec<Token> = Vec::with_capacity(estimated_capacity);
     let mut chars: CharStream = CharStream::new(source_code);
-    while let Some(&c) = chars.peek() {
-        if is_skippable(c) {
-            chars.next();
-            continue;
-        }
+    let mut tokens: Vec<Token> = Vec::with_capacity(source_code.len() + 100);
 
-        match c {
-            '(' | ')' | '{' | '}' | '[' | ']' | ',' | ';' | ':' | '.' | '~' | '+' | '*' | '%'
-            | '!' | '=' | '-' | '>' | '<' | '&' | '|' | '@' | '^' => {
-                tokenize_operator_or_symbol(c, &mut chars, &mut tokens)?;
-            }
-            '"' => {
-                tokenize_string_literal(&mut chars, &mut tokens)?;
-            }
-            '/' => {
-                tokenize_comment_or_divide(&mut chars, &mut tokens)?;
-            }
-            _ if c.is_ascii_digit() => {
-                tokenize_number(&mut chars, &mut tokens)?;
-            }
-            _ if c.is_ascii_alphabetic() || c == '_' => {
-                tokenize_identifier_or_keyword(&mut chars, &mut tokens)?;
-            }
-            _ => {
-                return Err(LexerError::UnrecognizedCharacter {
-                    character: c,
-                    line: chars.line,
-                    col: chars.col,
-                })
-            }
+    while let Some(c) = chars.peek() {
+        tokenize_chars(c, &mut chars, &mut tokens)?;
+    }
+}
+
+fn tokenize_chars(
+    c: &char,
+    chars: &mut CharStream,
+    tokens: &mut Vec<Token>,
+) -> Result<Token, LexerError> {
+    if is_skippable(c) {
+        chars.next();
+        return;
+    }
+
+    match c {
+        '(' | ')' | '{' | '}' | '[' | ']' | ',' | ';' | ':' | '.' | '~' | '+' | '*' | '%' | '!'
+        | '=' | '-' | '>' | '<' | '&' | '|' | '@' | '^' => {
+            tokenize_operator_or_symbol(c, chars, &mut tokens)?;
+        }
+        '"' => {
+            tokenize_string_literal(chars, &mut tokens)?;
+        }
+        '/' => {
+            tokenize_comment_or_divide(chars, &mut tokens)?;
+        }
+        _ if c.is_ascii_digit() => {
+            tokenize_number(chars, &mut tokens)?;
+        }
+        _ if c.is_ascii_alphabetic() || c == '_' => {
+            tokenize_identifier_or_keyword(chars, &mut tokens)?;
+        }
+        _ => {
+            return Err(LexerError::UnrecognizedCharacter {
+                character: c,
+                line: chars.line,
+                col: chars.col,
+            })
         }
     }
 
@@ -754,6 +764,7 @@ fn tokenize_string_literal(
     let starting_col = chars.col;
     chars.next(); // Consume the initial quote
     let mut literal = String::new();
+    let mut is_first_part = true; // Track whether this is the first part of the string for avoiding redundant Add tokens
     while let Some(&ch) = chars.peek() {
         match ch {
             '"' => {
@@ -773,12 +784,52 @@ fn tokenize_string_literal(
                         'n' => '\n',
                         't' => '\t',
                         'r' => '\r',
-                        '\\' => '\\',
-                        '"' => '"',
                         _ => escaped,
                     });
                     chars.next(); // Consume the escaped character
                 }
+            }
+            '{' => {
+                // Handle string interpolation
+
+                chars.next(); // Consume the opening brace
+
+                // If there is a literal accumulated, push it as a token
+                if !literal.is_empty() {
+                    tokens.push(Token {
+                        token: TokenType::StringLiteral(literal.clone()),
+                        line: starting_line,
+                        col: starting_col,
+                    });
+                    literal.clear(); // Clear the accumulated literal
+                }
+
+                // Add an `Add` operator before the placeholder if this is not the first part or if the literal is not empty
+                // This is to handle cases like `"Hello, {name}"` and `"Hello, {name}!"` where the `Add` operator is needed
+                // Or cases like `"{name}"` where the `Add` operator is not needed
+                if !is_first_part || !literal.is_empty() {
+                    tokens.push(Token {
+                        token: TokenType::Operator(Operator::Add),
+                        line: chars.line,
+                        col: chars.col,
+                    });
+                }
+
+                // Parse the placeholder
+                let mut placeholder_tokens = tokenize_interpolation(chars)?;
+
+                // Add the parsed placeholder tokens to the main tokens
+                tokens.append(&mut placeholder_tokens);
+
+                // Add an `Add` operator after the placeholder
+                // If the next part of the string is empty, it will just push an empty string to the tokens
+                tokens.push(Token {
+                    token: TokenType::Operator(Operator::Add),
+                    line: chars.line,
+                    col: chars.col,
+                });
+
+                is_first_part = false; // Set this to false after the first part
             }
             _ => {
                 literal.push(ch);
@@ -790,4 +841,23 @@ fn tokenize_string_literal(
         line: starting_line,
         col: starting_col,
     })
+}
+
+fn tokenize_interpolation(chars: &mut CharStream) -> Result<Vec<Token>, LexerError> {
+    let mut tokens: Vec<Token> = Vec::new();
+    let starting_line = chars.line;
+    let starting_col = chars.col;
+    let mut identifier = String::new();
+    while let Some(c) = chars.peek() {
+        match c {
+            '}' => {
+                chars.next(); // Consume the closing brace
+                break;
+            }
+            _ => {
+                identifier.push(tokenize_chars(c, chars, &mut tokens));
+            }
+        }
+    }
+    Ok(tokens)
 }
