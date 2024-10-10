@@ -317,37 +317,47 @@ pub fn tokenize(source_code: &str) -> Result<Vec<Token>, LexerError> {
     let mut chars: CharStream = CharStream::new(source_code);
     let mut tokens: Vec<Token> = Vec::with_capacity(source_code.len() + 100);
 
-    while let Some(c) = chars.peek() {
+    while let Some(&c) = chars.peek() {
         tokenize_chars(c, &mut chars, &mut tokens)?;
     }
+
+    tokens.push(Token {
+        token: TokenType::EOF,
+        line: chars.line,
+        col: chars.col,
+    });
+
+    println!("{:#?}", tokens);
+
+    Ok(tokens)
 }
 
 fn tokenize_chars(
-    c: &char,
+    c: char,
     chars: &mut CharStream,
     tokens: &mut Vec<Token>,
-) -> Result<Token, LexerError> {
+) -> Result<(), LexerError> {
     if is_skippable(c) {
         chars.next();
-        return;
+        return Ok(());
     }
 
     match c {
         '(' | ')' | '{' | '}' | '[' | ']' | ',' | ';' | ':' | '.' | '~' | '+' | '*' | '%' | '!'
         | '=' | '-' | '>' | '<' | '&' | '|' | '@' | '^' => {
-            tokenize_operator_or_symbol(c, chars, &mut tokens)?;
+            tokenize_operator_or_symbol(c, chars, tokens)?;
         }
         '"' => {
-            tokenize_string_literal(chars, &mut tokens)?;
+            tokenize_string_literal(chars, tokens)?;
         }
         '/' => {
-            tokenize_comment_or_divide(chars, &mut tokens)?;
+            tokenize_comment_or_divide(chars, tokens)?;
         }
         _ if c.is_ascii_digit() => {
-            tokenize_number(chars, &mut tokens)?;
+            tokenize_number(chars, tokens)?;
         }
         _ if c.is_ascii_alphabetic() || c == '_' => {
-            tokenize_identifier_or_keyword(chars, &mut tokens)?;
+            tokenize_identifier_or_keyword(chars, tokens)?;
         }
         _ => {
             return Err(LexerError::UnrecognizedCharacter {
@@ -358,12 +368,7 @@ fn tokenize_chars(
         }
     }
 
-    tokens.push(Token {
-        token: TokenType::EOF,
-        line: chars.line,
-        col: chars.col,
-    });
-    Ok(tokens)
+    Ok(())
 }
 
 fn tokenize_comment_or_divide(
@@ -801,10 +806,10 @@ fn tokenize_string_literal(
                         line: starting_line,
                         col: starting_col,
                     });
-                    literal.clear(); // Clear the accumulated literal
                 }
 
                 // Add an `Add` operator before the placeholder if this is not the first part or if the literal is not empty
+                // Primitive type `string` implements `Add` so we can concatenate strings
                 // This is to handle cases like `"Hello, {name}"` and `"Hello, {name}!"` where the `Add` operator is needed
                 // Or cases like `"{name}"` where the `Add` operator is not needed
                 if !is_first_part || !literal.is_empty() {
@@ -813,6 +818,8 @@ fn tokenize_string_literal(
                         line: chars.line,
                         col: chars.col,
                     });
+
+                    literal.clear(); // Clear the accumulated literal
                 }
 
                 // Parse the placeholder
@@ -845,17 +852,15 @@ fn tokenize_string_literal(
 
 fn tokenize_interpolation(chars: &mut CharStream) -> Result<Vec<Token>, LexerError> {
     let mut tokens: Vec<Token> = Vec::new();
-    let starting_line = chars.line;
-    let starting_col = chars.col;
-    let mut identifier = String::new();
-    while let Some(c) = chars.peek() {
+    while let Some(&c) = chars.peek() {
         match c {
             '}' => {
                 chars.next(); // Consume the closing brace
                 break;
             }
             _ => {
-                identifier.push(tokenize_chars(c, chars, &mut tokens));
+                tokenize_chars(c, chars, &mut tokens)
+                    .map_err(|e| LexerError::StringInterpolationError(Box::new(e)))?;
             }
         }
     }
