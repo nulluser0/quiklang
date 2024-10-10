@@ -11,6 +11,8 @@
 //! | Expr       | Represents an expression statement. All Expressions are Statements. |
 //! | VarDecl    | Represents a variable declaration statement. |
 
+use super::{expr::Expr, types::ASTTypeKind};
+
 /// Represents a statement in Quiklang.
 pub enum Stmt {
     /// An Expression statement. All Exprs are Stmts.
@@ -25,8 +27,8 @@ pub struct VarDeclStmt {
     pub name: &'static str,
     /// Is mutable?
     pub mutable: bool,
-    /// The type of the variable.
-    pub ty: Type,
+    /// The type of the variable. Optional, as it can be inferred.
+    pub ty: Option<ASTTypeKind>,
     /// The value assigned to the variable.
     pub value: Expr,
 }

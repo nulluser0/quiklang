@@ -18,6 +18,8 @@
 //! - [`BinaryAssignmentOperatorExpr`](#binary-assignment-operator-expr)
 //! - [`TypeCastOperatorExpr`](#type-cast-operator-expr)
 
+use crate::frontend::ast::types::ASTTypeKind;
+
 use super::Expr;
 
 /// Operator expression.
@@ -35,7 +37,7 @@ pub enum OperatorExpr {
     Assignment(AssignmentOperatorExpr),
     /// Binary assignment operator expression.
     BinaryAssignment(BinaryAssignmentOperatorExpr),
-    /// Type cast operator expression.
+    /// ASTTypeKind cast operator expression.
     TypeCast(TypeCastOperatorExpr),
 }
 
@@ -230,15 +232,15 @@ pub struct BinaryAssignmentOperatorExpr {
     pub rhs: Box<Expr>,
 }
 
-/// Type cast operator expression.
+/// ASTTypeKind cast operator expression.
 /// Represents a type cast operation.
 /// Example: `x as i32`.
 /// List of type cast operators:
-/// - `as` Type cast
+/// - `as` ASTTypeKind cast
 #[derive(Debug, Clone)]
 pub struct TypeCastOperatorExpr {
     /// The expression to cast.
     pub expr: Box<Expr>,
     /// The type to cast to.
-    pub ty: Type,
+    pub ty: ASTTypeKind,
 }

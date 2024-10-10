@@ -20,15 +20,22 @@
 //! | Enum       | Represents an enum in Quiklang. Enums are types that can have a fixed set of values. |
 //! | EnumVariant| Represents a variant within an enum. Variants have a name and fields. |
 //! | EnumField  | Represents the fields of an enum variant. Fields can be tuple or struct. |
-//! | TypeAlias  | Represents a type alias in Quiklang. Type aliases are used to alias types. |
+//! | TypeAlias  | Represents a type alias in Quiklang. ASTTypeKind aliases are used to alias types. |
 //! | Trait      | Represents a trait in Quiklang. Traits are collections of methods that can be implemented by other types. |
 //! | TraitBound | Represents a trait bound on a generic type parameter. Trait bounds specify that a generic type parameter must implement a certain trait. |
 //! | TraitItem  | Represents an item within a trait. Items can be methods, type aliases, or constants. |
 //! | TraitMethod| Represents a method within a trait. Methods are functions that are defined within a trait. |
-//! | TraitTypeAlias | Represents a type alias within a trait. Type aliases are used to alias types within a trait. |
+//! | TraitTypeAlias | Represents a type alias within a trait. ASTTypeKind aliases are used to alias types within a trait. |
 //! | TraitConst | Represents a constant within a trait. Constants are defined within a trait. |
 //! | Const      | Represents a constant in Quiklang. Constants are immutable values that are defined at compile time. |
 //! | Global     | Represents a global variable in Quiklang. Global variables are defined at the module level and can have varying levels of visibility. |
+
+use std::rc::Rc;
+
+use super::{
+    expr::{block_expr::BlockExpr, Expr},
+    types::{ASTGeneric, ASTTypeKind},
+};
 
 /// Every binary or library that is compiled with the Quiklang compiler is a `Package`.
 /// Packages are the main unit of compilation in Quiklang.
@@ -94,6 +101,8 @@ pub enum Item {
     TypeAlias(TypeAlias),
     /// A trait item.
     Trait(Trait),
+    /// An Impl item.
+    Impl(Impl),
     /// A constant item.
     Const(Const),
     /// A global variable item.
@@ -110,9 +119,18 @@ pub struct Function {
     /// The parameters of the function.
     pub parameters: Vec<Parameter>,
     /// The return type of the function.
-    pub return_type: Type,
+    pub return_type: ReturnType,
     /// The body of the function.
-    pub body: BlockStmt,
+    pub body: BlockExpr,
+}
+
+/// Function return type.
+/// Represents the return type of a function.
+pub enum ReturnType {
+    /// The function returns a value.
+    Value(ASTTypeKind),
+    /// The function does not return a value.
+    DefaultVoid,
 }
 
 /// A parameter is a variable that is passed to a function when it is called.
@@ -123,7 +141,7 @@ pub struct Parameter {
     /// The name of the parameter.
     pub name: &'static str,
     /// The type of the parameter.
-    pub ty: Type,
+    pub ty: ASTTypeKind,
     /// Whether the parameter is optional.
     pub optional: bool,
 }
@@ -137,7 +155,7 @@ pub struct Struct {
     /// The fields of the struct.
     pub fields: Vec<StructField>,
     /// Generics of the struct.
-    pub generics: Vec<Generic>,
+    pub generics: Vec<ASTGeneric>,
 }
 
 /// A struct field is a key-type pair that represents a field in a struct.
@@ -145,7 +163,7 @@ pub struct StructField {
     /// The name of the field.
     pub name: &'static str,
     /// The type of the field.
-    pub ty: Type,
+    pub ty: ASTTypeKind,
     /// Visibility of the field.
     pub visibility: Visibility,
 }
@@ -159,7 +177,7 @@ pub struct Enum {
     /// The variants of the enum.
     pub variants: Vec<EnumVariant>,
     /// Generics of the enum.
-    pub generics: Vec<Generic>,
+    pub generics: Vec<ASTGeneric>,
 }
 
 /// Emum variant, rust-like.
@@ -175,7 +193,7 @@ pub enum EnumField {
     /// No fields.
     None,
     /// Tuple fields.
-    Tuple(Vec<Type>),
+    Tuple(Vec<ASTTypeKind>),
     /// Struct fields.
     Struct(StructField),
 }
@@ -185,9 +203,9 @@ pub struct TypeAlias {
     /// The name of the type alias.
     pub name: &'static str,
     /// The type that the alias refers to.
-    pub ty: Type,
+    pub ty: ASTTypeKind,
     /// Generics of the type alias.
-    pub generics: Vec<Generic>,
+    pub generics: Vec<ASTGeneric>,
 }
 
 /// A trait is a collection of methods that can be implemented by other types.
@@ -196,11 +214,11 @@ pub struct Trait {
     /// The name of the trait.
     pub name: &'static str,
     /// The items of the trait.
-    pub items: Vec<TraitItem>,
+    pub items: Vec<AssociatedItem>,
     /// Bounds of the trait.
     pub bounds: Vec<TraitBound>,
     /// Generics of the trait.
-    pub generics: Vec<Generic>,
+    pub generics: Vec<ASTGeneric>,
 }
 
 /// A trait bound is a constraint on a generic type parameter.
@@ -209,14 +227,14 @@ pub struct TraitBound {
     /// The name of the trait that the generic type parameter must implement.
     pub name: &'static str,
     /// The generics of the trait bound.
-    pub generics: Vec<Generic>,
+    pub generics: Vec<ASTGeneric>,
 }
 
 /// Traits can have different types of items
 /// Methods, type aliases, and consts.
-pub enum TraitItem {
+pub enum AssociatedItem {
     /// A trait method.
-    Method(TraitMethod),
+    Method(AssociatedMethod),
     /// A type alias.
     TypeAlias(TypeAlias),
     /// A constant.
@@ -225,15 +243,15 @@ pub enum TraitItem {
 
 /// A trait method is a function that is defined within a trait.
 /// Trait methods can be implemented by other types.
-pub struct TraitMethod {
+pub struct AssociatedMethod {
     /// The name of the method.
     pub name: &'static str,
     /// The parameters of the method.
     pub parameters: Vec<Parameter>,
     /// The return type of the method.
-    pub return_type: Type,
+    pub return_type: ASTTypeKind,
     /// Optional body of the method.
-    pub body: Option<BlockStmt>,
+    pub body: Option<BlockExpr>,
 }
 
 /// A trait type alias is a type alias that is defined within a trait.
@@ -242,7 +260,7 @@ pub struct TraitTypeAlias {
     /// The name of the type alias.
     pub name: &'static str,
     /// The type that the alias refers to.
-    pub ty: Option<Type>,
+    pub ty: Option<ASTTypeKind>,
 }
 
 /// A trait constant is a constant that is defined within a trait.
@@ -251,9 +269,22 @@ pub struct TraitConst {
     /// The name of the constant.
     pub name: &'static str,
     /// The type of the constant.
-    pub ty: Type,
+    pub ty: ASTTypeKind,
     /// The value of the constant.
     pub value: Option<Expr>,
+}
+
+/// An Impl is a block of code that implements methods or traits for a type.
+/// Impls are used to define the behavior of a type.
+pub struct Impl {
+    /// Self type of the impl.
+    pub self_type: ASTTypeKind,
+    /// Generics of the impl.
+    pub generics: Vec<ASTGeneric>,
+    /// Trait implemented by the impl.
+    pub trait_impl: Option<Rc<Trait>>,
+    /// The items contained in the impl.
+    pub items: Vec<AssociatedItem>,
 }
 
 /// A const is a constant value that is defined at compile time.
@@ -261,8 +292,10 @@ pub struct TraitConst {
 pub struct Const {
     /// The name of the constant.
     pub name: &'static str,
+    /// The Visibility of the constant.
+    pub visibility: Visibility,
     /// The type of the constant.
-    pub ty: Type,
+    pub ty: ASTTypeKind,
     /// The value of the constant.
     pub value: Expr,
 }
@@ -276,7 +309,7 @@ pub struct Global {
     /// The visibility of the global variable.
     pub visibility: Visibility,
     /// The type of the global variable.
-    pub ty: Type,
+    pub ty: ASTTypeKind,
     /// Is mutable?
     pub mutable: bool,
     /// The value of the global variable.

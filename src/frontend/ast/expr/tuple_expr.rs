@@ -7,6 +7,8 @@
 //! ## List of Tuple Expression AST Structures
 //! - [`TupleExpr`](#tuple-expr)
 
+use super::Expr;
+
 /// Tuple expression.
 /// Represents a tuple.
 /// Example: `(42, 3.14, "Hello, World!")`.

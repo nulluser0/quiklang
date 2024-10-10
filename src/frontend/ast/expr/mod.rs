@@ -39,7 +39,7 @@ use enum_expr::EnumExpr;
 use field_access_expr::FieldAccessExpr;
 use for_expr::ForExpr;
 use func_call_expr::FuncCallExpr;
-use identpath_expr::IdentPathExpr;
+use identpath_expr::ASTPath;
 use if_expr::IfExpr;
 use literal_expr::LiteralExpr;
 use loop_expr::LoopExpr;
@@ -60,7 +60,7 @@ pub enum Expr {
     /// An operation expression.
     Operator(OperatorExpr),
     /// An identifier path expression.
-    IdentPath(IdentPathExpr),
+    ASTPath(ASTPath),
     /// A literal expression.
     Literal(LiteralExpr),
     /// A bracket expression.
