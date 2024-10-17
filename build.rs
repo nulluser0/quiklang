@@ -8,7 +8,7 @@ fn main() {
     let cargo: toml::Value = toml::from_str(&cargo_toml).expect("Failed to parse Cargo.toml");
 
     // Access the custom variables
-    if let Some(metadata) = cargo.get("package").and_then(|pkg| pkg.get("metadata")) {
+    if let Some(metadata) = cargo.get("workspace").and_then(|workspace| workspace.get("metadata")) {
         if let Some(custom_variable) = metadata.get("quiklang-vm-version") {
             let custom_variable = custom_variable
                 .as_integer()

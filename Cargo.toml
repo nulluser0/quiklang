@@ -1,40 +1,125 @@
-[package]
-name = "quiklang"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "2"
 
-[package.metadata]
+members = [
+    # ============================== Binaries ==============================
+
+    # Quiklang executor (QVM, loader, invokes quiklangc if needed, etc.)
+    "src/bin/quiklang",
+    # Quiklang compiler (compiler, like rustc, but for quiklang)
+    "src/bin/quiklangc",
+    # Quiklang Developer Tools (qldev)
+    "src/bin/qldev",
+    # Quiklang to binary converter
+    "src/bin/quiklang-to-bin",
+
+    # ============================== Compiler ==============================
+
+    # == Frontend ==
+
+    # Lexer (Converts source code to tokens)
+    "src/lib/frontend/lexer",
+    # AST (Representation of AST)
+    "src/lib/frontend/ast",
+    # Parser (Converts tokens to AST)
+    "src/lib/frontend/parser",
+    # Semantic Checker (Simple type checker)
+    "src/lib/frontend/semantic-checker",
+
+    # == HIR (High-level Intermediate Representation) ==
+
+    # HIR (Representation of HIR)
+    "src/lib/hir/hir",
+    # HIR Builder (Converts AST to HIR)
+    "src/lib/hir/hir-builder",
+    # HIR Visitor (Visits HIR)
+    "src/lib/hir/hir-visitor",
+    # HIR Typer (Type checks HIR)
+    "src/lib/hir/hir-typer",
+    # HIR Typer Visitor (Visits HIR Typer)
+    "src/lib/hir/hir-typer-visitor",
+
+    # == QIR (Quiklang Intermediate Representation) ==
+
+    # QIR (Representation of QIR)
+    "src/lib/qir/qir",
+    # QIR Builder (Converts HIR to QIR)
+    "src/lib/qir/qir-builder",
+    # QIR Optimizer (Optimizes QIR)
+    "src/lib/qir/qir-optimizer",
+
+    # == Backend ==
+
+    # QVM Codegen (Converts QIR to QVM bytecode)
+    "src/lib/backend/qvm-codegen",
+    # # Custom backend codegen (Converts QIR to custom backend code), most likely via a dll or so
+    # "src/lib/backend/custom-backend-codegen",
+
+    # ============================== QVM ==============================
+
+    # QVM (Quiklang Virtual Machine)
+    "src/lib/qvm",
+    # QVM QFFI (Quiklang Foreign Function Interface)
+    "src/lib/qvm/qffi",
+]
+
+[workspace.metadata]
 quiklang-vm-version = 1
 
-[dependencies]
+[workspace.dependencies]
+# ============================== Workspace Libraries ==============================
+
+# == Frontend ==
+quiklang-frontend-lexer = { path = "src/lib/frontend/lexer" }
+quiklang-frontend-ast = { path = "src/lib/frontend/ast" }
+quiklang-frontend-parser = { path = "src/lib/frontend/parser" }
+quiklang-frontend-semantic-checker = { path = "src/lib/frontend/semantic-checker" }
+
+# == HIR ==
+quiklang-hir-hir = { path = "src/lib/hir/hir" }
+quiklang-hir-hir-builder = { path = "src/lib/hir/hir-builder" }
+quiklang-hir-hir-visitor = { path = "src/lib/hir/hir-visitor" }
+quiklang-hir-hir-typer = { path = "src/lib/hir/hir-typer" }
+quiklang-hir-hir-typer-visitor = { path = "src/lib/hir/hir-typer-visitor" }
+
+# == QIR ==
+quiklang-qir-qir = { path = "src/lib/qir/qir" }
+quiklang-qir-qir-builder = { path = "src/lib/qir/qir-builder" }
+quiklang-qir-qir-optimizer = { path = "src/lib/qir/qir-optimizer" }
+
+# == Backend ==
+quiklang-backend-qvm-codegen = { path = "src/lib/backend/qvm-codegen" }
+# quiklang-backend-custom-backend-codegen = { path = "src/lib/backend/custom-backend-codegen" }
+
+# == QVM ==
+quiklang-qvm = { path = "src/lib/qvm" }
+quiklang-qvm-qffi = { path = "src/lib/qvm/qffi" }
+
+# ============================== External Libraries ==============================
+
+# Bytecode manipulation
 byteorder = "1.5.0"
+
+# CLI
 colored = "2.1.0"
-criterion = "0.5.1"
 dialoguer = "0.11.0"
-lazy_static = "1.5.0"
-libloading = "0.8.5"
 rustyline = "9.0.0"
+
+# Lazy static
+lazy_static = "1.5.0"
+
+# FFI for QVM QFFI
+libloading = "0.8.5"
+
+# Error handling
 thiserror = "1.0.64"
+
+# Async
 tokio = { version = "1.40.0", features = ["full"] }
 
 [build-dependencies]
+# Read Cargo.toml and get the version of the workspace
 toml = "0.8.19"
-
-[lib]
-name = "quiklang"
-path = "src/lib.rs"
-
-[[bin]]
-name = "quiklang"
-path = "src/bin/quiklang.rs"
-
-[[bin]]
-name = "quiklangc"
-path = "src/bin/quiklangc.rs"
-
-[[bin]]
-name = "quiklang-to-bin"
-path = "src/bin/quiklang-to-bin.rs"
 
 [profile.release]
 lto = "fat"
@@ -42,23 +127,3 @@ codegen-units = 1
 panic = "abort"
 strip = "symbols"
 opt-level = 3
-
-[[bench]]
-name = "tokenize_factorial"
-harness = false
-
-[[bench]]
-name = "tokenize_large"
-harness = false
-
-[[bench]]
-name = "rust_factorial"
-harness = false
-
-[[bench]]
-name = "bytecode_decode"
-harness = false
-
-[[bench]]
-name = "bytecode_encode"
-harness = false
