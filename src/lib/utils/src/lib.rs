@@ -7,3 +7,14 @@ pub struct Span {
     pub line: u32,  // Line number (starting from 1)
     pub col: u32,   // Column number (starting from 1)
 }
+
+impl Span {
+    pub fn new(start: u32, end: u32, line: u32, col: u32) -> Self {
+        Span {
+            start,
+            end,
+            line,
+            col,
+        }
+    }
+}

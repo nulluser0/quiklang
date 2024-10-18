@@ -23,13 +23,14 @@ use std::{
     str::{Chars, FromStr},
 };
 
+use quiklang_utils::Span;
+
 use crate::errors::LexerError;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub token: TokenType,
-    pub line: usize,
-    pub col: usize,
+    pub span: Span,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -282,6 +283,7 @@ fn is_skippable(src: char) -> bool {
 // Custom made struct to implement line and col.
 struct CharStream<'a> {
     chars: Peekable<Chars<'a>>,
+    current_pos: usize, // Byte offset from the beginning
     line: usize,
     col: usize,
 }
@@ -290,6 +292,7 @@ impl<'a> CharStream<'a> {
     fn new(source_code: &'a str) -> Self {
         CharStream {
             chars: source_code.chars().peekable(),
+            current_pos: 0,
             line: 1,
             col: 1,
         }
@@ -297,6 +300,8 @@ impl<'a> CharStream<'a> {
 
     fn next(&mut self) -> Option<char> {
         if let Some(c) = self.chars.next() {
+            let c_len = c.len_utf8();
+            self.current_pos += c_len;
             if c == '\n' {
                 self.line += 1;
                 self.col = 1;
@@ -312,6 +317,10 @@ impl<'a> CharStream<'a> {
     fn peek(&mut self) -> Option<&char> {
         self.chars.peek()
     }
+
+    fn get_position(&self) -> (usize, usize, usize) {
+        (self.current_pos, self.line, self.col)
+    }
 }
 
 pub fn tokenize(source_code: &str) -> Result<Vec<Token>, LexerError> {
@@ -324,8 +333,14 @@ pub fn tokenize(source_code: &str) -> Result<Vec<Token>, LexerError> {
 
     tokens.push(Token {
         token: TokenType::EOF,
-        line: chars.line,
-        col: chars.col,
+        // line: chars.line,
+        // col: chars.col,
+        span: Span::new(
+            chars.current_pos as u32,
+            chars.current_pos as u32,
+            chars.line as u32,
+            chars.col as u32,
+        ),
     });
 
     println!("{:#?}", tokens);
@@ -376,6 +391,7 @@ fn tokenize_comment_or_divide(
     chars: &mut CharStream,
     tokens: &mut Vec<Token>,
 ) -> Result<(), LexerError> {
+    let before_pos = chars.get_position().0;
     chars.next(); // Consume the '/'
     match chars.peek() {
         Some('/') => {
@@ -407,8 +423,14 @@ fn tokenize_comment_or_divide(
             // It's a divide operator
             tokens.push(Token {
                 token: TokenType::Operator(Operator::Divide),
-                line: chars.line,
-                col: chars.col,
+                // line: chars.line,
+                // col: chars.col,
+                span: Span::new(
+                    before_pos as u32,
+                    chars.current_pos as u32,
+                    chars.line as u32,
+                    chars.col as u32,
+                ),
             });
         }
     }
@@ -423,48 +445,84 @@ fn tokenize_operator_or_symbol(
     match c {
         '(' => tokens.push(Token {
             token: TokenType::Symbol(Symbol::LeftParen),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         ')' => tokens.push(Token {
             token: TokenType::Symbol(Symbol::RightParen),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         '{' => tokens.push(Token {
             token: TokenType::Symbol(Symbol::LeftBrace),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         '}' => tokens.push(Token {
             token: TokenType::Symbol(Symbol::RightBrace),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         '[' => tokens.push(Token {
             token: TokenType::Symbol(Symbol::LeftBracket),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         ']' => tokens.push(Token {
             token: TokenType::Symbol(Symbol::RightBracket),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         ',' => tokens.push(Token {
             token: TokenType::Symbol(Symbol::Comma),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         ';' => tokens.push(Token {
             token: TokenType::Symbol(Symbol::Semicolon),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         ':' => tokens.push(Token {
             token: TokenType::Symbol(Symbol::Colon),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         // '.' => tokens.push(Token {
         //     token: TokenType::Symbol(Symbol::Dot),
@@ -473,33 +531,57 @@ fn tokenize_operator_or_symbol(
         // }),
         '~' => tokens.push(Token {
             token: TokenType::Operator(Operator::BitwiseNot),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         '+' => tokens.push(Token {
             token: TokenType::Operator(Operator::Add),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         '*' => tokens.push(Token {
             token: TokenType::Operator(Operator::Multiply),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         '%' => tokens.push(Token {
             token: TokenType::Operator(Operator::Modulus),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         '@' => tokens.push(Token {
             token: TokenType::Symbol(Symbol::At),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         '^' => tokens.push(Token {
             token: TokenType::Operator(Operator::BitwiseXor),
-            line: chars.line,
-            col: chars.col,
+            span: Span::new(
+                chars.current_pos as u32 - 1,
+                chars.current_pos as u32,
+                chars.line as u32,
+                chars.col as u32,
+            ),
         }),
         '!' | '=' | '-' | '>' | '<' | '&' | '|' | '.' => {
             chars.next();
@@ -523,57 +605,84 @@ fn handle_complex_operators(
     tokens: &mut Vec<Token>,
 ) -> Result<(), LexerError> {
     // Current character already known, peek next to decide on multi-character operators
+    let before_pos = chars.get_position().0 - 1;
     match c {
         '!' => {
             if matches!(chars.peek(), Some(&'=')) {
+                chars.next(); // Consume '='
                 tokens.push(Token {
                     token: TokenType::Operator(Operator::NotEqual),
-                    line: chars.line,
-                    col: chars.col,
+                    span: Span::new(
+                        before_pos as u32,
+                        chars.current_pos as u32,
+                        chars.line as u32,
+                        chars.col as u32,
+                    ),
                 });
-                chars.next(); // Consume '='
                 Ok(())
             } else {
                 tokens.push(Token {
                     token: TokenType::Operator(Operator::LogicalNot),
-                    line: chars.line,
-                    col: chars.col,
+                    span: Span::new(
+                        before_pos as u32,
+                        chars.current_pos as u32,
+                        chars.line as u32,
+                        chars.col as u32,
+                    ),
                 });
                 Ok(())
             }
         }
         '=' => {
             if matches!(chars.peek(), Some(&'=')) {
+                chars.next(); // Consume '='
                 tokens.push(Token {
                     token: TokenType::Operator(Operator::Equal),
-                    line: chars.line,
-                    col: chars.col,
+                    span: Span::new(
+                        before_pos as u32,
+                        chars.current_pos as u32,
+                        chars.line as u32,
+                        chars.col as u32,
+                    ),
                 });
-                chars.next(); // Consume '='
+
                 Ok(())
             } else {
                 tokens.push(Token {
                     token: TokenType::Operator(Operator::Assign),
-                    line: chars.line,
-                    col: chars.col,
+                    span: Span::new(
+                        before_pos as u32,
+                        chars.current_pos as u32,
+                        chars.line as u32,
+                        chars.col as u32,
+                    ),
                 });
                 Ok(())
             }
         }
         '-' => {
             if matches!(chars.peek(), Some(&'>')) {
+                chars.next(); // Consume '>'
                 tokens.push(Token {
                     token: TokenType::Symbol(Symbol::Arrow),
-                    line: chars.line,
-                    col: chars.col,
+                    span: Span::new(
+                        before_pos as u32,
+                        chars.current_pos as u32,
+                        chars.line as u32,
+                        chars.col as u32,
+                    ),
                 });
-                chars.next(); // Consume '>'
+
                 Ok(())
             } else {
                 tokens.push(Token {
                     token: TokenType::Operator(Operator::Subtract),
-                    line: chars.line,
-                    col: chars.col,
+                    span: Span::new(
+                        before_pos as u32,
+                        chars.current_pos as u32,
+                        chars.line as u32,
+                        chars.col as u32,
+                    ),
                 });
                 Ok(())
             }
@@ -581,19 +690,28 @@ fn handle_complex_operators(
         '>' => {
             match chars.peek() {
                 Some(&'=') => {
+                    chars.next(); // Consume '='
                     tokens.push(Token {
                         token: TokenType::Operator(Operator::GreaterOrEqual),
-                        line: chars.line,
-                        col: chars.col,
+                        span: Span::new(
+                            before_pos as u32,
+                            chars.current_pos as u32,
+                            chars.line as u32,
+                            chars.col as u32,
+                        ),
                     });
-                    chars.next(); // Consume '='
+
                     Ok(())
                 }
                 _ => {
                     tokens.push(Token {
                         token: TokenType::Operator(Operator::GreaterThan),
-                        line: chars.line,
-                        col: chars.col,
+                        span: Span::new(
+                            before_pos as u32,
+                            chars.current_pos as u32,
+                            chars.line as u32,
+                            chars.col as u32,
+                        ),
                     });
                     Ok(())
                 }
@@ -602,19 +720,28 @@ fn handle_complex_operators(
         '<' => {
             match chars.peek() {
                 Some(&'=') => {
+                    chars.next(); // Consume '='
                     tokens.push(Token {
                         token: TokenType::Operator(Operator::LessOrEqual),
-                        line: chars.line,
-                        col: chars.col,
+                        span: Span::new(
+                            before_pos as u32,
+                            chars.current_pos as u32,
+                            chars.line as u32,
+                            chars.col as u32,
+                        ),
                     });
-                    chars.next(); // Consume '='
+
                     Ok(())
                 }
                 _ => {
                     tokens.push(Token {
                         token: TokenType::Operator(Operator::LessThan),
-                        line: chars.line,
-                        col: chars.col,
+                        span: Span::new(
+                            before_pos as u32,
+                            chars.current_pos as u32,
+                            chars.line as u32,
+                            chars.col as u32,
+                        ),
                     });
                     Ok(())
                 }
@@ -622,36 +749,54 @@ fn handle_complex_operators(
         }
         '&' => {
             if matches!(chars.peek(), Some(&'&')) {
+                chars.next(); // Consume '&'
                 tokens.push(Token {
                     token: TokenType::Operator(Operator::And),
-                    line: chars.line,
-                    col: chars.col,
+                    span: Span::new(
+                        before_pos as u32,
+                        chars.current_pos as u32,
+                        chars.line as u32,
+                        chars.col as u32,
+                    ),
                 });
-                chars.next(); // Consume '&'
+
                 Ok(())
             } else {
                 tokens.push(Token {
                     token: TokenType::Operator(Operator::BitwiseAnd),
-                    line: chars.line,
-                    col: chars.col,
+                    span: Span::new(
+                        before_pos as u32,
+                        chars.current_pos as u32,
+                        chars.line as u32,
+                        chars.col as u32,
+                    ),
                 });
                 Ok(())
             }
         }
         '|' => {
             if matches!(chars.peek(), Some(&'|')) {
+                chars.next(); // Consume '|'
                 tokens.push(Token {
                     token: TokenType::Operator(Operator::Or),
-                    line: chars.line,
-                    col: chars.col,
+                    span: Span::new(
+                        before_pos as u32,
+                        chars.current_pos as u32,
+                        chars.line as u32,
+                        chars.col as u32,
+                    ),
                 });
-                chars.next(); // Consume '|'
+
                 Ok(())
             } else {
                 tokens.push(Token {
                     token: TokenType::Operator(Operator::BitwiseOr),
-                    line: chars.line,
-                    col: chars.col,
+                    span: Span::new(
+                        before_pos as u32,
+                        chars.current_pos as u32,
+                        chars.line as u32,
+                        chars.col as u32,
+                    ),
                 });
                 Ok(())
             }
@@ -660,24 +805,36 @@ fn handle_complex_operators(
             if matches!(chars.peek(), Some(&'.')) {
                 chars.next();
                 if matches!(chars.peek(), Some(&'=')) {
+                    chars.next(); // Consume '='
                     tokens.push(Token {
                         token: TokenType::Operator(Operator::RangeInclusive),
-                        line: chars.line,
-                        col: chars.col,
+                        span: Span::new(
+                            before_pos as u32,
+                            chars.current_pos as u32,
+                            chars.line as u32,
+                            chars.col as u32,
+                        ),
                     });
-                    chars.next(); // Consume '='
                 } else {
                     tokens.push(Token {
                         token: TokenType::Operator(Operator::RangeExclusive),
-                        line: chars.line,
-                        col: chars.col,
+                        span: Span::new(
+                            before_pos as u32,
+                            chars.current_pos as u32,
+                            chars.line as u32,
+                            chars.col as u32,
+                        ),
                     });
                 }
             } else {
                 tokens.push(Token {
                     token: TokenType::Symbol(Symbol::Dot),
-                    line: chars.line,
-                    col: chars.col,
+                    span: Span::new(
+                        before_pos as u32,
+                        chars.current_pos as u32,
+                        chars.line as u32,
+                        chars.col as u32,
+                    ),
                 });
             }
             Ok(())
@@ -693,6 +850,7 @@ fn tokenize_number(chars: &mut CharStream, tokens: &mut Vec<Token>) -> Result<()
     let mut number = String::new();
     let starting_line = chars.line;
     let starting_col = chars.col;
+    let starting_pos = chars.get_position().0;
     while let Some(&next) = chars.peek() {
         if next.is_ascii_digit() || next == '.' {
             number.push(chars.next().unwrap());
@@ -709,8 +867,12 @@ fn tokenize_number(chars: &mut CharStream, tokens: &mut Vec<Token>) -> Result<()
                     col: starting_col,
                 }
             })?),
-            line: starting_line,
-            col: starting_col,
+            span: Span::new(
+                starting_pos as u32,
+                chars.current_pos as u32,
+                starting_line as u32,
+                starting_col as u32,
+            ),
         });
     } else {
         tokens.push(Token {
@@ -721,8 +883,12 @@ fn tokenize_number(chars: &mut CharStream, tokens: &mut Vec<Token>) -> Result<()
                     col: starting_col,
                 }
             })?),
-            line: starting_line,
-            col: starting_col,
+            span: Span::new(
+                starting_pos as u32,
+                chars.current_pos as u32,
+                starting_line as u32,
+                starting_col as u32,
+            ),
         });
     }
     Ok(())
@@ -735,6 +901,7 @@ fn tokenize_identifier_or_keyword(
     let mut identifier = String::new();
     let starting_line = chars.line;
     let starting_col = chars.col;
+    let starting_pos = chars.get_position().0;
     while let Some(&next) = chars.peek() {
         if next.is_ascii_alphanumeric() || next == '_' {
             identifier.push(chars.next().unwrap());
@@ -746,16 +913,24 @@ fn tokenize_identifier_or_keyword(
         Ok(keyword) => {
             tokens.push(Token {
                 token: TokenType::Keyword(keyword),
-                line: starting_line,
-                col: starting_col,
+                span: Span::new(
+                    starting_pos as u32,
+                    chars.current_pos as u32,
+                    starting_line as u32,
+                    starting_col as u32,
+                ),
             });
             Ok(())
         }
         Err(_) => {
             tokens.push(Token {
                 token: TokenType::Identifier(identifier),
-                line: starting_line,
-                col: starting_col,
+                span: Span::new(
+                    starting_pos as u32,
+                    chars.current_pos as u32,
+                    starting_line as u32,
+                    starting_col as u32,
+                ),
             });
             Ok(())
         }
@@ -768,6 +943,7 @@ fn tokenize_string_literal(
 ) -> Result<(), LexerError> {
     let starting_line = chars.line;
     let starting_col = chars.col;
+    let starting_pos = chars.get_position().0;
     chars.next(); // Consume the initial quote
     let mut literal = String::new();
     let mut is_first_part = true; // Track whether this is the first part of the string for avoiding redundant Add tokens
@@ -778,8 +954,12 @@ fn tokenize_string_literal(
 
                 tokens.push(Token {
                     token: TokenType::StringLiteral(literal),
-                    line: starting_line,
-                    col: starting_col,
+                    span: Span::new(
+                        starting_pos as u32,
+                        chars.current_pos as u32,
+                        starting_line as u32,
+                        starting_col as u32,
+                    ),
                 });
                 return Ok(());
             }
@@ -804,8 +984,12 @@ fn tokenize_string_literal(
                 if !literal.is_empty() {
                     tokens.push(Token {
                         token: TokenType::StringLiteral(literal.clone()),
-                        line: starting_line,
-                        col: starting_col,
+                        span: Span::new(
+                            starting_pos as u32,
+                            chars.current_pos as u32,
+                            starting_line as u32,
+                            starting_col as u32,
+                        ),
                     });
                 }
 
@@ -816,8 +1000,12 @@ fn tokenize_string_literal(
                 if !is_first_part || !literal.is_empty() {
                     tokens.push(Token {
                         token: TokenType::Operator(Operator::Add),
-                        line: chars.line,
-                        col: chars.col,
+                        span: Span::new(
+                            chars.current_pos as u32,
+                            chars.current_pos as u32,
+                            chars.line as u32,
+                            chars.col as u32,
+                        ),
                     });
 
                     literal.clear(); // Clear the accumulated literal
@@ -833,8 +1021,12 @@ fn tokenize_string_literal(
                 // If the next part of the string is empty, it will just push an empty string to the tokens
                 tokens.push(Token {
                     token: TokenType::Operator(Operator::Add),
-                    line: chars.line,
-                    col: chars.col,
+                    span: Span::new(
+                        chars.current_pos as u32,
+                        chars.current_pos as u32,
+                        chars.line as u32,
+                        chars.col as u32,
+                    ),
                 });
 
                 is_first_part = false; // Set this to false after the first part
