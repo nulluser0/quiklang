@@ -59,17 +59,12 @@ members = [
 
     # QVM (Quiklang Virtual Machine)
     "src/lib/qvm",
-    # QVM QFFI (Quiklang Foreign Function Interface)
-    "src/lib/qvm/qffi",
 
     # ============================== Utils ==============================
 
     # Build Utils (Utilities for building)
     "src/lib/build-utils",
 ]
-
-[workspace.metadata]
-quiklang-vm-version = 1
 
 [workspace.dependencies]
 # ============================== Workspace Libraries ==============================
@@ -98,7 +93,6 @@ quiklang-backend-qvm-codegen = { path = "src/lib/backend/qvm-codegen" }
 
 # == QVM ==
 quiklang-qvm = { path = "src/lib/qvm" }
-quiklang-qvm-qffi = { path = "src/lib/qvm/qffi" }
 
 # == Utils ==
 quiklang-build-utils = { path = "src/lib/build-utils" }

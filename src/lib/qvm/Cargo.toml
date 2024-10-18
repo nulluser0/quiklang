@@ -1,6 +1,19 @@
 [package]
 name = "quiklang-qvm"
+description = "Quiklang Virtual Machine, and related utilities"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+thiserror = { workspace = true }
+tokio = { workspace = true }
+byteorder = { workspace = true }
+lazy_static = { workspace = true }
+libloading = { workspace = true }
+
+
+[package.metadata]
+quiklang-vm-version = 1
+
+[build-dependencies]
+quiklang-build-utils = { workspace = true }

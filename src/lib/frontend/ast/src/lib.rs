@@ -1,14 +1,18 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! # AST
+//!
+//! The AST module contains the Abstract Syntax Tree data structures for the Quiklang project.
+//!
+//! [`Return to Frontend Module`](../index.html)
+//!
+//! ## Modules
+//!
+//! | Module                                 | Description                                 |
+//! |----------------------------------------|---------------------------------------------|
+//! | [`expr`](./expr/index.html)            | Module for expression AST structures.       |
+//! | [`package_module`](./package_module/index.html) | Module for packages and modules AST structures.           |
+//! | [`stmt`](./stmt/index.html)            | Module for statement AST structures.         |
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub mod expr;
+pub mod package_module;
+pub mod stmt;
+pub mod types;

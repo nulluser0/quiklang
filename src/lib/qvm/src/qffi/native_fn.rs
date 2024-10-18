@@ -2,7 +2,7 @@ use std::time::SystemTime;
 
 use lazy_static::lazy_static;
 
-use crate::{errors::VMRuntimeError, qvm::register_val::RegisterVal};
+use crate::{errors::VMRuntimeError, register_val::RegisterVal};
 
 use super::NativeFunction;
 
