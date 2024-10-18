@@ -44,7 +44,11 @@ pub enum TokenType {
     // Literals
     IntegerLiteral(i64),
     FloatLiteral(f64),
+
+    // String literals and interpolation
     StringLiteral(String),
+    StringInterpolationStart,
+    StringInterpolationEnd,
 
     // Operators
     Operator(Operator),
@@ -64,6 +68,8 @@ impl std::fmt::Display for TokenType {
             TokenType::IntegerLiteral(value) => write!(f, "{}", value),
             TokenType::FloatLiteral(value) => write!(f, "{}", value),
             TokenType::StringLiteral(value) => write!(f, "{}", value),
+            TokenType::StringInterpolationStart => write!(f, "String Interpolation Start"),
+            TokenType::StringInterpolationEnd => write!(f, "String Interpolation End"),
             TokenType::Operator(operator) => write!(f, "{}", operator),
             TokenType::Symbol(symbol) => write!(f, "{}", symbol),
             TokenType::EOF => write!(f, "EOF"),
@@ -941,105 +947,76 @@ fn tokenize_string_literal(
     chars: &mut CharStream,
     tokens: &mut Vec<Token>,
 ) -> Result<(), LexerError> {
-    let starting_line = chars.line;
-    let starting_col = chars.col;
-    let starting_pos = chars.get_position().0;
+    let mut start_span = Span::new(
+        chars.current_pos as u32,
+        0,
+        chars.line as u32,
+        chars.col as u32,
+    ); // Temporary end
     chars.next(); // Consume the initial quote
     let mut literal = String::new();
-    let mut is_first_part = true; // Track whether this is the first part of the string for avoiding redundant Add tokens
+    let mut current_pos = chars.current_pos;
+    let mut current_line = chars.line;
+    let mut current_col = chars.col;
+
     while let Some(&ch) = chars.peek() {
         match ch {
             '"' => {
                 chars.next(); // Consume the closing quote
-
+                let end_span = Span::new(
+                    current_pos as u32,
+                    chars.current_pos as u32,
+                    current_line as u32,
+                    current_col as u32,
+                );
                 tokens.push(Token {
                     token: TokenType::StringLiteral(literal),
                     span: Span::new(
-                        starting_pos as u32,
-                        chars.current_pos as u32,
-                        starting_line as u32,
-                        starting_col as u32,
+                        start_span.start,
+                        end_span.end,
+                        start_span.line,
+                        start_span.col,
                     ),
                 });
                 return Ok(());
             }
-            '\\' => {
-                chars.next(); // Consume the backslash
-                if let Some(&escaped) = chars.peek() {
-                    literal.push(match escaped {
-                        'n' => '\n',
-                        't' => '\t',
-                        'r' => '\r',
-                        _ => escaped,
-                    });
-                    chars.next(); // Consume the escaped character
-                }
-            }
             '{' => {
-                // Handle string interpolation
-
-                chars.next(); // Consume the opening brace
-
-                // If there is a literal accumulated, push it as a token
-                if !literal.is_empty() {
-                    tokens.push(Token {
-                        token: TokenType::StringLiteral(literal.clone()),
-                        span: Span::new(
-                            starting_pos as u32,
-                            chars.current_pos as u32,
-                            starting_line as u32,
-                            starting_col as u32,
-                        ),
-                    });
-                }
-
-                // Add an `Add` operator before the placeholder if this is not the first part or if the literal is not empty
-                // Primitive type `string` implements `Add` so we can concatenate strings
-                // This is to handle cases like `"Hello, {name}"` and `"Hello, {name}!"` where the `Add` operator is needed
-                // Or cases like `"{name}"` where the `Add` operator is not needed
-                if !is_first_part || !literal.is_empty() {
-                    tokens.push(Token {
-                        token: TokenType::Operator(Operator::Add),
-                        span: Span::new(
-                            chars.current_pos as u32,
-                            chars.current_pos as u32,
-                            chars.line as u32,
-                            chars.col as u32,
-                        ),
-                    });
-
-                    literal.clear(); // Clear the accumulated literal
-                }
-
-                // Parse the placeholder
-                let mut placeholder_tokens = tokenize_interpolation(chars)?;
-
-                // Add the parsed placeholder tokens to the main tokens
-                tokens.append(&mut placeholder_tokens);
-
-                // Add an `Add` operator after the placeholder
-                // If the next part of the string is empty, it will just push an empty string to the tokens
+                chars.next(); // Consume '{'
+                let end_span = Span::new(
+                    current_pos as u32,
+                    chars.current_pos as u32,
+                    current_line as u32,
+                    current_col as u32,
+                );
                 tokens.push(Token {
-                    token: TokenType::Operator(Operator::Add),
+                    token: TokenType::StringLiteral(literal.clone()),
                     span: Span::new(
-                        chars.current_pos as u32,
-                        chars.current_pos as u32,
-                        chars.line as u32,
-                        chars.col as u32,
+                        start_span.start,
+                        end_span.end,
+                        start_span.line,
+                        start_span.col,
                     ),
                 });
-
-                is_first_part = false; // Set this to false after the first part
+                tokens.push(Token {
+                    token: TokenType::StringInterpolationStart,
+                    span: end_span,
+                });
+                literal.clear();
+                start_span.start = chars.current_pos as u32;
             }
             _ => {
                 literal.push(ch);
                 chars.next();
+                current_pos = chars.current_pos;
+                current_line = chars.line;
+                current_col = chars.col;
             }
         }
     }
+
     Err(LexerError::UnterminatedStringLiteral {
-        line: starting_line,
-        col: starting_col,
+        line: start_span.line as usize,
+        col: start_span.col as usize,
     })
 }
 
