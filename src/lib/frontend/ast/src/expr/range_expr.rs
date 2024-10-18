@@ -7,7 +7,7 @@
 //! ## List of Range Expression AST Structures
 //! - [`RangeExpr`](#range-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 

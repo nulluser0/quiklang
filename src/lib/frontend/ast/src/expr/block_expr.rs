@@ -7,7 +7,9 @@
 //! ## List of Block Expression AST Structures
 //! - [`BlockExpr`](#block-expr)
 
-use crate::{stmt::Stmt, Span};
+use quiklang_utils::Span;
+
+use crate::stmt::Stmt;
 
 /// Block expression.
 /// Represents a block of statements.

@@ -7,7 +7,7 @@
 //! ## List of Tuple Expression AST Structures
 //! - [`TupleExpr`](#tuple-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 

@@ -7,7 +7,7 @@
 //! ## List of Array Expression AST Structures
 //! - [`ArrayExpr`](#array-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 

@@ -7,7 +7,7 @@
 //! ## List of Literal Expression AST Structures
 //! - [`LiteralExpr`](#literal-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 /// Literal expression.
 /// Represents a literal value.

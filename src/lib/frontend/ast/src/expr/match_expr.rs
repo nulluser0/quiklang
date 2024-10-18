@@ -8,7 +8,7 @@
 //! - [`MatchExpr`](#match-expr)
 //! - [`MatchArm`](#match-arm)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 

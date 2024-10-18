@@ -9,7 +9,7 @@
 //! - [`BreakExpr`](#break-expr)
 //! - [`ContinueExpr`](#continue-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 

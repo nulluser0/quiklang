@@ -7,7 +7,7 @@
 //! ## List of For Expression AST Structures
 //! - [`ForExpr`](#for-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 

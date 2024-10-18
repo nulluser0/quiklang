@@ -7,7 +7,7 @@
 //! ## List of Tuple Index Expression AST Structures
 //! - [`TupleIndexExpr`](#tuple-index-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 

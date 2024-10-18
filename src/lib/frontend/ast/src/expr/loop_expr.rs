@@ -7,7 +7,7 @@
 //! ## List of Loop Expression AST Structures
 //! - [`LoopExpr`](#loop-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 

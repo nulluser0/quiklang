@@ -7,7 +7,7 @@
 //! ## List of Field Access Expression AST Structures
 //! - [`FieldAccessExpr`](#field-access-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 

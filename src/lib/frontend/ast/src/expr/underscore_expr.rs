@@ -7,7 +7,7 @@
 //! ## List of Underscore Expression AST Structures
 //! - [`UnderscoreExpr`](#underscore-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 /// Underscore expression.
 /// Represents an underscore.

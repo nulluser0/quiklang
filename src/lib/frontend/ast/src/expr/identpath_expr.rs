@@ -7,7 +7,9 @@
 //! ## List of Identifier Path Expression AST Structures
 //! - [`IdentPathExpr`](#ident-path-expr)
 
-use crate::{types::ASTTypeKind, Span};
+use quiklang_utils::Span;
+
+use crate::types::ASTTypeKind;
 
 /// Path types
 #[derive(Debug, Clone)]

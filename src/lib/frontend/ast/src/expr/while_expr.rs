@@ -7,7 +7,7 @@
 //! ## List of While Expression AST Structures
 //! - [`WhileExpr`](#while-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 

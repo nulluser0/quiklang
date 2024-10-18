@@ -18,7 +18,9 @@
 //! - [`BinaryAssignmentOperatorExpr`](#binary-assignment-operator-expr)
 //! - [`TypeCastOperatorExpr`](#type-cast-operator-expr)
 
-use crate::{types::ASTTypeKind, Span};
+use quiklang_utils::Span;
+
+use crate::types::ASTTypeKind;
 
 use super::Expr;
 

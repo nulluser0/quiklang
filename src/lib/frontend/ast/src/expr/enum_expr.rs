@@ -7,7 +7,7 @@
 //! ## List of Enum Expression AST Structures
 //! - [`EnumExpr`](#enum-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::{struct_expr::FilledStructField, Expr};
 

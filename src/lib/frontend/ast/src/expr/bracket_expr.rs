@@ -7,7 +7,7 @@
 //! ## List of Bracket Expression AST Structures
 //! - [`BracketExpr`](#bracket-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 

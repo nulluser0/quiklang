@@ -7,7 +7,7 @@
 //! ## List of Struct Expression AST Structures
 //! - [`StructExpr`](#struct-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 

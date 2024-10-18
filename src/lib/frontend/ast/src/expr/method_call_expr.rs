@@ -7,7 +7,7 @@
 //! ## List of Method Call Expression AST Structures
 //! - [`MethodCallExpr`](#method-call-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 

@@ -7,7 +7,7 @@
 //! ## List of Function Call Expression AST Structures
 //! - [`FuncCallExpr`](#func-call-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 

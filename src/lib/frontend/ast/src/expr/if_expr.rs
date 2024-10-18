@@ -7,7 +7,7 @@
 //! ## List of If Expression AST Structures
 //! - [`IfExpr`](#if-expr)
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::Expr;
 
