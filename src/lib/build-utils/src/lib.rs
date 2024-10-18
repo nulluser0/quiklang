@@ -20,10 +20,9 @@ pub fn add_env() {
         let cargo_toml_path = path.join("Cargo.toml");
         if cargo_toml_path.exists() {
             // Read Cargo.toml
-            let cargo_toml = fs::read_to_string(&cargo_toml_path).expect(&format!(
-                "Failed to read Cargo.toml at {}",
-                cargo_toml_path.display()
-            ));
+            let cargo_toml = fs::read_to_string(&cargo_toml_path).unwrap_or_else(|_| {
+                panic!("Failed to read Cargo.toml at {}", cargo_toml_path.display())
+            });
 
             // Parse Cargo.toml
             let cargo: Value = toml::from_str(&cargo_toml).expect("Failed to parse Cargo.toml");
