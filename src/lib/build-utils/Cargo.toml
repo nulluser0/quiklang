@@ -1,0 +1,9 @@
+[package]
+name = "quiklang-build-utils"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+pathdiff = "0.2.2"
+# Read Cargo.toml and get the version of the workspace
+toml = "0.8.19"

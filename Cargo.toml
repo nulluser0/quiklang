@@ -61,6 +61,11 @@ members = [
     "src/lib/qvm",
     # QVM QFFI (Quiklang Foreign Function Interface)
     "src/lib/qvm/qffi",
+
+    # ============================== Utils ==============================
+
+    # Build Utils (Utilities for building)
+    "src/lib/build-utils",
 ]
 
 [workspace.metadata]
@@ -95,6 +100,9 @@ quiklang-backend-qvm-codegen = { path = "src/lib/backend/qvm-codegen" }
 quiklang-qvm = { path = "src/lib/qvm" }
 quiklang-qvm-qffi = { path = "src/lib/qvm/qffi" }
 
+# == Utils ==
+quiklang-build-utils = { path = "src/lib/build-utils" }
+
 # ============================== External Libraries ==============================
 
 # Bytecode manipulation
@@ -116,10 +124,6 @@ thiserror = "1.0.64"
 
 # Async
 tokio = { version = "1.40.0", features = ["full"] }
-
-[build-dependencies]
-# Read Cargo.toml and get the version of the workspace
-toml = "0.8.19"
 
 [profile.release]
 lto = "fat"
