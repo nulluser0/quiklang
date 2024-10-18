@@ -11,7 +11,7 @@
 //! | Expr       | Represents an expression statement. All Expressions are Statements. |
 //! | VarDecl    | Represents a variable declaration statement. |
 
-use crate::Span;
+use quiklang_utils::Span;
 
 use super::{expr::Expr, types::ASTTypeKind};
 

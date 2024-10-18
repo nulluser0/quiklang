@@ -231,10 +231,17 @@ dependencies = [
 [[package]]
 name = "quiklang-frontend-ast"
 version = "0.1.0"
+dependencies = [
+ "quiklang-utils",
+]
 
 [[package]]
 name = "quiklang-frontend-lexer"
 version = "0.1.0"
+dependencies = [
+ "quiklang-utils",
+ "thiserror",
+]
 
 [[package]]
 name = "quiklang-frontend-parser"
@@ -294,6 +301,10 @@ dependencies = [
 
 [[package]]
 name = "quiklang-to-bin"
+version = "0.1.0"
+
+[[package]]
+name = "quiklang-utils"
 version = "0.1.0"
 
 [[package]]

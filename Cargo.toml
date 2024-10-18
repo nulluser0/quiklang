@@ -62,6 +62,8 @@ members = [
 
     # ============================== Utils ==============================
 
+    # General Utils (General utilities)
+    "src/lib/utils",
     # Build Utils (Utilities for building)
     "src/lib/build-utils",
 ]
@@ -95,6 +97,7 @@ quiklang-backend-qvm-codegen = { path = "src/lib/backend/qvm-codegen" }
 quiklang-qvm = { path = "src/lib/qvm" }
 
 # == Utils ==
+quiklang-utils = { path = "src/lib/utils" }
 quiklang-build-utils = { path = "src/lib/build-utils" }
 
 # ============================== External Libraries ==============================
