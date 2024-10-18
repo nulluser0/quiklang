@@ -7,7 +7,7 @@
 //! ## List of Block Expression AST Structures
 //! - [`BlockExpr`](#block-expr)
 
-use crate::stmt::Stmt;
+use crate::{stmt::Stmt, Span};
 
 /// Block expression.
 /// Represents a block of statements.
@@ -18,4 +18,6 @@ use crate::stmt::Stmt;
 pub struct BlockExpr {
     /// The statements in the block.
     pub stmts: Vec<Stmt>,
+    /// Span
+    pub span: Span,
 }

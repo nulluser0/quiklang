@@ -7,6 +7,8 @@
 //! ## List of While Expression AST Structures
 //! - [`WhileExpr`](#while-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// While expression.
@@ -19,4 +21,6 @@ pub struct WhileExpr {
     pub cond: Box<Expr>,
     /// The block to execute while the condition is true.
     pub block: Box<Expr>,
+    /// Span
+    pub span: Span,
 }

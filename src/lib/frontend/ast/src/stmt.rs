@@ -11,6 +11,8 @@
 //! | Expr       | Represents an expression statement. All Expressions are Statements. |
 //! | VarDecl    | Represents a variable declaration statement. |
 
+use crate::Span;
+
 use super::{expr::Expr, types::ASTTypeKind};
 
 /// Represents a statement in Quiklang.
@@ -33,4 +35,6 @@ pub struct VarDeclStmt {
     pub ty: Option<ASTTypeKind>,
     /// The value assigned to the variable.
     pub value: Expr,
+    /// Span
+    pub span: Span,
 }

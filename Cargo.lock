@@ -239,6 +239,10 @@ version = "0.1.0"
 [[package]]
 name = "quiklang-frontend-parser"
 version = "0.1.0"
+dependencies = [
+ "quiklang-frontend-ast",
+ "quiklang-frontend-lexer",
+]
 
 [[package]]
 name = "quiklang-frontend-semantic-checker"

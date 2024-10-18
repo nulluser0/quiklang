@@ -7,6 +7,8 @@
 //! ## List of Function Call Expression AST Structures
 //! - [`FuncCallExpr`](#func-call-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// Function call expression.
@@ -20,4 +22,6 @@ pub struct FuncCallExpr {
     pub func: Box<Expr>,
     /// The arguments to the function.
     pub args: Vec<Expr>,
+    /// Span
+    pub span: Span,
 }

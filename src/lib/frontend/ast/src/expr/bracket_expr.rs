@@ -7,6 +7,8 @@
 //! ## List of Bracket Expression AST Structures
 //! - [`BracketExpr`](#bracket-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// Bracket expression.
@@ -18,4 +20,6 @@ use super::Expr;
 pub struct BracketExpr {
     /// The expression inside the brackets.
     pub expr: Box<Expr>,
+    /// Span
+    pub span: Span,
 }

@@ -7,6 +7,8 @@
 //! ## List of Loop Expression AST Structures
 //! - [`LoopExpr`](#loop-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// Forever loop expression.
@@ -17,4 +19,6 @@ use super::Expr;
 pub struct LoopExpr {
     /// The block to execute forever.
     pub block: Box<Expr>,
+    /// Span
+    pub span: Span,
 }

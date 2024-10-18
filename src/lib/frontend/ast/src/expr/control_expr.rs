@@ -9,6 +9,8 @@
 //! - [`BreakExpr`](#break-expr)
 //! - [`ContinueExpr`](#continue-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// Return expression.
@@ -23,6 +25,8 @@ use super::Expr;
 pub struct ReturnExpr {
     /// The return value.
     pub value: Option<Box<Expr>>,
+    /// Span
+    pub span: Span,
 }
 
 /// Break expression.
@@ -36,6 +40,8 @@ pub struct ReturnExpr {
 pub struct BreakExpr {
     /// The break value.
     pub value: Option<Box<Expr>>,
+    /// Span
+    pub span: Span,
 }
 
 /// Continue expression.
@@ -44,4 +50,7 @@ pub struct BreakExpr {
 /// The continue statement is used to skip the rest of the loop body and start the next iteration.
 /// The continue statement is only allowed in loop bodies.
 #[derive(Debug, Clone)]
-pub struct ContinueExpr {}
+pub struct ContinueExpr {
+    /// Span
+    pub span: Span,
+}

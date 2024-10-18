@@ -7,6 +7,8 @@
 //! ## List of Range Expression AST Structures
 //! - [`RangeExpr`](#range-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// Range expression.
@@ -23,4 +25,6 @@ pub struct RangeExpr {
     pub end: Box<Expr>,
     /// Is the range inclusive on the end?
     pub inclusive: bool,
+    /// Span
+    pub span: Span,
 }

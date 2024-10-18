@@ -16,3 +16,11 @@ pub mod expr;
 pub mod package_module;
 pub mod stmt;
 pub mod types;
+
+/// A span represents a range of text in the source code.
+/// It is used to provide more detailed error messages.
+#[derive(Debug, Clone)]
+pub struct Span {
+    pub start: u32, // Byte offset from the start of the file
+    pub end: u32,   // Byte offset from the start of the file
+}

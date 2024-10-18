@@ -7,6 +7,8 @@
 //! ## List of Field Access Expression AST Structures
 //! - [`FieldAccessExpr`](#field-access-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// Field access expression.
@@ -22,4 +24,6 @@ pub struct FieldAccessExpr {
     pub expr: Box<Expr>,
     /// The name of the field.
     pub field: &'static str,
+    /// Span
+    pub span: Span,
 }

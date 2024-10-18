@@ -7,6 +7,8 @@
 //! ## List of Struct Expression AST Structures
 //! - [`StructExpr`](#struct-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// Struct expression.
@@ -18,6 +20,8 @@ pub struct StructExpr {
     pub name: &'static str,
     /// The fields of the struct.
     pub fields: Vec<FilledStructField>,
+    /// Span
+    pub span: Span,
 }
 
 /// Filled struct field.
@@ -28,4 +32,6 @@ pub struct FilledStructField {
     pub name: &'static str,
     /// The value of the field.
     pub value: Expr,
+    /// Span
+    pub span: Span,
 }

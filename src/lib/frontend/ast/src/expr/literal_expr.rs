@@ -7,6 +7,8 @@
 //! ## List of Literal Expression AST Structures
 //! - [`LiteralExpr`](#literal-expr)
 
+use crate::Span;
+
 /// Literal expression.
 /// Represents a literal value.
 /// Example: `42`, `3.14`, `"Hello, World!"`.
@@ -21,6 +23,8 @@
 pub struct LiteralExpr {
     /// The literal value.
     pub value: Literal,
+    /// Span
+    pub span: Span,
 }
 
 /// Literal.

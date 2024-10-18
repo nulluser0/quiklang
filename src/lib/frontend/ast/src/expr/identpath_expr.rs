@@ -7,7 +7,7 @@
 //! ## List of Identifier Path Expression AST Structures
 //! - [`IdentPathExpr`](#ident-path-expr)
 
-use crate::types::ASTTypeKind;
+use crate::{types::ASTTypeKind, Span};
 
 /// Path types
 #[derive(Debug, Clone)]
@@ -25,6 +25,8 @@ pub enum ASTPath {
 pub struct AbsoluteASTPath {
     /// The path to the module.
     pub path: Vec<SpecificPath>,
+    /// Span
+    pub span: Span,
 }
 
 /// Specific path to an identifier (or module), representing one part of the path.
@@ -37,6 +39,8 @@ pub struct SpecificPath {
     pub id: usize,
     /// ASTTypeKind arguments to the module.
     pub args: Vec<ASTTypeKind>,
+    /// Span
+    pub span: Span,
 }
 
 /// Relative path to an identifier (or module), representing one part of the path.
@@ -48,4 +52,6 @@ pub struct RelativeASTPath {
     pub ty: Box<ASTTypeKind>,
     /// The (only) path to the module.
     pub path: SpecificPath,
+    /// Span
+    pub span: Span,
 }

@@ -7,6 +7,8 @@
 //! ## List of Enum Expression AST Structures
 //! - [`EnumExpr`](#enum-expr)
 
+use crate::Span;
+
 use super::{struct_expr::FilledStructField, Expr};
 
 /// Enum expression.
@@ -18,6 +20,8 @@ pub struct EnumExpr {
     pub name: &'static str,
     /// The variant of the enum.
     pub variant: FilledEnumVariant,
+    /// Span
+    pub span: Span,
 }
 
 /// Filled enum variant.
@@ -28,6 +32,8 @@ pub struct FilledEnumVariant {
     pub name: &'static str,
     /// The value of the variant.
     pub value: Option<FilledEnumField>,
+    /// Span
+    pub span: Span,
 }
 
 /// Filled enum field.

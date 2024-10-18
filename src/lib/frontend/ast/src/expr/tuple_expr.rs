@@ -7,6 +7,8 @@
 //! ## List of Tuple Expression AST Structures
 //! - [`TupleExpr`](#tuple-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// Tuple expression.
@@ -18,4 +20,6 @@ use super::Expr;
 pub struct TupleExpr {
     /// The values in the tuple.
     pub values: Vec<Expr>,
+    /// Span
+    pub span: Span,
 }

@@ -7,6 +7,8 @@
 //! ## List of Tuple Index Expression AST Structures
 //! - [`TupleIndexExpr`](#tuple-index-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// Tuple index expression.
@@ -23,4 +25,6 @@ pub struct TupleIndexExpr {
     pub tuple: Box<Expr>,
     /// The index into the tuple.
     pub index: usize,
+    /// Span
+    pub span: Span,
 }

@@ -18,7 +18,7 @@
 //! - [`BinaryAssignmentOperatorExpr`](#binary-assignment-operator-expr)
 //! - [`TypeCastOperatorExpr`](#type-cast-operator-expr)
 
-use crate::types::ASTTypeKind;
+use crate::{types::ASTTypeKind, Span};
 
 use super::Expr;
 
@@ -63,6 +63,8 @@ pub struct BinaryOperatorExpr {
     pub op: BinaryOperator,
     /// The right-hand side expression.
     pub rhs: Box<Expr>,
+    /// Span
+    pub span: Span,
 }
 
 /// Binary operator.
@@ -108,6 +110,8 @@ pub struct UnaryOperatorExpr {
     pub op: UnaryOperator,
     /// The expression.
     pub expr: Box<Expr>,
+    /// Span
+    pub span: Span,
 }
 
 /// Unary operator.
@@ -147,6 +151,8 @@ pub struct ComparisonOperatorExpr {
     pub op: ComparisonOperator,
     /// The right-hand side expression.
     pub rhs: Box<Expr>,
+    /// Span
+    pub span: Span,
 }
 
 /// Comparison operator.
@@ -182,6 +188,8 @@ pub struct BooleanOperatorExpr {
     pub op: BooleanOperator,
     /// The right-hand side expression.
     pub rhs: Box<Expr>,
+    /// Span
+    pub span: Span,
 }
 
 /// Boolean operator.
@@ -206,6 +214,8 @@ pub struct AssignmentOperatorExpr {
     pub lhs: Box<Expr>,
     /// The right-hand side expression.
     pub rhs: Box<Expr>,
+    /// Span
+    pub span: Span,
 }
 
 /// Binary assignment operator expression.
@@ -230,6 +240,8 @@ pub struct BinaryAssignmentOperatorExpr {
     pub op: BinaryOperator,
     /// The right-hand side expression.
     pub rhs: Box<Expr>,
+    /// Span
+    pub span: Span,
 }
 
 /// ASTTypeKind cast operator expression.
@@ -243,4 +255,6 @@ pub struct TypeCastOperatorExpr {
     pub expr: Box<Expr>,
     /// The type to cast to.
     pub ty: ASTTypeKind,
+    /// Span
+    pub span: Span,
 }

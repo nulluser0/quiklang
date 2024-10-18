@@ -8,6 +8,8 @@
 //! - [`MatchExpr`](#match-expr)
 //! - [`MatchArm`](#match-arm)
 
+use crate::Span;
+
 use super::Expr;
 
 /// Match expression.
@@ -20,6 +22,8 @@ pub struct MatchExpr {
     pub expr: Box<Expr>,
     /// The match arms.
     pub arms: Vec<MatchArm>,
+    /// Span
+    pub span: Span,
 }
 
 /// Match arm.
@@ -31,4 +35,6 @@ pub struct MatchArm {
     // pub pattern: MatchPattern,
     /// The expression to execute
     pub expr: Box<Expr>,
+    /// Span
+    pub span: Span,
 }

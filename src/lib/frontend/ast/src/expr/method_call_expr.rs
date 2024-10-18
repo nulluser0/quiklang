@@ -7,6 +7,8 @@
 //! ## List of Method Call Expression AST Structures
 //! - [`MethodCallExpr`](#method-call-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// Method call expression.
@@ -20,4 +22,6 @@ pub struct MethodCallExpr {
     pub method: Box<Expr>,
     /// The arguments to the method.
     pub args: Vec<Expr>,
+    /// Span
+    pub span: Span,
 }

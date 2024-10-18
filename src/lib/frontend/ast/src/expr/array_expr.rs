@@ -7,6 +7,8 @@
 //! ## List of Array Expression AST Structures
 //! - [`ArrayExpr`](#array-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// Array expression.
@@ -20,4 +22,6 @@ pub struct ArrayExpr {
     pub values: Vec<Expr>,
     /// The size of the array.
     pub size: Option<usize>,
+    /// Span
+    pub span: Span,
 }

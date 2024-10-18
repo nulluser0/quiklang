@@ -7,6 +7,8 @@
 //! ## List of For Expression AST Structures
 //! - [`ForExpr`](#for-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// For expression.
@@ -21,4 +23,6 @@ pub struct ForExpr {
     pub iterable: Box<Expr>,
     /// The block to execute for each item in the iterable.
     pub block: Box<Expr>,
+    /// Span
+    pub span: Span,
 }

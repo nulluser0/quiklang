@@ -7,6 +7,8 @@
 //! ## List of Array Index Expression AST Structures
 //! - [`ArrayIndexExpr`](#array-index-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// Array index expression.
@@ -22,4 +24,6 @@ pub struct ArrayIndexExpr {
     pub array: Box<Expr>,
     /// The index into the array.
     pub index: Box<Expr>,
+    /// Span
+    pub span: Span,
 }

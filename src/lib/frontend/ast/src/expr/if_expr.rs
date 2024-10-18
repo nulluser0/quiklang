@@ -7,6 +7,8 @@
 //! ## List of If Expression AST Structures
 //! - [`IfExpr`](#if-expr)
 
+use crate::Span;
+
 use super::Expr;
 
 /// If expression.
@@ -26,4 +28,6 @@ pub struct IfExpr {
     pub then_block: Box<Expr>,
     /// The else block to execute if the condition is false.
     pub else_block: Option<Box<Expr>>,
+    /// Span
+    pub span: Span,
 }
