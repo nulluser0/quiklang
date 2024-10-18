@@ -7,11 +7,10 @@ use std::{
 
 use tokio::sync::{oneshot, Mutex};
 
-use crate::errors::VMRuntimeError;
+use crate::{bytecode::TaggedConstantValue, errors::VMRuntimeError};
 
 use super::{
     bytecode::ByteCode,
-    bytecode_compiler::compiler::TaggedConstantValue,
     instructions::{
         get_arga, get_argb, get_argbx, get_argc, get_opcode, is_k, rk_to_k, Instruction, OP_NOP,
     },

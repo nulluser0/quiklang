@@ -14,6 +14,7 @@
 use super::{expr::Expr, types::ASTTypeKind};
 
 /// Represents a statement in Quiklang.
+#[derive(Debug, Clone)]
 pub enum Stmt {
     /// An Expression statement. All Exprs are Stmts.
     Expr(Expr),
@@ -22,6 +23,7 @@ pub enum Stmt {
 }
 
 /// Represents a variable declaration statement.
+#[derive(Debug, Clone)]
 pub struct VarDeclStmt {
     /// The name of the variable.
     pub name: &'static str,

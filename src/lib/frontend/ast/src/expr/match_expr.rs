@@ -28,7 +28,7 @@ pub struct MatchExpr {
 #[derive(Debug, Clone)]
 pub struct MatchArm {
     /// The pattern to match.
-    pub pattern: MatchPattern,
+    // pub pattern: MatchPattern,
     /// The expression to execute
     pub expr: Box<Expr>,
 }

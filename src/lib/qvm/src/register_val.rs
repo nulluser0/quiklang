@@ -2,9 +2,7 @@
 
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 
-use crate::errors::VMRuntimeError;
-
-use super::bytecode_compiler::compiler::TaggedConstantValue;
+use crate::{bytecode::TaggedConstantValue, errors::VMRuntimeError};
 
 #[repr(C, align(8))]
 #[derive(Clone, Copy)]

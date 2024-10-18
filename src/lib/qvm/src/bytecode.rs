@@ -78,18 +78,17 @@
 use core::str;
 use std::{
     fmt::Display,
+    hash::Hash,
+    hash::Hasher,
     io::{Cursor, Read, Write},
     vec,
 };
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
-use crate::{
-    errors::VMBytecodeError,
-    qvm::{instructions::to_string, register_val::to_quiklangc_strings},
-};
+use crate::{errors::VMBytecodeError, instructions::to_string, register_val::to_quiklangc_strings};
 
-use super::{bytecode_compiler::compiler::TaggedConstantValue, instructions::Instruction};
+use super::instructions::Instruction;
 
 /// Represents the Quiklang Bytecode.
 #[derive(Debug, Clone)]
@@ -116,6 +115,31 @@ pub struct BCIntegrityInfo {
     pub num_constants: i32,
     pub num_qlang_functions: i32,
     pub num_inst: i32,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub enum TaggedConstantValue {
+    #[default]
+    Null,
+    Int(i64),
+    Float(f64),
+    Bool(bool),
+    Str(String),
+    // Pointers are not saved in the constant pool. They are only used in the VM.
+}
+
+impl Eq for TaggedConstantValue {}
+
+impl Hash for TaggedConstantValue {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            TaggedConstantValue::Null => 0.hash(state),
+            TaggedConstantValue::Int(i) => i.hash(state),
+            TaggedConstantValue::Float(f) => f.to_bits().hash(state),
+            TaggedConstantValue::Bool(b) => b.hash(state),
+            TaggedConstantValue::Str(s) => s.hash(state),
+        }
+    }
 }
 
 /// Implementing Display for ByteCode
@@ -377,7 +401,7 @@ impl ByteCode {
 
 #[cfg(test)]
 mod tests {
-    use crate::qvm::instructions::{ABx, Abc, OP_LOADBOOL, OP_LOADCONST, OP_MOVE};
+    use crate::instructions::{ABx, Abc, OP_LOADBOOL, OP_LOADCONST, OP_MOVE};
 
     use super::*;
     use byteorder::{LittleEndian, WriteBytesExt};

@@ -18,7 +18,7 @@
 //! - [`BinaryAssignmentOperatorExpr`](#binary-assignment-operator-expr)
 //! - [`TypeCastOperatorExpr`](#type-cast-operator-expr)
 
-use crate::frontend::ast::types::ASTTypeKind;
+use crate::types::ASTTypeKind;
 
 use super::Expr;
 

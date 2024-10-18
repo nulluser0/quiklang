@@ -7,7 +7,7 @@
 //! ## List of Block Expression AST Structures
 //! - [`BlockExpr`](#block-expr)
 
-use crate::frontend::ast::stmt::Stmt;
+use crate::stmt::Stmt;
 
 /// Block expression.
 /// Represents a block of statements.

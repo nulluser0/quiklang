@@ -41,6 +41,7 @@ use super::{
 /// Packages are the main unit of compilation in Quiklang.
 /// A package can contain multiple modules, which are the building blocks of the package.
 /// Packages can also reference other packages, locally or from external sources (extern package).
+#[derive(Debug)]
 pub struct Package {
     /// The name of the package.
     pub name: &'static str,
@@ -58,6 +59,7 @@ pub struct Package {
 
 /// A module is a collection of functions, types, and other items that are grouped together.
 /// Modules are the building blocks of a package.
+#[derive(Debug)]
 pub struct Module {
     /// The name of the module.
     pub name: &'static str,
@@ -68,6 +70,7 @@ pub struct Module {
 /// A module item is a function, type, or other item that is contained within a module.
 /// Module items are the individual components of a module.
 /// They can be exported or private, depending on their visibility.
+#[derive(Debug)]
 pub struct ModuleItem {
     /// The visibility of the module item.
     pub visibility: Visibility,
@@ -78,6 +81,7 @@ pub struct ModuleItem {
 /// The visibility of a module item determines whether it can be accessed from outside the module.
 /// Items can be private (only accessible within the module) or public (accessible from other modules).
 /// There are different levels of visibility, such as `pub`, `pub(package)`, and `pub(parent)`.
+#[derive(Debug)]
 pub enum Visibility {
     /// Public visibility (`pub`).
     Public,
@@ -90,6 +94,7 @@ pub enum Visibility {
 }
 
 /// An item is a function, type, or other entity that is contained within a module.
+#[derive(Debug)]
 pub enum Item {
     /// A function item.
     Function(Function),
@@ -113,6 +118,7 @@ pub enum Item {
 /// Functions can have parameters, a return type, and a body that contains the code to be executed.
 /// Functions can also be generic, meaning they can take type parameters.
 /// Functions can be defined at the module level or within other functions.
+#[derive(Debug)]
 pub struct Function {
     /// The name of the function.
     pub name: &'static str,
@@ -126,6 +132,7 @@ pub struct Function {
 
 /// Function return type.
 /// Represents the return type of a function.
+#[derive(Debug)]
 pub enum ReturnType {
     /// The function returns a value.
     Value(ASTTypeKind),
@@ -137,6 +144,7 @@ pub enum ReturnType {
 /// Parameters have a name and a type.
 /// Parameters can be required or optional, depending on whether they have default values.
 /// Parameters can also be generic, meaning they can take type parameters.
+#[derive(Debug)]
 pub struct Parameter {
     /// The name of the parameter.
     pub name: &'static str,
@@ -149,6 +157,7 @@ pub struct Parameter {
 /// A struct is a data structure that contains named fields.
 /// If you are reading this, you probably already know what a struct is.
 /// Quiklang structs are rust-like.
+#[derive(Debug)]
 pub struct Struct {
     /// The name of the struct.
     pub name: &'static str,
@@ -159,6 +168,7 @@ pub struct Struct {
 }
 
 /// A struct field is a key-type pair that represents a field in a struct.
+#[derive(Debug)]
 pub struct StructField {
     /// The name of the field.
     pub name: &'static str,
@@ -171,6 +181,7 @@ pub struct StructField {
 /// An enum is a type that can have a fixed set of values.
 /// This is a major selling point of Quiklang, as many VM languages do not have native-level enums
 /// Quiklang enums are rust-like.
+#[derive(Debug)]
 pub struct Enum {
     /// The name of the enum.
     pub name: &'static str,
@@ -181,6 +192,7 @@ pub struct Enum {
 }
 
 /// Emum variant, rust-like.
+#[derive(Debug)]
 pub struct EnumVariant {
     /// The name of the variant.
     pub name: &'static str,
@@ -189,6 +201,7 @@ pub struct EnumVariant {
 }
 
 /// Enum field, rust-like.
+#[derive(Debug)]
 pub enum EnumField {
     /// No fields.
     None,
@@ -199,6 +212,7 @@ pub enum EnumField {
 }
 
 /// Types can be aliased using type aliases.
+#[derive(Debug)]
 pub struct TypeAlias {
     /// The name of the type alias.
     pub name: &'static str,
@@ -210,6 +224,7 @@ pub struct TypeAlias {
 
 /// A trait is a collection of methods that can be implemented by other types.
 /// Traits are similar to interfaces in other languages.
+#[derive(Debug)]
 pub struct Trait {
     /// The name of the trait.
     pub name: &'static str,
@@ -223,6 +238,7 @@ pub struct Trait {
 
 /// A trait bound is a constraint on a generic type parameter.
 /// Trait bounds specify that a generic type parameter must implement a certain trait.
+#[derive(Debug, Clone)]
 pub struct TraitBound {
     /// The name of the trait that the generic type parameter must implement.
     pub name: &'static str,
@@ -232,6 +248,7 @@ pub struct TraitBound {
 
 /// Traits can have different types of items
 /// Methods, type aliases, and consts.
+#[derive(Debug)]
 pub enum AssociatedItem {
     /// A trait method.
     Method(AssociatedMethod),
@@ -243,6 +260,7 @@ pub enum AssociatedItem {
 
 /// A trait method is a function that is defined within a trait.
 /// Trait methods can be implemented by other types.
+#[derive(Debug)]
 pub struct AssociatedMethod {
     /// The name of the method.
     pub name: &'static str,
@@ -256,6 +274,7 @@ pub struct AssociatedMethod {
 
 /// A trait type alias is a type alias that is defined within a trait.
 /// Trait type aliases can be implemented by other types.
+#[derive(Debug)]
 pub struct TraitTypeAlias {
     /// The name of the type alias.
     pub name: &'static str,
@@ -265,6 +284,7 @@ pub struct TraitTypeAlias {
 
 /// A trait constant is a constant that is defined within a trait.
 /// Trait constants can be implemented by other types.
+#[derive(Debug)]
 pub struct TraitConst {
     /// The name of the constant.
     pub name: &'static str,
@@ -276,6 +296,7 @@ pub struct TraitConst {
 
 /// An Impl is a block of code that implements methods or traits for a type.
 /// Impls are used to define the behavior of a type.
+#[derive(Debug)]
 pub struct Impl {
     /// Self type of the impl.
     pub self_type: ASTTypeKind,
@@ -289,6 +310,7 @@ pub struct Impl {
 
 /// A const is a constant value that is defined at compile time.
 /// Constants are immutable and cannot be changed during runtime.
+#[derive(Debug)]
 pub struct Const {
     /// The name of the constant.
     pub name: &'static str,
@@ -303,6 +325,7 @@ pub struct Const {
 /// A global variable is a variable that is defined at the module level.
 /// Global variables have varying levels of visibility.
 /// Global variables can be mutable or immutable.
+#[derive(Debug)]
 pub struct Global {
     /// The name of the global variable.
     pub name: &'static str,

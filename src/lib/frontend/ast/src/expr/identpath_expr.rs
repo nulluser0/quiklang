@@ -7,7 +7,7 @@
 //! ## List of Identifier Path Expression AST Structures
 //! - [`IdentPathExpr`](#ident-path-expr)
 
-use crate::frontend::ast::types::ASTTypeKind;
+use crate::types::ASTTypeKind;
 
 /// Path types
 #[derive(Debug, Clone)]
