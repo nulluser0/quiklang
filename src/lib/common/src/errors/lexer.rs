@@ -11,7 +11,10 @@ pub enum LexerError {
     #[error("Unterminated string literal starting at line {}, column {}.", span.line, span.col)]
     UnterminatedStringLiteral { span: Span },
 
-    #[error("Unterminated Multi-line comment starting at line {}, column {}.", span.line, span.col)]
+    #[error("Unterminated string interpolation starting at line {}, column {}.", span.line, span.col)]
+    UnterminatedInterpolation { span: Span },
+
+    #[error("Unterminated multi-line comment starting at line {}, column {}.", span.line, span.col)]
     UnterminatedMultiLineComment { span: Span },
 
     #[error("Invalid number format '{invalid_string}' at line {}, column {}.", span.line, span.col)]
@@ -23,6 +26,7 @@ impl LexerError {
         match self {
             LexerError::UnrecognizedCharacter { span, .. } => *span,
             LexerError::UnterminatedStringLiteral { span, .. } => *span,
+            LexerError::UnterminatedInterpolation { span, .. } => *span,
             LexerError::UnterminatedMultiLineComment { span, .. } => *span,
             LexerError::InvalidNumberFormat { span, .. } => *span,
         }

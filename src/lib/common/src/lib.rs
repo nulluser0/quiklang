@@ -16,7 +16,7 @@ pub struct File {
 }
 
 /// Manages all files involved in the compilation process.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct FileStore {
     files: HashMap<usize, File>,
     next_id: usize,
