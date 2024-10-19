@@ -1,8 +1,6 @@
 pub mod lexer;
 pub mod parser;
 
-use std::collections::HashMap;
-
 use lexer::{LexerError, LexerWarning};
 use parser::{ParserError, ParserWarning};
 use thiserror::Error;
