@@ -194,6 +194,10 @@ pub fn tokenize(source_code: &str, file_id: usize, report: &mut CompilationRepor
                                             string_info.start_line,
                                             string_info.start_col,
                                         ),
+                                        suggestions: vec![
+                                            "You may have forgotten to close the string with '\"'."
+                                                .to_string(),
+                                        ],
                                     }
                                     .into(),
                                 );
@@ -220,6 +224,9 @@ pub fn tokenize(source_code: &str, file_id: usize, report: &mut CompilationRepor
                                 string_info.start_line,
                                 string_info.start_col,
                             ),
+                            suggestions: vec![
+                                "You may have forgotten to close the string with '\"'.".to_string(),
+                            ],
                         }
                         .into(),
                     );
@@ -281,6 +288,9 @@ pub fn tokenize(source_code: &str, file_id: usize, report: &mut CompilationRepor
                         string_info.start_line,
                         string_info.start_col,
                     ),
+                    suggestions: vec![
+                        "You may have forgotten to close the string with '\"'.".to_string()
+                    ],
                 }
                 .into(),
             );
@@ -306,6 +316,9 @@ pub fn tokenize(source_code: &str, file_id: usize, report: &mut CompilationRepor
                         string_info.start_line,
                         string_info.start_col,
                     ),
+                    suggestions: vec![
+                        "You may have forgotten to close the interpolation with '}'.".to_string(),
+                    ],
                 }
                 .into(),
             );
@@ -393,6 +406,10 @@ fn tokenize_normally(
                                     start_line,
                                     start_col,
                                 ),
+                                suggestions: vec![
+                                    "You may have forgotten to close the comment with '*/'."
+                                        .to_string(),
+                                ],
                             },
                         ));
                     }
@@ -484,6 +501,7 @@ fn tokenize_normally(
                 LexerError::UnrecognizedCharacter {
                     character: c,
                     span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                    suggestion: vec![],
                 },
             ));
             chars.next_char(); // Skip the unrecognized character
@@ -543,10 +561,32 @@ fn lex_number(
                 span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
             }),
             Err(_) => {
-                report.add_error(CompilerError::LexerError(LexerError::InvalidNumberFormat {
-                    invalid_string: number,
-                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
-                }));
+                // Check if float has multiple decimal points
+                if number.matches('.').count() > 1 {
+                    report.add_error(CompilerError::LexerError(LexerError::InvalidNumberFormat {
+                        invalid_string: number,
+                        span: Span::new(
+                            file_id,
+                            start_pos,
+                            chars.current_pos,
+                            start_line,
+                            start_col,
+                        ),
+                        suggestions: vec!["You may have multiple decimal points.".to_string()],
+                    }));
+                } else {
+                    report.add_error(CompilerError::LexerError(LexerError::InvalidNumberFormat {
+                        invalid_string: number,
+                        span: Span::new(
+                            file_id,
+                            start_pos,
+                            chars.current_pos,
+                            start_line,
+                            start_col,
+                        ),
+                        suggestions: vec!["Your number may be too large or too small.".to_string()],
+                    }));
+                }
                 Err(())
             }
         }
@@ -560,6 +600,7 @@ fn lex_number(
                 report.add_error(CompilerError::LexerError(LexerError::InvalidNumberFormat {
                     invalid_string: number,
                     span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                    suggestions: vec!["Your number may be too large or too small.".to_string()],
                 }));
                 Err(())
             }
@@ -836,12 +877,16 @@ mod tests {
         // Assert that one error was reported
         assert_eq!(report.errors.len(), 1, "Expected one lexer error.");
 
-        if let CompilerError::LexerError(LexerError::UnrecognizedCharacter { character, span }) =
-            &report.errors[0]
+        if let CompilerError::LexerError(LexerError::UnrecognizedCharacter {
+            character,
+            span,
+            suggestion,
+        }) = &report.errors[0]
         {
             assert_eq!(*character, '$');
             assert_eq!(span.line, 3);
             assert_eq!(span.col, 21);
+            assert_eq!(*suggestion, Vec::<String>::new());
         } else {
             panic!("Expected UnrecognizedCharacter lexer error.");
         }
@@ -854,8 +899,7 @@ mod tests {
     #[test]
     fn test_unterminated_string_literal() {
         let source = r#"
-            let message = "Hello, World!;
-        "#;
+            let message = "Hello, World!;"#;
         let file_name = "test_unterminated_string_literal.quik";
         let mut file_store = FileStore::default();
         let file_id = setup_file_store(source, file_name, &mut file_store);
@@ -887,7 +931,7 @@ mod tests {
         // Assert that one error was reported
         assert_eq!(report.errors.len(), 1, "Expected one lexer error.");
 
-        if let CompilerError::LexerError(LexerError::UnterminatedStringLiteral { span }) =
+        if let CompilerError::LexerError(LexerError::UnterminatedStringLiteral { span, .. }) =
             &report.errors[0]
         {
             assert_eq!(span.line, 2);
@@ -979,6 +1023,7 @@ mod tests {
         if let CompilerError::LexerError(LexerError::InvalidNumberFormat {
             invalid_string,
             span,
+            ..
         }) = &report.errors[0]
         {
             assert_eq!(invalid_string, "12.34.56");

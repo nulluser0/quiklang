@@ -86,14 +86,16 @@ impl CompilationReport {
                             *file_id_map.get(&e.span().file_id).unwrap(),
                             e.span().start..e.span().end,
                         )
-                        .with_message("here")]),
+                        .with_message("here")])
+                        .with_notes(e.suggestions()),
                     CompilerError::ParserError(e) => Diagnostic::error()
                         .with_message(format!("{}", e))
                         .with_labels(vec![Label::primary(
                             *file_id_map.get(&e.span().file_id).unwrap(),
                             e.span().start..e.span().end,
                         )
-                        .with_message("here")]),
+                        .with_message("here")])
+                        .with_notes(e.suggestions()),
                 };
 
                 codespan_reporting::term::emit(&mut writer, &config, &files, &diagnostic).unwrap();

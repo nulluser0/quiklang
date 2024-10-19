@@ -8,7 +8,7 @@ use super::Span;
 #[derive(Debug, Error)]
 pub enum ParserError {
     #[error("Unexpected end of file at line {}, column {}.", span.line, span.col)]
-    UnexpectedEOF { span: Span },
+    UnexpectedEOF { span: Span, suggestion: Vec<String> },
     #[error(
         "Unexpected token '{found:?}' at line {}, column {}. Expected {expected}.",
         span.line,
@@ -18,6 +18,7 @@ pub enum ParserError {
         expected: String,
         found: TokenType,
         span: Span,
+        suggestion: Vec<String>,
     },
     // Add more parser-specific errors
 }
@@ -25,8 +26,21 @@ pub enum ParserError {
 impl ParserError {
     pub fn span(&self) -> Span {
         match self {
-            ParserError::UnexpectedEOF { span } => *span,
+            ParserError::UnexpectedEOF { span, .. } => *span,
             ParserError::UnexpectedToken { span, .. } => *span,
+        }
+    }
+
+    pub fn suggestions(&self) -> Vec<String> {
+        match self {
+            ParserError::UnexpectedEOF {
+                suggestion: suggestions,
+                ..
+            } => suggestions.clone(),
+            ParserError::UnexpectedToken {
+                suggestion: suggestions,
+                ..
+            } => suggestions.clone(),
         }
     }
 }
