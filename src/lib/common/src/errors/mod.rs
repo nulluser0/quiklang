@@ -1,3 +1,10 @@
+pub mod lexer;
+pub mod parser;
+
+use std::collections::HashMap;
+
+use lexer::{LexerError, LexerWarning};
+use parser::{ParserError, ParserWarning};
 use thiserror::Error;
 
 /// Centralized Compiler Error Enum
@@ -10,56 +17,14 @@ pub enum CompilerError {
     ParserError(#[from] ParserError),
 }
 
-/// Lexer-Specific Errors
-#[derive(Debug, Error)]
-pub enum LexerError {
-    #[error("Unrecognized character '{character}' at line {}, column {}.", span.line, span.col)]
-    UnrecognizedCharacter { character: char, span: Span },
-
-    #[error("Unterminated string literal starting at line {}, column {}.", span.line, span.col)]
-    UnterminatedStringLiteral { span: Span },
-
-    #[error("Invalid number format '{invalid_string}' at line {}, column {}.", span.line, span.col)]
-    InvalidNumberFormat { invalid_string: String, span: Span },
-
-    #[error("Internal error. Please report this!: {0}")]
-    InternalError(String),
-}
-
-/// Parser-Specific Errors
-#[derive(Debug, Error)]
-pub enum ParserError {
-    #[error("Unexpected end of file at line {}, column {}.", span.line, span.col)]
-    UnexpectedEOF { span: Span },
-    #[error(
-        "Unexpected token '{found:?}' at line {}, column {}. Expected {expected}.",
-        span.line,
-        span.col
-    )]
-    UnexpectedToken {
-        expected: String,
-        found: TokenType,
-        span: Span,
-    },
-    // Add more parser-specific errors
-}
-
-/// Warning Enum (similar to errors, if needed)
+/// Centralized Compiler Warning Enum
 #[derive(Debug, Error)]
 pub enum CompilerWarning {
-    #[error("Unused variable '{name}' at line {}, column {}.", span.line, span.col)]
-    UnusedVariable {
-        name: String,
-        span: Span,
-        suggestion: Option<String>,
-    },
-    #[error("Deprecated feature '{feature}' used at line {}, column {}.", span.line, span.col)]
-    DeprecatedFeature {
-        feature: String,
-        span: Span,
-        suggestion: Option<String>,
-    },
-    // Add more warnings as needed
+    #[error("{0}")]
+    LexerWarning(#[from] LexerWarning),
+
+    #[error("{0}")]
+    ParserWarning(#[from] ParserWarning),
 }
 
 /// Span Struct to Represent Error Locations
@@ -83,10 +48,6 @@ impl Span {
         }
     }
 }
-
-use std::collections::HashMap;
-
-use crate::data_structs::tokens::TokenType;
 
 #[derive(Debug, Clone)]
 pub struct File {

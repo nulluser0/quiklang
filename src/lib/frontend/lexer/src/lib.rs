@@ -14,19 +14,24 @@
 //! - Symbols/Delimiters
 //! - End of File
 
-use std::{iter::Peekable, str::Chars};
-
-use quiklang_common::{
-    data_structs::tokens::{Token, TokenType},
-    errors::{LexerError, Span},
+use std::{
+    iter::Peekable,
+    str::{Chars, FromStr},
 };
 
-#[inline]
-fn is_skippable(src: char) -> bool {
-    src.is_whitespace()
+use quiklang_common::{
+    data_structs::tokens::{Keyword, Operator, Symbol, TokenType},
+    errors::{lexer::LexerError, CompilerError, Span},
+    CompilationReport,
+};
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Token {
+    pub token: TokenType,
+    pub span: Span,
 }
 
-// Custom made struct to implement line and col.
+/// Custom made struct to implement line and col.
 struct CharStream<'a> {
     chars: Peekable<Chars<'a>>,
     current_pos: usize, // Byte offset from the beginning
@@ -44,7 +49,7 @@ impl<'a> CharStream<'a> {
         }
     }
 
-    fn next(&mut self) -> Option<char> {
+    fn next_char(&mut self) -> Option<char> {
         if let Some(c) = self.chars.next() {
             let c_len = c.len_utf8();
             self.current_pos += c_len;
@@ -60,7 +65,7 @@ impl<'a> CharStream<'a> {
         }
     }
 
-    fn peek(&mut self) -> Option<&char> {
+    fn peek_char(&mut self) -> Option<&char> {
         self.chars.peek()
     }
 
@@ -69,693 +74,503 @@ impl<'a> CharStream<'a> {
     }
 }
 
-pub fn tokenize(source_code: &str) -> Result<Vec<Token>, LexerError> {
-    let mut chars: CharStream = CharStream::new(source_code);
-    let mut tokens: Vec<Token> = Vec::with_capacity(source_code.len() + 100);
+/// Tokenizes the input source code and returns a list of tokens.
+/// Errors are pushed into the `report`.
+pub fn tokenize(source_code: &str, file_id: usize, report: &mut CompilationReport) -> Vec<Token> {
+    let mut chars = CharStream::new(source_code);
+    let mut tokens = Vec::new();
 
-    while let Some(&c) = chars.peek() {
-        tokenize_chars(c, &mut chars, &mut tokens)?;
+    while let Some(&c) = chars.peek_char() {
+        if is_skippable(c) {
+            chars.next_char();
+            continue;
+        }
+
+        let (start_pos, start_line, start_col) = chars.get_position();
+
+        match c {
+            '/' => {
+                // Handle comments or division
+                chars.next_char(); // Consume '/'
+                if let Some(&next_char) = chars.peek_char() {
+                    if next_char == '/' {
+                        // Single-line comment: skip until end of line
+                        chars.next_char(); // Consume second '/'
+                        while let Some(c) = chars.next_char() {
+                            if c == '\n' {
+                                break;
+                            }
+                        }
+                        continue;
+                    } else if next_char == '*' {
+                        // Multi-line comment: skip until '*/'
+                        chars.next_char(); // Consume '*'
+                        let mut found_end = false;
+                        while let Some(c) = chars.next_char() {
+                            if c == '*' {
+                                if let Some(&'/') = chars.peek_char() {
+                                    chars.next_char(); // Consume '/'
+                                    found_end = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if !found_end {
+                            report.add_error(CompilerError::LexerError(
+                                LexerError::UnterminatedMultiLineComment {
+                                    span: Span::new(
+                                        file_id,
+                                        start_pos,
+                                        chars.current_pos,
+                                        start_line,
+                                        start_col,
+                                    ),
+                                },
+                            ));
+                        }
+                        continue;
+                    } else {
+                        // It's a division operator
+                        tokens.push(Token {
+                            token: TokenType::Operator(Operator::Divide),
+                            span: Span::new(
+                                file_id,
+                                start_pos,
+                                chars.current_pos,
+                                start_line,
+                                start_col,
+                            ),
+                        });
+                        continue;
+                    }
+                } else {
+                    // It's a division operator at EOF
+                    tokens.push(Token {
+                        token: TokenType::Operator(Operator::Divide),
+                        span: Span::new(
+                            file_id,
+                            start_pos,
+                            chars.current_pos,
+                            start_line,
+                            start_col,
+                        ),
+                    });
+                    continue;
+                }
+            }
+            '"' => {
+                match tokenize_string_literal(
+                    &mut chars, file_id, start_pos, start_line, start_col, report,
+                ) {
+                    Ok(token) => tokens.push(token),
+                    Err(_) => {
+                        // Error already reported
+                    }
+                }
+                continue;
+            }
+            c if is_identifier_start(c) => {
+                let identifier = lex_identifier(&mut chars);
+                let end_pos = chars.current_pos;
+                let _end_line = chars.line;
+                let _end_col = chars.col;
+                let token_type = match Keyword::from_str(&identifier) {
+                    Ok(keyword) => TokenType::Keyword(keyword),
+                    Err(_) => TokenType::Identifier(identifier),
+                };
+                tokens.push(Token {
+                    token: token_type,
+                    span: Span::new(file_id, start_pos, end_pos, start_line, start_col),
+                });
+                continue;
+            }
+            c if c.is_ascii_digit() => {
+                match lex_number(
+                    &mut chars, file_id, start_pos, start_line, start_col, report,
+                ) {
+                    Ok(token) => tokens.push(token),
+                    Err(_) => {
+                        // Error already reported
+                    }
+                }
+                continue;
+            }
+            '+' | '-' | '*' | '=' | '!' | '>' | '<' | '&' | '|' | '@' | '^' | '~' | '.' => {
+                match tokenize_operator_or_symbol(
+                    &mut chars, file_id, start_pos, start_line, start_col, c, report,
+                ) {
+                    Ok(Some(token)) => tokens.push(token),
+                    Ok(None) => (), // Token was already handled (e.g., comments)
+                    Err(_) => {
+                        // Error already reported
+                    }
+                }
+                continue;
+            }
+            '(' | ')' | '{' | '}' | '[' | ']' | ',' | ';' | ':' => {
+                let symbol = match c {
+                    '(' => Symbol::LeftParen,
+                    ')' => Symbol::RightParen,
+                    '{' => Symbol::LeftBrace,
+                    '}' => Symbol::RightBrace,
+                    '[' => Symbol::LeftBracket,
+                    ']' => Symbol::RightBracket,
+                    ',' => Symbol::Comma,
+                    ';' => Symbol::Semicolon,
+                    ':' => Symbol::Colon,
+                    _ => unreachable!(),
+                };
+                chars.next_char(); // Consume symbol
+                tokens.push(Token {
+                    token: TokenType::Symbol(symbol),
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                });
+                continue;
+            }
+            _ => {
+                // Unrecognized character
+                report.add_error(CompilerError::LexerError(
+                    LexerError::UnrecognizedCharacter {
+                        character: c,
+                        span: Span::new(
+                            file_id,
+                            start_pos,
+                            chars.current_pos,
+                            start_line,
+                            start_col,
+                        ),
+                    },
+                ));
+                chars.next_char(); // Skip the unrecognized character
+                continue;
+            }
+        }
     }
 
     tokens.push(Token {
         token: TokenType::EOF,
-        // line: chars.line,
-        // col: chars.col,
         span: Span::new(
-            chars.current_pos as u32,
-            chars.current_pos as u32,
-            chars.line as u32,
-            chars.col as u32,
+            file_id,
+            chars.current_pos,
+            chars.current_pos,
+            chars.line,
+            chars.col,
         ),
     });
 
-    println!("{:#?}", tokens);
+    // Optional: Print tokens for debugging
+    // println!("{:#?}", tokens);
 
-    Ok(tokens)
+    tokens
 }
 
-fn tokenize_chars(
-    c: char,
-    chars: &mut CharStream,
-    tokens: &mut Vec<Token>,
-) -> Result<(), LexerError> {
-    if is_skippable(c) {
-        chars.next();
-        return Ok(());
-    }
-
-    match c {
-        '(' | ')' | '{' | '}' | '[' | ']' | ',' | ';' | ':' | '.' | '~' | '+' | '*' | '%' | '!'
-        | '=' | '-' | '>' | '<' | '&' | '|' | '@' | '^' => {
-            tokenize_operator_or_symbol(c, chars, tokens)?;
-        }
-        '"' => {
-            tokenize_string_literal(chars, tokens)?;
-        }
-        '/' => {
-            tokenize_comment_or_divide(chars, tokens)?;
-        }
-        _ if c.is_ascii_digit() => {
-            tokenize_number(chars, tokens)?;
-        }
-        _ if c.is_ascii_alphabetic() || c == '_' => {
-            tokenize_identifier_or_keyword(chars, tokens)?;
-        }
-        _ => {
-            return Err(LexerError::UnrecognizedCharacter {
-                character: c,
-                line: chars.line,
-                col: chars.col,
-            })
-        }
-    }
-
-    Ok(())
+fn is_skippable(c: char) -> bool {
+    c.is_whitespace()
 }
 
-fn tokenize_comment_or_divide(
-    chars: &mut CharStream,
-    tokens: &mut Vec<Token>,
-) -> Result<(), LexerError> {
-    let before_pos = chars.get_position().0;
-    chars.next(); // Consume the '/'
-    match chars.peek() {
-        Some('/') => {
-            // Single-line comment
-            chars.next(); // Consume the second '/'
-            while let Some(&ch) = chars.peek() {
-                if ch == '\n' {
-                    break; // End of comment
-                }
-                chars.next();
-            }
-        }
-        Some('*') => {
-            // Multi-line comment
-            chars.next(); // Consume the '*'
-            loop {
-                match (chars.next(), chars.peek()) {
-                    (Some('*'), Some('/')) => {
-                        chars.next(); // Consume the '/'
-                        break; // End of comment
-                    }
-                    (Some(_), None) => break, // EOF without closing comment
-                    (None, _) => break,       // Handle EOF gracefully
-                    _ => {}                   // Continue scanning
-                }
-            }
-        }
-        _ => {
-            // It's a divide operator
-            tokens.push(Token {
-                token: TokenType::Operator(Operator::Divide),
-                // line: chars.line,
-                // col: chars.col,
-                span: Span::new(
-                    before_pos as u32,
-                    chars.current_pos as u32,
-                    chars.line as u32,
-                    chars.col as u32,
-                ),
-            });
+fn is_identifier_start(c: char) -> bool {
+    c.is_alphabetic() || c == '_'
+}
+
+fn lex_identifier(chars: &mut CharStream) -> String {
+    let mut identifier = String::new();
+    while let Some(&c) = chars.peek_char() {
+        if c.is_alphanumeric() || c == '_' {
+            identifier.push(c);
+            chars.next_char();
+        } else {
+            break;
         }
     }
-    Ok(())
+    identifier
+}
+
+fn lex_number(
+    chars: &mut CharStream,
+    file_id: usize,
+    start_pos: usize,
+    start_line: usize,
+    start_col: usize,
+    report: &mut CompilationReport,
+) -> Result<Token, ()> {
+    let mut number = String::new();
+    let mut has_dot = false;
+
+    while let Some(&c) = chars.peek_char() {
+        if c.is_ascii_digit() {
+            number.push(c);
+            chars.next_char();
+        } else if c == '.' && !has_dot {
+            has_dot = true;
+            number.push(c);
+            chars.next_char();
+        } else {
+            break;
+        }
+    }
+
+    if has_dot {
+        match number.parse::<f64>() {
+            Ok(value) => Ok(Token {
+                token: TokenType::FloatLiteral(value),
+                span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+            }),
+            Err(_) => {
+                report.add_error(CompilerError::LexerError(LexerError::InvalidNumberFormat {
+                    invalid_string: number,
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }));
+                Err(())
+            }
+        }
+    } else {
+        match number.parse::<i64>() {
+            Ok(value) => Ok(Token {
+                token: TokenType::IntegerLiteral(value),
+                span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+            }),
+            Err(_) => {
+                report.add_error(CompilerError::LexerError(LexerError::InvalidNumberFormat {
+                    invalid_string: number,
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }));
+                Err(())
+            }
+        }
+    }
 }
 
 fn tokenize_operator_or_symbol(
-    c: char,
     chars: &mut CharStream,
-    tokens: &mut Vec<Token>,
-) -> Result<(), LexerError> {
-    match c {
-        '(' => tokens.push(Token {
-            token: TokenType::Symbol(Symbol::LeftParen),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        ')' => tokens.push(Token {
-            token: TokenType::Symbol(Symbol::RightParen),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        '{' => tokens.push(Token {
-            token: TokenType::Symbol(Symbol::LeftBrace),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        '}' => tokens.push(Token {
-            token: TokenType::Symbol(Symbol::RightBrace),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        '[' => tokens.push(Token {
-            token: TokenType::Symbol(Symbol::LeftBracket),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        ']' => tokens.push(Token {
-            token: TokenType::Symbol(Symbol::RightBracket),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        ',' => tokens.push(Token {
-            token: TokenType::Symbol(Symbol::Comma),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        ';' => tokens.push(Token {
-            token: TokenType::Symbol(Symbol::Semicolon),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        ':' => tokens.push(Token {
-            token: TokenType::Symbol(Symbol::Colon),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        // '.' => tokens.push(Token {
-        //     token: TokenType::Symbol(Symbol::Dot),
-        //     line: chars.line,
-        //     col: chars.col,
-        // }),
-        '~' => tokens.push(Token {
-            token: TokenType::Operator(Operator::BitwiseNot),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        '+' => tokens.push(Token {
-            token: TokenType::Operator(Operator::Add),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        '*' => tokens.push(Token {
-            token: TokenType::Operator(Operator::Multiply),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        '%' => tokens.push(Token {
-            token: TokenType::Operator(Operator::Modulus),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        '@' => tokens.push(Token {
-            token: TokenType::Symbol(Symbol::At),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        '^' => tokens.push(Token {
-            token: TokenType::Operator(Operator::BitwiseXor),
-            span: Span::new(
-                chars.current_pos as u32 - 1,
-                chars.current_pos as u32,
-                chars.line as u32,
-                chars.col as u32,
-            ),
-        }),
-        '!' | '=' | '-' | '>' | '<' | '&' | '|' | '.' => {
-            chars.next();
-            handle_complex_operators(c, chars, tokens)?;
-            return Ok(());
-        }
-        _ => {
-            return Err(LexerError::InternalError(format!(
-                "Unresolved character {}",
-                c
-            )))
-        }
-    }
-    chars.next();
-    Ok(())
-}
-
-fn handle_complex_operators(
-    c: char,
-    chars: &mut CharStream,
-    tokens: &mut Vec<Token>,
-) -> Result<(), LexerError> {
-    // Current character already known, peek next to decide on multi-character operators
-    let before_pos = chars.get_position().0 - 1;
-    match c {
+    file_id: usize,
+    start_pos: usize,
+    start_line: usize,
+    start_col: usize,
+    current_char: char,
+    report: &mut CompilationReport,
+) -> Result<Option<Token>, ()> {
+    let _ = report;
+    match current_char {
         '!' => {
-            if matches!(chars.peek(), Some(&'=')) {
-                chars.next(); // Consume '='
-                tokens.push(Token {
+            if let Some(&'=') = chars.peek_char() {
+                chars.next_char(); // Consume '='
+                Ok(Some(Token {
                     token: TokenType::Operator(Operator::NotEqual),
-                    span: Span::new(
-                        before_pos as u32,
-                        chars.current_pos as u32,
-                        chars.line as u32,
-                        chars.col as u32,
-                    ),
-                });
-                Ok(())
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
             } else {
-                tokens.push(Token {
+                Ok(Some(Token {
                     token: TokenType::Operator(Operator::LogicalNot),
-                    span: Span::new(
-                        before_pos as u32,
-                        chars.current_pos as u32,
-                        chars.line as u32,
-                        chars.col as u32,
-                    ),
-                });
-                Ok(())
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
             }
         }
         '=' => {
-            if matches!(chars.peek(), Some(&'=')) {
-                chars.next(); // Consume '='
-                tokens.push(Token {
+            if let Some(&'=') = chars.peek_char() {
+                chars.next_char(); // Consume '='
+                Ok(Some(Token {
                     token: TokenType::Operator(Operator::Equal),
-                    span: Span::new(
-                        before_pos as u32,
-                        chars.current_pos as u32,
-                        chars.line as u32,
-                        chars.col as u32,
-                    ),
-                });
-
-                Ok(())
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
             } else {
-                tokens.push(Token {
+                Ok(Some(Token {
                     token: TokenType::Operator(Operator::Assign),
-                    span: Span::new(
-                        before_pos as u32,
-                        chars.current_pos as u32,
-                        chars.line as u32,
-                        chars.col as u32,
-                    ),
-                });
-                Ok(())
-            }
-        }
-        '-' => {
-            if matches!(chars.peek(), Some(&'>')) {
-                chars.next(); // Consume '>'
-                tokens.push(Token {
-                    token: TokenType::Symbol(Symbol::Arrow),
-                    span: Span::new(
-                        before_pos as u32,
-                        chars.current_pos as u32,
-                        chars.line as u32,
-                        chars.col as u32,
-                    ),
-                });
-
-                Ok(())
-            } else {
-                tokens.push(Token {
-                    token: TokenType::Operator(Operator::Subtract),
-                    span: Span::new(
-                        before_pos as u32,
-                        chars.current_pos as u32,
-                        chars.line as u32,
-                        chars.col as u32,
-                    ),
-                });
-                Ok(())
-            }
-        }
-        '>' => {
-            match chars.peek() {
-                Some(&'=') => {
-                    chars.next(); // Consume '='
-                    tokens.push(Token {
-                        token: TokenType::Operator(Operator::GreaterOrEqual),
-                        span: Span::new(
-                            before_pos as u32,
-                            chars.current_pos as u32,
-                            chars.line as u32,
-                            chars.col as u32,
-                        ),
-                    });
-
-                    Ok(())
-                }
-                _ => {
-                    tokens.push(Token {
-                        token: TokenType::Operator(Operator::GreaterThan),
-                        span: Span::new(
-                            before_pos as u32,
-                            chars.current_pos as u32,
-                            chars.line as u32,
-                            chars.col as u32,
-                        ),
-                    });
-                    Ok(())
-                }
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
             }
         }
         '<' => {
-            match chars.peek() {
-                Some(&'=') => {
-                    chars.next(); // Consume '='
-                    tokens.push(Token {
-                        token: TokenType::Operator(Operator::LessOrEqual),
-                        span: Span::new(
-                            before_pos as u32,
-                            chars.current_pos as u32,
-                            chars.line as u32,
-                            chars.col as u32,
-                        ),
-                    });
-
-                    Ok(())
-                }
-                _ => {
-                    tokens.push(Token {
-                        token: TokenType::Operator(Operator::LessThan),
-                        span: Span::new(
-                            before_pos as u32,
-                            chars.current_pos as u32,
-                            chars.line as u32,
-                            chars.col as u32,
-                        ),
-                    });
-                    Ok(())
-                }
+            if let Some(&'=') = chars.peek_char() {
+                chars.next_char(); // Consume '='
+                Ok(Some(Token {
+                    token: TokenType::Operator(Operator::LessOrEqual),
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
+            } else {
+                Ok(Some(Token {
+                    token: TokenType::Operator(Operator::LessThan),
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
+            }
+        }
+        '>' => {
+            if let Some(&'=') = chars.peek_char() {
+                chars.next_char(); // Consume '='
+                Ok(Some(Token {
+                    token: TokenType::Operator(Operator::GreaterOrEqual),
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
+            } else {
+                Ok(Some(Token {
+                    token: TokenType::Operator(Operator::GreaterThan),
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
             }
         }
         '&' => {
-            if matches!(chars.peek(), Some(&'&')) {
-                chars.next(); // Consume '&'
-                tokens.push(Token {
+            if let Some(&'&') = chars.peek_char() {
+                chars.next_char(); // Consume '&'
+                Ok(Some(Token {
                     token: TokenType::Operator(Operator::And),
-                    span: Span::new(
-                        before_pos as u32,
-                        chars.current_pos as u32,
-                        chars.line as u32,
-                        chars.col as u32,
-                    ),
-                });
-
-                Ok(())
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
             } else {
-                tokens.push(Token {
+                Ok(Some(Token {
                     token: TokenType::Operator(Operator::BitwiseAnd),
-                    span: Span::new(
-                        before_pos as u32,
-                        chars.current_pos as u32,
-                        chars.line as u32,
-                        chars.col as u32,
-                    ),
-                });
-                Ok(())
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
             }
         }
         '|' => {
-            if matches!(chars.peek(), Some(&'|')) {
-                chars.next(); // Consume '|'
-                tokens.push(Token {
+            if let Some(&'|') = chars.peek_char() {
+                chars.next_char(); // Consume '|'
+                Ok(Some(Token {
                     token: TokenType::Operator(Operator::Or),
-                    span: Span::new(
-                        before_pos as u32,
-                        chars.current_pos as u32,
-                        chars.line as u32,
-                        chars.col as u32,
-                    ),
-                });
-
-                Ok(())
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
             } else {
-                tokens.push(Token {
+                Ok(Some(Token {
                     token: TokenType::Operator(Operator::BitwiseOr),
-                    span: Span::new(
-                        before_pos as u32,
-                        chars.current_pos as u32,
-                        chars.line as u32,
-                        chars.col as u32,
-                    ),
-                });
-                Ok(())
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
+            }
+        }
+        '-' => {
+            if let Some(&'>') = chars.peek_char() {
+                chars.next_char(); // Consume '>'
+                Ok(Some(Token {
+                    token: TokenType::Symbol(Symbol::Arrow),
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
+            } else {
+                Ok(Some(Token {
+                    token: TokenType::Operator(Operator::Subtract),
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
             }
         }
         '.' => {
-            if matches!(chars.peek(), Some(&'.')) {
-                chars.next();
-                if matches!(chars.peek(), Some(&'=')) {
-                    chars.next(); // Consume '='
-                    tokens.push(Token {
+            if let Some(&'.') = chars.peek_char() {
+                chars.next_char(); // Consume second '.'
+                if let Some(&'=') = chars.peek_char() {
+                    chars.next_char(); // Consume '='
+                    Ok(Some(Token {
                         token: TokenType::Operator(Operator::RangeInclusive),
                         span: Span::new(
-                            before_pos as u32,
-                            chars.current_pos as u32,
-                            chars.line as u32,
-                            chars.col as u32,
+                            file_id,
+                            start_pos,
+                            chars.current_pos,
+                            start_line,
+                            start_col,
                         ),
-                    });
+                    }))
                 } else {
-                    tokens.push(Token {
+                    Ok(Some(Token {
                         token: TokenType::Operator(Operator::RangeExclusive),
                         span: Span::new(
-                            before_pos as u32,
-                            chars.current_pos as u32,
-                            chars.line as u32,
-                            chars.col as u32,
+                            file_id,
+                            start_pos,
+                            chars.current_pos,
+                            start_line,
+                            start_col,
                         ),
-                    });
+                    }))
                 }
             } else {
-                tokens.push(Token {
+                Ok(Some(Token {
                     token: TokenType::Symbol(Symbol::Dot),
-                    span: Span::new(
-                        before_pos as u32,
-                        chars.current_pos as u32,
-                        chars.line as u32,
-                        chars.col as u32,
-                    ),
-                });
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
             }
-            Ok(())
         }
-        _ => Err(LexerError::InternalError(format!(
-            "handle_complex_operators called with unexpected character: {} @ {} {}",
-            c, chars.line, chars.col
-        ))),
-    }
-}
-
-fn tokenize_number(chars: &mut CharStream, tokens: &mut Vec<Token>) -> Result<(), LexerError> {
-    let mut number = String::new();
-    let starting_line = chars.line;
-    let starting_col = chars.col;
-    let starting_pos = chars.get_position().0;
-    while let Some(&next) = chars.peek() {
-        if next.is_ascii_digit() || next == '.' {
-            number.push(chars.next().unwrap());
-        } else {
-            break;
-        }
-    }
-    if number.contains('.') {
-        tokens.push(Token {
-            token: TokenType::FloatLiteral(number.parse().map_err(|_| {
-                LexerError::InvalidNumberFormat {
-                    invalid_string: number.clone(),
-                    line: starting_line,
-                    col: starting_col,
-                }
-            })?),
-            span: Span::new(
-                starting_pos as u32,
-                chars.current_pos as u32,
-                starting_line as u32,
-                starting_col as u32,
-            ),
-        });
-    } else {
-        tokens.push(Token {
-            token: TokenType::IntegerLiteral(number.parse().map_err(|_| {
-                LexerError::InvalidNumberFormat {
-                    invalid_string: number.clone(),
-                    line: starting_line,
-                    col: starting_col,
-                }
-            })?),
-            span: Span::new(
-                starting_pos as u32,
-                chars.current_pos as u32,
-                starting_line as u32,
-                starting_col as u32,
-            ),
-        });
-    }
-    Ok(())
-}
-
-fn tokenize_identifier_or_keyword(
-    chars: &mut CharStream,
-    tokens: &mut Vec<Token>,
-) -> Result<(), LexerError> {
-    let mut identifier = String::new();
-    let starting_line = chars.line;
-    let starting_col = chars.col;
-    let starting_pos = chars.get_position().0;
-    while let Some(&next) = chars.peek() {
-        if next.is_ascii_alphanumeric() || next == '_' {
-            identifier.push(chars.next().unwrap());
-        } else {
-            break;
-        }
-    }
-    match Keyword::from_str(&identifier) {
-        Ok(keyword) => {
-            tokens.push(Token {
-                token: TokenType::Keyword(keyword),
-                span: Span::new(
-                    starting_pos as u32,
-                    chars.current_pos as u32,
-                    starting_line as u32,
-                    starting_col as u32,
-                ),
-            });
-            Ok(())
-        }
-        Err(_) => {
-            tokens.push(Token {
-                token: TokenType::Identifier(identifier),
-                span: Span::new(
-                    starting_pos as u32,
-                    chars.current_pos as u32,
-                    starting_line as u32,
-                    starting_col as u32,
-                ),
-            });
-            Ok(())
+        _ => {
+            // Handle other operators if necessary
+            Ok(None)
         }
     }
 }
 
 fn tokenize_string_literal(
     chars: &mut CharStream,
-    tokens: &mut Vec<Token>,
-) -> Result<(), LexerError> {
-    let mut start_span = Span::new(
-        chars.current_pos as u32,
-        0,
-        chars.line as u32,
-        chars.col as u32,
-    ); // Temporary end
-    chars.next(); // Consume the initial quote
+    file_id: usize,
+    start_pos: usize,
+    start_line: usize,
+    start_col: usize,
+    report: &mut CompilationReport,
+) -> Result<Token, LexerError> {
+    chars.next_char(); // Consume the initial quote
     let mut literal = String::new();
-    let mut current_pos = chars.current_pos;
-    let mut current_line = chars.line;
-    let mut current_col = chars.col;
+    // let mut current_pos = chars.current_pos;
+    // let mut current_line = chars.line;
+    // let mut current_col = chars.col;
 
-    while let Some(&ch) = chars.peek() {
+    while let Some(&ch) = chars.peek_char() {
         match ch {
             '"' => {
-                chars.next(); // Consume the closing quote
-                let end_span = Span::new(
-                    current_pos as u32,
-                    chars.current_pos as u32,
-                    current_line as u32,
-                    current_col as u32,
-                );
-                tokens.push(Token {
+                chars.next_char(); // Consume the closing quote
+                return Ok(Token {
                     token: TokenType::StringLiteral(literal),
-                    span: Span::new(
-                        start_span.start,
-                        end_span.end,
-                        start_span.line,
-                        start_span.col,
-                    ),
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
                 });
-                return Ok(());
             }
             '{' => {
-                chars.next(); // Consume '{'
-                let end_span = Span::new(
-                    current_pos as u32,
-                    chars.current_pos as u32,
-                    current_line as u32,
-                    current_col as u32,
-                );
-                tokens.push(Token {
-                    token: TokenType::StringLiteral(literal.clone()),
-                    span: Span::new(
-                        start_span.start,
-                        end_span.end,
-                        start_span.line,
-                        start_span.col,
-                    ),
-                });
-                tokens.push(Token {
-                    token: TokenType::StringInterpolationStart,
-                    span: end_span,
-                });
-                literal.clear();
-                start_span.start = chars.current_pos as u32;
+                chars.next_char(); // Consume '{'
+                unimplemented!("String interpolation is not yet supported");
+                // Alternatively, handle string interpolation start
+            }
+            '\\' => {
+                chars.next_char(); // Consume '\\'
+                if let Some(&escaped_char) = chars.peek_char() {
+                    let escaped = match escaped_char {
+                        'n' => '\n',
+                        't' => '\t',
+                        'r' => '\r',
+                        '"' => '"',
+                        '\\' => '\\',
+                        other => other, // Treat unknown escapes literally
+                    };
+                    literal.push(escaped);
+                    chars.next_char(); // Consume escaped character
+                } else {
+                    // Unterminated string literal
+                    report.add_error(
+                        LexerError::UnterminatedStringLiteral {
+                            span: Span::new(
+                                file_id,
+                                start_pos,
+                                chars.current_pos,
+                                start_line,
+                                start_col,
+                            ),
+                        }
+                        .into(),
+                    );
+                    return Err(LexerError::UnterminatedStringLiteral {
+                        span: Span::new(
+                            file_id,
+                            start_pos,
+                            chars.current_pos,
+                            start_line,
+                            start_col,
+                        ),
+                    });
+                }
             }
             _ => {
                 literal.push(ch);
-                chars.next();
-                current_pos = chars.current_pos;
-                current_line = chars.line;
-                current_col = chars.col;
+                chars.next_char();
             }
         }
     }
 
+    // If we reach here, the string was unterminated
+    report.add_error(
+        LexerError::UnterminatedStringLiteral {
+            span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+        }
+        .into(),
+    );
     Err(LexerError::UnterminatedStringLiteral {
-        line: start_span.line as usize,
-        col: start_span.col as usize,
+        span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
     })
 }

@@ -117,6 +117,7 @@ libloading = "0.8.5"
 
 # Error handling
 thiserror = "1.0.64"
+codespan-reporting = "0.11.1"
 
 # Async
 tokio = { version = "1.40.0", features = ["full"] }
