@@ -5,4 +5,4 @@ edition = "2021"
 
 [dependencies]
 thiserror = { workspace = true }
-quiklang-utils = { workspace = true }
+quiklang-common = { workspace = true }

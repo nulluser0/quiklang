@@ -19,8 +19,6 @@ members = [
 
     # Lexer (Converts source code to tokens)
     "src/lib/frontend/lexer",
-    # AST (Representation of AST)
-    "src/lib/frontend/ast",
     # Parser (Converts tokens to AST)
     "src/lib/frontend/parser",
     # Semantic Checker (Simple type checker)
@@ -28,8 +26,6 @@ members = [
 
     # == HIR (High-level Intermediate Representation) ==
 
-    # HIR (Representation of HIR)
-    "src/lib/hir/hir",
     # HIR Builder (Converts AST to HIR)
     "src/lib/hir/hir-builder",
     # HIR Visitor (Visits HIR)
@@ -41,8 +37,6 @@ members = [
 
     # == QIR (Quiklang Intermediate Representation) ==
 
-    # QIR (Representation of QIR)
-    "src/lib/qir/qir",
     # QIR Builder (Converts HIR to QIR)
     "src/lib/qir/qir-builder",
     # QIR Optimizer (Optimizes QIR)
@@ -65,7 +59,12 @@ members = [
     # General Utils (General utilities)
     "src/lib/utils",
     # Build Utils (Utilities for building)
-    "src/lib/build-utils",
+    "src/lib/build-utils", 
+    
+    # ============================== Common ==============================
+
+    # Common (Common utilities like data structures, errors, etc.)
+    "src/lib/common",
 ]
 
 [workspace.dependencies]
@@ -73,19 +72,16 @@ members = [
 
 # == Frontend ==
 quiklang-frontend-lexer = { path = "src/lib/frontend/lexer" }
-quiklang-frontend-ast = { path = "src/lib/frontend/ast" }
 quiklang-frontend-parser = { path = "src/lib/frontend/parser" }
 quiklang-frontend-semantic-checker = { path = "src/lib/frontend/semantic-checker" }
 
 # == HIR ==
-quiklang-hir-hir = { path = "src/lib/hir/hir" }
 quiklang-hir-hir-builder = { path = "src/lib/hir/hir-builder" }
 quiklang-hir-hir-visitor = { path = "src/lib/hir/hir-visitor" }
 quiklang-hir-hir-typer = { path = "src/lib/hir/hir-typer" }
 quiklang-hir-hir-typer-visitor = { path = "src/lib/hir/hir-typer-visitor" }
 
 # == QIR ==
-quiklang-qir-qir = { path = "src/lib/qir/qir" }
 quiklang-qir-qir-builder = { path = "src/lib/qir/qir-builder" }
 quiklang-qir-qir-optimizer = { path = "src/lib/qir/qir-optimizer" }
 
@@ -99,6 +95,9 @@ quiklang-qvm = { path = "src/lib/qvm" }
 # == Utils ==
 quiklang-utils = { path = "src/lib/utils" }
 quiklang-build-utils = { path = "src/lib/build-utils" }
+
+# == Common ==
+quiklang-common = { path = "src/lib/common" }
 
 # ============================== External Libraries ==============================
 
