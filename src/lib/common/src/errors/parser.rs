@@ -7,6 +7,9 @@ use super::Span;
 /// Parser-Specific Errors
 #[derive(Debug, Error)]
 pub enum ParserError {
+    #[error("File ID {file_id} not found in the file store.")]
+    FileNotFound { file_id: usize },
+
     #[error("Unexpected end of file at line {}, column {}.", span.line, span.col)]
     UnexpectedEOF { span: Span, suggestion: Vec<String> },
     #[error(
