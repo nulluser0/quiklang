@@ -44,17 +44,28 @@ use super::{
 #[derive(Debug)]
 pub struct Package {
     /// The name of the package.
-    pub name: &'static str,
+    pub name: String,
     /// The version of the package.
-    pub version: &'static str,
+    pub version: String,
     /// The authors of the package.
-    pub authors: Vec<&'static str>,
+    pub authors: Vec<String>,
     /// The description of the package.
-    pub description: &'static str,
-    /// The modules contained in the package.
-    pub modules: Vec<Module>,
+    pub description: String,
+    /// The library module of the package (if any).
+    pub library: Option<Module>,
+    /// The binary modules of the package (if any).
+    pub binaries: Vec<Bin>,
     /// The dependencies of the package.
     pub dependencies: Vec<Package>,
+}
+
+/// A bin is a binary module that is compiled as an executable.
+#[derive(Debug)]
+pub struct Bin {
+    /// The name of the binary module.
+    pub name: String,
+    /// The module itself.
+    pub module: Module,
 }
 
 /// A module is a collection of functions, types, and other items that are grouped together.
@@ -62,9 +73,11 @@ pub struct Package {
 #[derive(Debug)]
 pub struct Module {
     /// The name of the module.
-    pub name: &'static str,
+    pub name: String,
     /// Items contained in the module.
     pub items: Vec<ModuleItem>,
+    /// Nested modules.
+    pub submodules: Vec<Module>,
 }
 
 /// A module item is a function, type, or other item that is contained within a module.
@@ -87,7 +100,7 @@ pub enum Visibility {
     Public,
     /// Public visibility within the package (`pub(package)`).
     Package,
-    /// Public visibility to the parent module (`pub(parent)`).
+    /// Public visibility to the parent module (`pub(super)`).
     Super,
     /// Private visibility (not specified, default).
     Private,
@@ -150,8 +163,8 @@ pub struct Parameter {
     pub name: &'static str,
     /// The type of the parameter.
     pub ty: ASTTypeKind,
-    /// Whether the parameter is optional.
-    pub optional: bool,
+    /// Does the parameter have a default value?
+    pub default_value: Option<Expr>,
 }
 
 /// A struct is a data structure that contains named fields.

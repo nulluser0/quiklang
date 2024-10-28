@@ -12,6 +12,8 @@
 //! | [`types`](./types/index.html)          | Module for type AST structures.             |
 
 pub mod expr;
+pub mod package_metadata;
 pub mod package_module;
+pub mod paths;
 pub mod stmt;
 pub mod types;

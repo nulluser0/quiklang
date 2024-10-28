@@ -10,8 +10,12 @@ pub enum ParserError {
     #[error("File ID {file_id} not found in the file store.")]
     FileNotFound { file_id: usize },
 
+    #[error("No valid entry point found in the package.")]
+    NoEntryPoint { suggestion: Vec<String> },
+
     #[error("Unexpected end of file at line {}, column {}.", span.line, span.col)]
     UnexpectedEOF { span: Span, suggestion: Vec<String> },
+
     #[error(
         "Unexpected token '{found:?}' at line {}, column {}. Expected {expected}.",
         span.line,
@@ -31,6 +35,8 @@ impl ParserError {
         match self {
             ParserError::UnexpectedEOF { span, .. } => *span,
             ParserError::UnexpectedToken { span, .. } => *span,
+            ParserError::FileNotFound { .. } => unimplemented!(),
+            ParserError::NoEntryPoint { .. } => unimplemented!(),
         }
     }
 
@@ -44,6 +50,8 @@ impl ParserError {
                 suggestion: suggestions,
                 ..
             } => suggestions.clone(),
+            ParserError::FileNotFound { .. } => vec![],
+            ParserError::NoEntryPoint { suggestion } => suggestion.clone(),
         }
     }
 }

@@ -16,7 +16,6 @@ pub mod enum_expr;
 pub mod field_access_expr;
 pub mod for_expr;
 pub mod func_call_expr;
-pub mod identpath_expr;
 pub mod if_expr;
 pub mod literal_expr;
 pub mod loop_expr;
@@ -39,7 +38,6 @@ use enum_expr::EnumExpr;
 use field_access_expr::FieldAccessExpr;
 use for_expr::ForExpr;
 use func_call_expr::FuncCallExpr;
-use identpath_expr::ASTPath;
 use if_expr::IfExpr;
 use literal_expr::LiteralExpr;
 use loop_expr::LoopExpr;
@@ -59,8 +57,6 @@ use while_expr::WhileExpr;
 pub enum Expr {
     /// An operation expression.
     Operator(OperatorExpr),
-    /// An identifier path expression.
-    ASTPath(ASTPath),
     /// A literal expression.
     Literal(LiteralExpr),
     /// A bracket expression.

@@ -116,11 +116,17 @@ lazy_static = "1.5.0"
 libloading = "0.8.5"
 
 # Error handling
-thiserror = "1.0.64"
+thiserror = "1.0.65"
 codespan-reporting = "0.11.1"
 
+# TOML
+toml = { version = "0.8.19" }
+
+# Serde
+serde = { version = "1.0.213", features = ["derive"] }
+
 # Async
-tokio = { version = "1.40.0", features = ["full"] }
+tokio = { version = "1.41.0", features = ["full"] }
 
 [profile.release]
 lto = "fat"

@@ -55,36 +55,40 @@ impl std::fmt::Display for TokenType {
 // Keywords
 #[derive(Debug, PartialEq, Clone)]
 pub enum Keyword {
-    Import, // import
-    Fn,     // fn
-    Let,    // let
-    Mut,    // mut
-    Const,  // const
-    Return, // return
-    If,     // if
-    Else,   // else
-    Err,    // Err
-    Ok,     // Ok
-    Exit,   // exit
-    Break,  // break
-    Async,  // async
-    Await,  // await
-    While,  // while
-    For,    // for
-    Loop,   // loop
-    Global, // global
-    Block,  // block
-    In,     // in
-    Struct, // struct
-    Enum,   // enum
-    Type,   // type
-    Impl,   // impl
-    Extern, // extern
-    As,     // as
-    Clone,  // clone
-    Ref,    // ref
-    MutRef, // mutref
-    Extend, // extend
+    Fn,      // fn
+    Let,     // let
+    Mut,     // mut
+    Const,   // const
+    Return,  // return
+    If,      // if
+    Else,    // else
+    Err,     // Err
+    Ok,      // Ok
+    Exit,    // exit
+    Break,   // break
+    Async,   // async
+    Await,   // await
+    While,   // while
+    For,     // for
+    Loop,    // loop
+    Global,  // global
+    Block,   // block
+    In,      // in
+    Struct,  // struct
+    Enum,    // enum
+    Type,    // type
+    Impl,    // impl
+    Extern,  // extern
+    As,      // as
+    Clone,   // clone
+    Ref,     // ref
+    MutRef,  // mutref
+    Extend,  // extend
+    Pub,     // pub
+    Super,   // super
+    Package, // package
+    Trait,   // trait
+    Mod,     // mod
 }
 
 impl FromStr for Keyword {
@@ -92,7 +96,6 @@ impl FromStr for Keyword {
 
     fn from_str(s: &str) -> Result<Self, <Keyword as FromStr>::Err> {
         match s {
-            "import" => Ok(Keyword::Import),
             "fn" => Ok(Keyword::Fn),
             "let" => Ok(Keyword::Let),
             "mut" => Ok(Keyword::Mut),
@@ -122,6 +125,11 @@ impl FromStr for Keyword {
             "ref" => Ok(Keyword::Ref),
             "mutref" => Ok(Keyword::MutRef),
             "extend" => Ok(Keyword::Extend),
+            "pub" => Ok(Keyword::Pub),
+            "super" => Ok(Keyword::Super),
+            "package" => Ok(Keyword::Package),
+            "trait" => Ok(Keyword::Trait),
+            "mod" => Ok(Keyword::Mod),
             _ => Err(format!("{} is not a keyword.", s)),
         }
     }
@@ -130,7 +138,6 @@ impl FromStr for Keyword {
 impl std::fmt::Display for Keyword {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Keyword::Import => write!(f, "Keyword 'import'"),
             Keyword::Fn => write!(f, "Keyword 'fn'"),
             Keyword::Let => write!(f, "Keyword 'let'"),
             Keyword::Mut => write!(f, "Keyword 'mut'"),
@@ -160,6 +167,11 @@ impl std::fmt::Display for Keyword {
             Keyword::Ref => write!(f, "Keyword 'ref'"),
             Keyword::MutRef => write!(f, "Keyword 'mutref'"),
             Keyword::Extend => write!(f, "Keyword 'extend'"),
+            Keyword::Pub => write!(f, "Keyword 'pub'"),
+            Keyword::Super => write!(f, "Keyword 'super'"),
+            Keyword::Package => write!(f, "Keyword 'package'"),
+            Keyword::Trait => write!(f, "Keyword 'trait'"),
+            Keyword::Mod => write!(f, "Keyword 'mod'"),
         }
     }
 }

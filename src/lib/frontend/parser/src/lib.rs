@@ -5,19 +5,31 @@
 
 pub mod symbol_table;
 
-use std::fmt::Result;
-
 use quiklang_common::{
-    data_structs::ast::package_module::Package,
+    data_structs::{
+        ast::{
+            expr::identpath_expr::ASTPath,
+            package_module::{Bin, Function, Module, ModuleItem, Package, Parameter, Visibility},
+            types::{ASTType, ASTTypeKind, PrimitiveType},
+        },
+        tokens::{Keyword, Operator, Symbol, TokenType},
+    },
     errors::{parser::ParserError, CompilerError},
     CompilationReport, FileStore,
 };
+use quiklang_frontend_lexer::{tokenize, Tokens};
 use symbol_table::SymbolTable;
 
 pub struct Parser<'a> {
     file_store: &'a mut FileStore,
     compilation_report: &'a mut CompilationReport,
     symbol_table: SymbolTable,
+}
+
+struct EntryFiles {
+    lib: Option<usize>,
+    main: Option<usize>,
+    bins: Vec<usize>,
 }
 
 impl<'a> Parser<'a> {
@@ -32,20 +44,396 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Collects all entry files: lib, main, and binaries.
+    fn collect_entry_files(&self) -> Result<EntryFiles, ()> {
+        let mut entry_files = EntryFiles {
+            lib: None,
+            main: None,
+            bins: Vec::new(),
+        };
+
+        for file in self.file_store.files() {
+            let path = std::path::Path::new(&file.name);
+
+            if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                if file_name == "lib.quik" {
+                    entry_files.lib = Some(file.id);
+                } else if file_name == "main.quik" {
+                    entry_files.main = Some(file.id);
+                } else if path.starts_with("src/bin") && file_name.ends_with(".quik") {
+                    entry_files.bins.push(file.id);
+                }
+            }
+        }
+
+        Ok(entry_files)
+    }
+
     /// Entry point for the parser, which parses the entire package.
-    pub fn parse_package(&mut self, entry_file_id: usize) -> Package {
-        let entry_file = match self.file_store.get_file(entry_file_id) {
-            Some(file) => file,
+    pub fn parse_package(&mut self) -> Result<Package, ()> {
+        // Collect entry files
+        let entry_files = self.collect_entry_files()?;
+
+        // Use package metadata from FileStore or external source
+        let package_metadata = match self.file_store.project_metadata.as_ref() {
+            Some(result) => result,
             None => {
                 self.compilation_report
-                    .add_error(CompilerError::ParserError(ParserError::FileNotFound {
-                        file_id: entry_file_id,
+                    .add_error(CompilerError::ParserError(ParserError::NoEntryPoint {
+                        suggestion: vec![
+                            "Add a Package.toml file to the project directory.".to_string()
+                        ],
+                    }));
+                return Err(());
+            }
+        };
+
+        // Create the package
+        let mut package = Package {
+            name: package_metadata.package.name.clone(),
+            version: package_metadata.package.version.clone(),
+            authors: package_metadata.package.authors.clone(),
+            description: package_metadata.package.description.clone(),
+            library: None,
+            binaries: Vec::new(),
+            dependencies: vec![],
+        };
+
+        // Parse the library module if it exists
+        if let Some(lib_file_id) = entry_files.lib {
+            let lib_module = self.parse_module_file(lib_file_id)?;
+            package.library = Some(lib_module);
+        }
+
+        // Parse the main binary if it exists
+        if let Some(main_file_id) = entry_files.main {
+            let main_binary = self.parse_binary_file(main_file_id, "main".to_string())?;
+            package.binaries.push(main_binary);
+        }
+
+        // Parse additional binaries
+        for bin_file_id in entry_files.bins {
+            let bin_file = self.file_store.get_file(bin_file_id).unwrap();
+            let bin_name = std::path::Path::new(&bin_file.name)
+                .file_stem()
+                .unwrap()
+                .to_string_lossy()
+                .to_string();
+            let binary = self.parse_binary_file(bin_file_id, bin_name)?;
+            package.binaries.push(binary);
+        }
+
+        // Check for any compilation errors
+        if self.compilation_report.has_errors() {
+            return Err(());
+        }
+
+        Ok(package)
+    }
+
+    /// Parses a module file and returns a `Module`.
+    fn parse_module_file(&mut self, file_id: usize) -> Result<Module, ()> {
+        let file = self.file_store.get_file(file_id).unwrap().clone();
+        let mut module = Module {
+            name: file.name.split('/').last().unwrap().replace(".quik", ""),
+            items: vec![],
+            submodules: vec![],
+        };
+
+        self.parse_module(file.source.clone(), file_id, &mut module);
+        Ok(module)
+    }
+
+    /// Parses a binary file and returns a `Binary`.
+    fn parse_binary_file(&mut self, file_id: usize, name: String) -> Result<Bin, ()> {
+        let module = self.parse_module_file(file_id)?;
+        let binary = Bin { name, module };
+        Ok(binary)
+    }
+
+    /// Parses a module.
+    fn parse_module(&mut self, source: String, file_id: usize, module: &mut Module) {
+        // Lex the source code
+        let mut tokens = tokenize(&source, file_id, &mut self.compilation_report);
+
+        // Parse the tokens
+        while tokens.not_eof() {
+            module.items.push(self.parse_module_item(&mut tokens));
+        }
+    }
+
+    /// Parses a module item.
+    fn parse_module_item(&mut self, tokens: &mut Tokens) -> ModuleItem {
+        // Parse visibility
+        let visibility = match tokens.at().token {
+            // Pub
+            TokenType::Keyword(Keyword::Pub) => {
+                tokens.eat();
+                // Check for pub(package), pub(super) etc.
+                if let TokenType::Symbol(Symbol::LeftParen) = tokens.at().token {
+                    tokens.eat();
+                    match tokens.at().token {
+                        // pub(package)
+                        TokenType::Keyword(Keyword::Package) => {
+                            tokens.eat();
+                            tokens.expect(
+                                TokenType::Symbol(Symbol::RightParen),
+                                &mut self.compilation_report,
+                            );
+                            Visibility::Package
+                        }
+                        // pub(super)
+                        TokenType::Keyword(Keyword::Super) => {
+                            tokens.eat();
+                            tokens.expect(
+                                TokenType::Symbol(Symbol::RightParen),
+                                &mut self.compilation_report,
+                            );
+                            Visibility::Super
+                        }
+                        // Error
+                        _ => {
+                            self.compilation_report
+                                .add_error(CompilerError::ParserError(
+                                    ParserError::UnexpectedToken {
+                                        expected: "package or super".to_string(),
+                                        found: tokens.at().token.clone(),
+                                        span: tokens.at().span,
+                                        suggestion: vec![
+                                            "Expected 'package' or 'super' after 'pub'."
+                                                .to_string(),
+                                        ],
+                                    },
+                                ));
+                            Visibility::Private
+                        }
+                    }
+                } else {
+                    // pub
+                    Visibility::Public
+                }
+            }
+            // private
+            _ => Visibility::Private,
+        };
+
+        // Parse the rest of the module item
+        match &tokens.at().token {
+            TokenType::Keyword(Keyword::Fn) => self.parse_module_function(visibility, tokens),
+            TokenType::Keyword(Keyword::Struct) => self.parse_module_struct(visibility, tokens),
+            TokenType::Keyword(Keyword::Enum) => self.parse_module_enum(visibility, tokens),
+            TokenType::Keyword(Keyword::Type) => self.parse_module_type(visibility, tokens),
+            TokenType::Keyword(Keyword::Trait) => self.parse_module_trait(visibility, tokens),
+            TokenType::Keyword(Keyword::Impl) => self.parse_module_impl(visibility, tokens),
+            TokenType::Keyword(Keyword::Const) => self.parse_module_const(visibility, tokens),
+            TokenType::Keyword(Keyword::Global) => self.parse_module_global(visibility, tokens),
+            TokenType::Keyword(Keyword::Mod) => self.parse_module_mod(visibility, tokens),
+            bad => {
+                // Tokens that are not valid at the module level
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "function, struct, enum, type, trait, impl, const, global, mod"
+                            .to_string(),
+                        found: bad.clone(),
+                        span: tokens.at().span,
+                        suggestion: vec![
+                            "Expected a module item such as a function, struct, enum, etc."
+                                .to_string(),
+                        ],
+                    }));
+            }
+        }
+
+        todo!()
+    }
+
+    fn parse_type_declaration(&mut self, tokens: &mut Tokens) -> ASTType {
+        let ty = match &tokens.eat().token {
+            TokenType::Identifier(ident) => ident.clone(),
+            _ => {
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "identifier".to_string(),
+                        found: tokens.at().token.clone(),
+                        span: tokens.at().span,
+                        suggestion: vec!["Expected a type identifier.".to_string()],
+                    }));
+                return ASTType {
+                    kind: ASTTypeKind::Primitive(PrimitiveType::Void),
+                };
+            }
+        };
+
+        match &tokens.at().token {
+            TokenType::Operator(Operator::LessThan) => {
+                // Generic type
+                tokens.eat();
+                let mut generics = Vec::new();
+                while tokens.at().token != TokenType::Operator(Operator::GreaterThan) {
+                    let generic = match &tokens.eat().token {
+                        TokenType::Identifier(ident) => ident.clone(),
+                        _ => {
+                            self.compilation_report
+                                .add_error(CompilerError::ParserError(
+                                    ParserError::UnexpectedToken {
+                                        expected: "identifier".to_string(),
+                                        found: tokens.at().token.clone(),
+                                        span: tokens.at().span,
+                                        suggestion: vec![
+                                            "Expected a generic type identifier.".to_string()
+                                        ],
+                                    },
+                                ));
+                            return ASTType {
+                                kind: ASTTypeKind::Primitive(PrimitiveType::Void),
+                            };
+                        }
+                    };
+                    generics.push(generic);
+                    if tokens.at().token == TokenType::Symbol(Symbol::Comma) {
+                        tokens.eat();
+                    }
+                }
+                tokens.expect(
+                    TokenType::Operator(Operator::GreaterThan),
+                    &mut self.compilation_report,
+                );
+                ASTType {
+                    kind: ASTTypeKind::Generic(ty, generics),
+                }
+            }
+            _ => ASTType {
+                kind: ASTTypeKind::Simple(ty),
+            },
+        }
+    }
+
+    fn parse_module_function(&mut self, visibility: Visibility, tokens: &mut Tokens) -> Function {
+        // Consume fn token
+        tokens.eat();
+
+        // Parse function identifier
+        let ident = match &tokens.eat().token {
+            TokenType::Identifier(ident) => ident,
+            _ => {
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "identifier".to_string(),
+                        found: tokens.at().token.clone(),
+                        span: tokens.at().span,
+                        suggestion: vec!["Expected an identifier after 'fn'.".to_string()],
                     }));
                 return;
             }
         };
 
-        // Parse the entry module
-        self.parse_module(entry_file.source.clone())
+        // Parse function parameters
+        // (ident: type, ident: type = default_value, ...)
+        let params = self.parse_module_function_params(tokens);
+
+        // Parse function return type
+        let return_ty = if tokens.at().token == TokenType::Symbol(Symbol::Arrow) {
+            tokens.eat();
+            match &tokens.eat().token {
+                TokenType::Identifier(ident) => ident.clone(),
+                _ => {
+                    self.compilation_report
+                        .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                            expected: "identifier".to_string(),
+                            found: tokens.at().token.clone(),
+                            span: tokens.at().span,
+                            suggestion: vec!["Expected a type after ':'.".to_string()],
+                        }));
+                    return Err(());
+                }
+            }
+        } else {
+            ASTType {
+                kind: ASTTypeKind::Void,
+            }
+        };
+    }
+
+    fn parse_module_function_params(&mut self, tokens: &mut Tokens) -> Vec<Parameter> {
+        // Consume left parenthesis
+        tokens.expect(
+            TokenType::Symbol(Symbol::LeftParen),
+            &mut self.compilation_report,
+        );
+
+        let mut params = Vec::new();
+
+        // Parse parameters
+        while tokens.at().token != TokenType::Symbol(Symbol::RightParen) && tokens.not_eof() {
+            // Parse parameter
+            let param = self.parse_module_function_param(tokens);
+            params.push(param);
+
+            // Check for comma
+            if tokens.at().token == TokenType::Symbol(Symbol::Comma) {
+                tokens.eat();
+            }
+        }
+
+        // Consume right parenthesis
+        tokens.expect(
+            TokenType::Symbol(Symbol::RightParen),
+            &mut self.compilation_report,
+        );
+
+        params
+    }
+
+    fn parse_module_function_param(&mut self, tokens: &mut Tokens) -> Parameter {
+        // Parse parameter identifier
+        let ident = match &tokens.eat().token {
+            TokenType::Identifier(ident) => ident,
+            _ => {
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "identifier".to_string(),
+                        found: tokens.at().token.clone(),
+                        span: tokens.at().span,
+                        suggestion: vec!["Expected an identifier.".to_string()],
+                    }));
+                return Parameter {
+                    name: "".to_string(),
+                    ty: "".to_string(),
+                    default: None,
+                };
+            }
+        };
+    }
+
+    fn parse_module_struct(&mut self, visibility: Visibility, tokens: &mut Tokens) {
+        todo!()
+    }
+
+    fn parse_module_enum(&mut self, visibility: Visibility, tokens: &mut Tokens) {
+        todo!()
+    }
+
+    fn parse_module_type(&mut self, visibility: Visibility, tokens: &mut Tokens) {
+        todo!()
+    }
+
+    fn parse_module_trait(&mut self, visibility: Visibility, tokens: &mut Tokens) {
+        todo!()
+    }
+
+    fn parse_module_impl(&mut self, visibility: Visibility, tokens: &mut Tokens) {
+        todo!()
+    }
+
+    fn parse_module_const(&mut self, visibility: Visibility, tokens: &mut Tokens) {
+        todo!()
+    }
+
+    fn parse_module_global(&mut self, visibility: Visibility, tokens: &mut Tokens) {
+        todo!()
+    }
+
+    fn parse_module_mod(&mut self, visibility: Visibility, tokens: &mut Tokens) {
+        todo!()
     }
 }

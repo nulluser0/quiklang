@@ -16,12 +16,13 @@
 
 use std::{
     iter::Peekable,
+    ops::Index,
     str::{Chars, FromStr},
 };
 
 use quiklang_common::{
     data_structs::tokens::{Keyword, Operator, Symbol, TokenType},
-    errors::{lexer::LexerError, CompilerError, Span},
+    errors::{lexer::LexerError, parser::ParserError, CompilerError, Span},
     CompilationReport,
 };
 
@@ -90,9 +91,70 @@ impl<'a> CharStream<'a> {
     }
 }
 
+pub struct Tokens {
+    tokens: Vec<Token>,
+    index: usize,
+}
+
+impl Tokens {
+    pub fn new(tokens: Vec<Token>) -> Self {
+        Tokens { tokens, index: 0 }
+    }
+
+    pub fn not_eof(&self) -> bool {
+        self.tokens
+            .first()
+            .map_or(false, |t| t.token != TokenType::EOF)
+    }
+
+    pub fn at(&self) -> &Token {
+        &self.tokens[self.index]
+    }
+
+    pub fn eat(&mut self) -> &Token {
+        let token = &self.tokens[self.index];
+        self.index += 1;
+        token
+    }
+
+    pub fn expect(&mut self, expected: TokenType, report: &mut CompilationReport) {
+        if self.at().token != expected {
+            report.add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                expected: expected.to_string(),
+                found: self.at().token.clone(),
+                span: self.at().span,
+                suggestion: vec![],
+            }));
+        }
+        self.eat();
+    }
+}
+
+impl Index<usize> for Tokens {
+    type Output = Token;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.tokens[index]
+    }
+}
+
+impl Iterator for Tokens {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.tokens.len() {
+            let token = self.tokens[self.index].clone();
+            self.index += 1;
+            Some(token)
+        } else {
+            None
+        }
+    }
+}
+
 /// Tokenizes the input source code and returns a list of tokens.
 /// Errors are pushed into the `report`.
-pub fn tokenize(source_code: &str, file_id: usize, report: &mut CompilationReport) -> Vec<Token> {
+pub fn tokenize(source_code: &str, file_id: usize, report: &mut CompilationReport) -> Tokens {
     let mut chars = CharStream::new(source_code);
     let mut tokens = Vec::new();
     let mut state = LexingState::Normal;
@@ -351,7 +413,7 @@ pub fn tokenize(source_code: &str, file_id: usize, report: &mut CompilationRepor
     // Optional: Print tokens for debugging
     // println!("{:#?}", tokens);
 
-    tokens
+    Tokens::new(tokens)
 }
 
 fn tokenize_normally(
@@ -803,7 +865,8 @@ mod tests {
             &file_store.get_file(file_id).unwrap().source,
             file_id,
             &mut report,
-        );
+        )
+        .tokens;
 
         // Define expected tokens
         let expected_tokens = vec![
@@ -856,7 +919,8 @@ mod tests {
             &file_store.get_file(file_id).unwrap().source,
             file_id,
             &mut report,
-        );
+        )
+        .tokens;
 
         // Define expected tokens (excluding the unrecognized character)
         let expected_tokens = vec![
@@ -912,7 +976,8 @@ mod tests {
             &file_store.get_file(file_id).unwrap().source,
             file_id,
             &mut report,
-        );
+        )
+        .tokens;
 
         // Define expected tokens (the string is unterminated, so it should not be present)
         let expected_tokens = vec![
@@ -964,7 +1029,8 @@ mod tests {
             &file_store.get_file(file_id).unwrap().source,
             file_id,
             &mut report,
-        );
+        )
+        .tokens;
 
         // Define expected tokens
         let expected_tokens = vec![
@@ -1005,7 +1071,8 @@ mod tests {
             &file_store.get_file(file_id).unwrap().source,
             file_id,
             &mut report,
-        );
+        )
+        .tokens;
 
         // Define expected tokens (the invalid number is split or causes an error)
         let expected_tokens = vec![
@@ -1056,7 +1123,8 @@ mod tests {
             &file_store.get_file(file_id).unwrap().source,
             file_id,
             &mut report,
-        );
+        )
+        .tokens;
 
         // Define expected tokens (assuming string interpolation is not fully implemented)
         let expected_tokens = vec![
