@@ -94,7 +94,7 @@ pub struct ModuleItem {
 /// The visibility of a module item determines whether it can be accessed from outside the module.
 /// Items can be private (only accessible within the module) or public (accessible from other modules).
 /// There are different levels of visibility, such as `pub`, `pub(package)`, and `pub(parent)`.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Visibility {
     /// Public visibility (`pub`).
     Public,
@@ -134,7 +134,7 @@ pub enum Item {
 #[derive(Debug)]
 pub struct Function {
     /// The name of the function.
-    pub name: &'static str,
+    pub name: String,
     /// The parameters of the function.
     pub parameters: Vec<Parameter>,
     /// The return type of the function.
@@ -160,7 +160,7 @@ pub enum ReturnType {
 #[derive(Debug)]
 pub struct Parameter {
     /// The name of the parameter.
-    pub name: &'static str,
+    pub name: String,
     /// The type of the parameter.
     pub ty: ASTTypeKind,
     /// Does the parameter have a default value?
@@ -173,7 +173,7 @@ pub struct Parameter {
 #[derive(Debug)]
 pub struct Struct {
     /// The name of the struct.
-    pub name: &'static str,
+    pub name: String,
     /// The fields of the struct.
     pub fields: Vec<StructField>,
     /// Generics of the struct.
@@ -184,7 +184,7 @@ pub struct Struct {
 #[derive(Debug)]
 pub struct StructField {
     /// The name of the field.
-    pub name: &'static str,
+    pub name: String,
     /// The type of the field.
     pub ty: ASTTypeKind,
     /// Visibility of the field.
@@ -197,7 +197,7 @@ pub struct StructField {
 #[derive(Debug)]
 pub struct Enum {
     /// The name of the enum.
-    pub name: &'static str,
+    pub name: String,
     /// The variants of the enum.
     pub variants: Vec<EnumVariant>,
     /// Generics of the enum.
@@ -208,7 +208,7 @@ pub struct Enum {
 #[derive(Debug)]
 pub struct EnumVariant {
     /// The name of the variant.
-    pub name: &'static str,
+    pub name: String,
     /// The fields of the variant.
     pub fields: EnumField,
 }
@@ -228,7 +228,7 @@ pub enum EnumField {
 #[derive(Debug)]
 pub struct TypeAlias {
     /// The name of the type alias.
-    pub name: &'static str,
+    pub name: String,
     /// The type that the alias refers to.
     pub ty: ASTTypeKind,
     /// Generics of the type alias.
@@ -326,7 +326,7 @@ pub struct Impl {
 #[derive(Debug)]
 pub struct Const {
     /// The name of the constant.
-    pub name: &'static str,
+    pub name: String,
     /// The Visibility of the constant.
     pub visibility: Visibility,
     /// The type of the constant.

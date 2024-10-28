@@ -8,8 +8,20 @@ pub mod symbol_table;
 use quiklang_common::{
     data_structs::{
         ast::{
-            expr::identpath_expr::ASTPath,
-            package_module::{Bin, Function, Module, ModuleItem, Package, Parameter, Visibility},
+            expr::{
+                block_expr::BlockExpr,
+                func_call_expr::FuncCallExpr,
+                if_expr::IfExpr,
+                literal_expr::{Literal, LiteralExpr},
+                Expr,
+            },
+            package_module::{
+                Bin, Const, Enum, EnumField, EnumVariant, Function, Global, Impl, Item, Module,
+                ModuleItem, Package, Parameter, ReturnType, Struct, StructField, Trait, TypeAlias,
+                Visibility,
+            },
+            paths::{ASTPath, PathSegment},
+            stmt::Stmt,
             types::{ASTType, ASTTypeKind, PrimitiveType},
         },
         tokens::{Keyword, Operator, Symbol, TokenType},
@@ -158,37 +170,117 @@ impl<'a> Parser<'a> {
 
         // Parse the tokens
         while tokens.not_eof() {
-            module.items.push(self.parse_module_item(&mut tokens));
+            let item = self.parse_module_item(&mut tokens);
+            if let Some(item) = item {
+                module.items.push(item);
+            }
         }
     }
 
     /// Parses a module item.
-    fn parse_module_item(&mut self, tokens: &mut Tokens) -> ModuleItem {
+    fn parse_module_item(&mut self, tokens: &mut Tokens) -> Option<ModuleItem> {
         // Parse visibility
-        let visibility = match tokens.at().token {
+        let visibility = self.parse_visibility(tokens);
+
+        // Parse the rest of the module item
+        match &tokens.at().token {
+            TokenType::Keyword(Keyword::Fn) => {
+                let function = self.parse_module_function(visibility, tokens)?;
+                Some(ModuleItem {
+                    visibility,
+                    item: Item::Function(function),
+                })
+            }
+            TokenType::Keyword(Keyword::Struct) => {
+                let structure = self.parse_module_struct(visibility, tokens)?;
+                Some(ModuleItem {
+                    visibility,
+                    item: Item::Struct(structure),
+                })
+            }
+            TokenType::Keyword(Keyword::Enum) => {
+                let enumeration = self.parse_module_enum(visibility, tokens)?;
+                Some(ModuleItem {
+                    visibility,
+                    item: Item::Enum(enumeration),
+                })
+            }
+            TokenType::Keyword(Keyword::Type) => {
+                let type_alias = self.parse_module_type_alias(visibility, tokens)?;
+                Some(ModuleItem {
+                    visibility,
+                    item: Item::TypeAlias(type_alias),
+                })
+            }
+            TokenType::Keyword(Keyword::Trait) => {
+                let trait_item = self.parse_module_trait(visibility, tokens)?;
+                Some(ModuleItem {
+                    visibility,
+                    item: Item::Trait(trait_item),
+                })
+            }
+            TokenType::Keyword(Keyword::Impl) => {
+                let impl_item = self.parse_module_impl(visibility, tokens)?;
+                Some(ModuleItem {
+                    visibility,
+                    item: Item::Impl(impl_item),
+                })
+            }
+            TokenType::Keyword(Keyword::Const) => {
+                let const_item = self.parse_module_const(visibility, tokens)?;
+                Some(ModuleItem {
+                    visibility,
+                    item: Item::Const(const_item),
+                })
+            }
+            TokenType::Keyword(Keyword::Global) => {
+                let global = self.parse_module_global(visibility, tokens)?;
+                Some(ModuleItem {
+                    visibility,
+                    item: Item::Global(global),
+                })
+            }
+            TokenType::Keyword(Keyword::Mod) => {
+                // Handle submodule parsing here if necessary
+                // For now, we'll skip this
+                tokens.eat(); // Consume 'mod'
+                tokens.eat(); // Consume the module name
+                None
+            }
+            _ => {
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "module item".to_string(),
+                        found: tokens.at().token.clone(),
+                        span: tokens.at().span,
+                        suggestion: vec![
+                            "Expected a module item such as a function, struct, enum, etc."
+                                .to_string(),
+                        ],
+                    }));
+                None
+            }
+        }
+    }
+
+    /// Parses visibility modifiers.
+    fn parse_visibility(&mut self, tokens: &mut Tokens) -> Visibility {
+        match tokens.at().token {
             // Pub
             TokenType::Keyword(Keyword::Pub) => {
                 tokens.eat();
-                // Check for pub(package), pub(super) etc.
+                // Check for pub(package), pub(super), etc.
                 if let TokenType::Symbol(Symbol::LeftParen) = tokens.at().token {
                     tokens.eat();
-                    match tokens.at().token {
+                    let visibility = match tokens.at().token {
                         // pub(package)
                         TokenType::Keyword(Keyword::Package) => {
                             tokens.eat();
-                            tokens.expect(
-                                TokenType::Symbol(Symbol::RightParen),
-                                &mut self.compilation_report,
-                            );
                             Visibility::Package
                         }
                         // pub(super)
                         TokenType::Keyword(Keyword::Super) => {
                             tokens.eat();
-                            tokens.expect(
-                                TokenType::Symbol(Symbol::RightParen),
-                                &mut self.compilation_report,
-                            );
                             Visibility::Super
                         }
                         // Error
@@ -200,14 +292,19 @@ impl<'a> Parser<'a> {
                                         found: tokens.at().token.clone(),
                                         span: tokens.at().span,
                                         suggestion: vec![
-                                            "Expected 'package' or 'super' after 'pub'."
+                                            "Expected 'package' or 'super' after 'pub('."
                                                 .to_string(),
                                         ],
                                     },
                                 ));
                             Visibility::Private
                         }
-                    }
+                    };
+                    tokens.expect(
+                        TokenType::Symbol(Symbol::RightParen),
+                        &mut self.compilation_report,
+                    );
+                    visibility
                 } else {
                     // pub
                     Visibility::Public
@@ -215,146 +312,62 @@ impl<'a> Parser<'a> {
             }
             // private
             _ => Visibility::Private,
-        };
-
-        // Parse the rest of the module item
-        match &tokens.at().token {
-            TokenType::Keyword(Keyword::Fn) => self.parse_module_function(visibility, tokens),
-            TokenType::Keyword(Keyword::Struct) => self.parse_module_struct(visibility, tokens),
-            TokenType::Keyword(Keyword::Enum) => self.parse_module_enum(visibility, tokens),
-            TokenType::Keyword(Keyword::Type) => self.parse_module_type(visibility, tokens),
-            TokenType::Keyword(Keyword::Trait) => self.parse_module_trait(visibility, tokens),
-            TokenType::Keyword(Keyword::Impl) => self.parse_module_impl(visibility, tokens),
-            TokenType::Keyword(Keyword::Const) => self.parse_module_const(visibility, tokens),
-            TokenType::Keyword(Keyword::Global) => self.parse_module_global(visibility, tokens),
-            TokenType::Keyword(Keyword::Mod) => self.parse_module_mod(visibility, tokens),
-            bad => {
-                // Tokens that are not valid at the module level
-                self.compilation_report
-                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
-                        expected: "function, struct, enum, type, trait, impl, const, global, mod"
-                            .to_string(),
-                        found: bad.clone(),
-                        span: tokens.at().span,
-                        suggestion: vec![
-                            "Expected a module item such as a function, struct, enum, etc."
-                                .to_string(),
-                        ],
-                    }));
-            }
-        }
-
-        todo!()
-    }
-
-    fn parse_type_declaration(&mut self, tokens: &mut Tokens) -> ASTType {
-        let ty = match &tokens.eat().token {
-            TokenType::Identifier(ident) => ident.clone(),
-            _ => {
-                self.compilation_report
-                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
-                        expected: "identifier".to_string(),
-                        found: tokens.at().token.clone(),
-                        span: tokens.at().span,
-                        suggestion: vec!["Expected a type identifier.".to_string()],
-                    }));
-                return ASTType {
-                    kind: ASTTypeKind::Primitive(PrimitiveType::Void),
-                };
-            }
-        };
-
-        match &tokens.at().token {
-            TokenType::Operator(Operator::LessThan) => {
-                // Generic type
-                tokens.eat();
-                let mut generics = Vec::new();
-                while tokens.at().token != TokenType::Operator(Operator::GreaterThan) {
-                    let generic = match &tokens.eat().token {
-                        TokenType::Identifier(ident) => ident.clone(),
-                        _ => {
-                            self.compilation_report
-                                .add_error(CompilerError::ParserError(
-                                    ParserError::UnexpectedToken {
-                                        expected: "identifier".to_string(),
-                                        found: tokens.at().token.clone(),
-                                        span: tokens.at().span,
-                                        suggestion: vec![
-                                            "Expected a generic type identifier.".to_string()
-                                        ],
-                                    },
-                                ));
-                            return ASTType {
-                                kind: ASTTypeKind::Primitive(PrimitiveType::Void),
-                            };
-                        }
-                    };
-                    generics.push(generic);
-                    if tokens.at().token == TokenType::Symbol(Symbol::Comma) {
-                        tokens.eat();
-                    }
-                }
-                tokens.expect(
-                    TokenType::Operator(Operator::GreaterThan),
-                    &mut self.compilation_report,
-                );
-                ASTType {
-                    kind: ASTTypeKind::Generic(ty, generics),
-                }
-            }
-            _ => ASTType {
-                kind: ASTTypeKind::Simple(ty),
-            },
         }
     }
 
-    fn parse_module_function(&mut self, visibility: Visibility, tokens: &mut Tokens) -> Function {
-        // Consume fn token
+    /// Parses a function.
+    fn parse_module_function(
+        &mut self,
+        _visibility: Visibility,
+        tokens: &mut Tokens,
+    ) -> Option<Function> {
+        // Consume 'fn' token
         tokens.eat();
 
         // Parse function identifier
         let ident = match &tokens.eat().token {
-            TokenType::Identifier(ident) => ident,
-            _ => {
+            TokenType::Identifier(ident) => ident.clone(),
+            token => {
                 self.compilation_report
                     .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
                         expected: "identifier".to_string(),
-                        found: tokens.at().token.clone(),
+                        found: token.clone(),
                         span: tokens.at().span,
                         suggestion: vec!["Expected an identifier after 'fn'.".to_string()],
                     }));
-                return;
+                return None;
             }
         };
 
         // Parse function parameters
-        // (ident: type, ident: type = default_value, ...)
-        let params = self.parse_module_function_params(tokens);
+        let params = self.parse_module_function_params(tokens)?;
 
         // Parse function return type
         let return_ty = if tokens.at().token == TokenType::Symbol(Symbol::Arrow) {
             tokens.eat();
-            match &tokens.eat().token {
-                TokenType::Identifier(ident) => ident.clone(),
-                _ => {
-                    self.compilation_report
-                        .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
-                            expected: "identifier".to_string(),
-                            found: tokens.at().token.clone(),
-                            span: tokens.at().span,
-                            suggestion: vec!["Expected a type after ':'.".to_string()],
-                        }));
-                    return Err(());
-                }
-            }
+            self.parse_type_declaration(tokens)?
         } else {
             ASTType {
-                kind: ASTTypeKind::Void,
+                kind: ASTTypeKind::Primitive(PrimitiveType::Void),
             }
         };
+
+        // Parse function body
+        let body = self.parse_block(tokens)?;
+
+        Some(Function {
+            name: ident,
+            parameters: params,
+            return_type: match return_ty.kind {
+                ASTTypeKind::Primitive(PrimitiveType::Void) => ReturnType::DefaultVoid,
+                _ => ReturnType::Value(return_ty.kind),
+            },
+            body,
+        })
     }
 
-    fn parse_module_function_params(&mut self, tokens: &mut Tokens) -> Vec<Parameter> {
+    /// Parses function parameters.
+    fn parse_module_function_params(&mut self, tokens: &mut Tokens) -> Option<Vec<Parameter>> {
         // Consume left parenthesis
         tokens.expect(
             TokenType::Symbol(Symbol::LeftParen),
@@ -366,12 +379,14 @@ impl<'a> Parser<'a> {
         // Parse parameters
         while tokens.at().token != TokenType::Symbol(Symbol::RightParen) && tokens.not_eof() {
             // Parse parameter
-            let param = self.parse_module_function_param(tokens);
+            let param = self.parse_module_function_param(tokens)?;
             params.push(param);
 
             // Check for comma
             if tokens.at().token == TokenType::Symbol(Symbol::Comma) {
                 tokens.eat();
+            } else {
+                break;
             }
         }
 
@@ -381,59 +396,547 @@ impl<'a> Parser<'a> {
             &mut self.compilation_report,
         );
 
-        params
+        Some(params)
     }
 
-    fn parse_module_function_param(&mut self, tokens: &mut Tokens) -> Parameter {
+    /// Parses a single function parameter.
+    fn parse_module_function_param(&mut self, tokens: &mut Tokens) -> Option<Parameter> {
         // Parse parameter identifier
         let ident = match &tokens.eat().token {
-            TokenType::Identifier(ident) => ident,
-            _ => {
+            TokenType::Identifier(ident) => ident.clone(),
+            token => {
                 self.compilation_report
                     .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
                         expected: "identifier".to_string(),
-                        found: tokens.at().token.clone(),
+                        found: token.clone(),
                         span: tokens.at().span,
-                        suggestion: vec!["Expected an identifier.".to_string()],
+                        suggestion: vec!["Expected an identifier in parameter list.".to_string()],
                     }));
-                return Parameter {
-                    name: "".to_string(),
-                    ty: "".to_string(),
-                    default: None,
-                };
+                return None;
             }
         };
+
+        // Expect colon ':'
+        tokens.expect(
+            TokenType::Symbol(Symbol::Colon),
+            &mut self.compilation_report,
+        );
+
+        // Parse parameter type
+        let ty = self.parse_type_declaration(tokens)?;
+
+        // Optional default value
+        let default_value = if tokens.at().token == TokenType::Operator(Operator::Assign) {
+            tokens.eat(); // Consume '='
+            Some(self.parse_expression(tokens)?)
+        } else {
+            None
+        };
+
+        Some(Parameter {
+            name: ident,
+            ty: ty.kind,
+            default_value,
+        })
     }
 
-    fn parse_module_struct(&mut self, visibility: Visibility, tokens: &mut Tokens) {
-        todo!()
+    /// Parses a type declaration.
+    fn parse_type_declaration(&mut self, tokens: &mut Tokens) -> Option<ASTType> {
+        let ty = match &tokens.eat().token {
+            TokenType::Identifier(ident) => ident.clone(),
+            token => {
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "type identifier".to_string(),
+                        found: token.clone(),
+                        span: tokens.at().span,
+                        suggestion: vec!["Expected a type identifier.".to_string()],
+                    }));
+                return None;
+            }
+        };
+
+        let mut path_segments = vec![PathSegment {
+            name: ty,
+            args: vec![],
+            span: tokens.at().span,
+        }];
+
+        // Handle paths with '::'
+        while tokens.at().token == TokenType::Symbol(Symbol::DoubleColon) {
+            tokens.eat(); // Consume '::'
+            match &tokens.eat().token {
+                TokenType::Identifier(ident) => {
+                    path_segments.push(PathSegment {
+                        name: ident.clone(),
+                        args: vec![],
+                        span: tokens.at().span,
+                    });
+                }
+                token => {
+                    self.compilation_report
+                        .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                            expected: "identifier".to_string(),
+                            found: token.clone(),
+                            span: tokens.at().span,
+                            suggestion: vec!["Expected an identifier after '::'.".to_string()],
+                        }));
+                    return None;
+                }
+            }
+        }
+
+        Some(ASTType {
+            kind: ASTTypeKind::Path(ASTPath {
+                segments: path_segments,
+                span: tokens.at().span,
+            }),
+        })
     }
 
-    fn parse_module_enum(&mut self, visibility: Visibility, tokens: &mut Tokens) {
-        todo!()
+    /// Parses a block expression.
+    fn parse_block(&mut self, tokens: &mut Tokens) -> Option<BlockExpr> {
+        tokens.expect(
+            TokenType::Symbol(Symbol::LeftBrace),
+            &mut self.compilation_report,
+        );
+
+        let mut stmts = Vec::new();
+
+        while tokens.at().token != TokenType::Symbol(Symbol::RightBrace) && tokens.not_eof() {
+            let stmt = self.parse_statement(tokens)?;
+            stmts.push(stmt);
+        }
+
+        tokens.expect(
+            TokenType::Symbol(Symbol::RightBrace),
+            &mut self.compilation_report,
+        );
+
+        Some(BlockExpr {
+            stmts,
+            span: tokens.at().span,
+        })
     }
 
-    fn parse_module_type(&mut self, visibility: Visibility, tokens: &mut Tokens) {
-        todo!()
+    /// Parses a statement.
+    fn parse_statement(&mut self, tokens: &mut Tokens) -> Option<Stmt> {
+        // For simplicity, let's assume statements are expressions for now
+        let expr = self.parse_expression(tokens)?;
+        tokens.expect(
+            TokenType::Symbol(Symbol::Semicolon),
+            &mut self.compilation_report,
+        );
+        Some(Stmt::Expr(expr))
     }
 
-    fn parse_module_trait(&mut self, visibility: Visibility, tokens: &mut Tokens) {
-        todo!()
+    /// Parses an expression.
+    fn parse_expression(&mut self, tokens: &mut Tokens) -> Option<Expr> {
+        self.parse_primary_expression(tokens)
     }
 
-    fn parse_module_impl(&mut self, visibility: Visibility, tokens: &mut Tokens) {
-        todo!()
+    /// Parses a primary expression.
+    fn parse_primary_expression(&mut self, tokens: &mut Tokens) -> Option<Expr> {
+        // Use a smaller scope for the mutable borrow
+        let token = tokens.eat();
+        let span = token.span.clone();
+        match &token.token {
+            TokenType::IntegerLiteral(value) => Some(Expr::Literal(LiteralExpr {
+                value: Literal::Integer(*value),
+                span,
+            })),
+            TokenType::FloatLiteral(value) => Some(Expr::Literal(LiteralExpr {
+                value: Literal::Float(*value),
+                span,
+            })),
+            TokenType::StringLiteral(value) => Some(Expr::Literal(LiteralExpr {
+                value: Literal::String(value.to_string()),
+                span,
+            })),
+            TokenType::Identifier(name) => {
+                // Clone the name to end the borrow of `token`
+                let name_clone = name.clone();
+                // The mutable borrow from `tokens.eat()` ends here because `token` is no longer used
+
+                // Now we can safely peek without borrow conflicts
+                if let Some(next_token) = tokens.peek() {
+                    if next_token.token == TokenType::Symbol(Symbol::LeftParen) {
+                        tokens.eat(); // Consume the '('
+
+                        // Function call
+                        let args = self.parse_call_arguments(tokens)?;
+                        return Some(Expr::FuncCall(FuncCallExpr {
+                            func: Box::new(Expr::Literal(LiteralExpr {
+                                value: Literal::String(name_clone),
+                                span,
+                            })),
+                            args,
+                            span,
+                        }));
+                    }
+                }
+
+                // Variable reference (for now, treat as literal)
+                Some(Expr::Literal(LiteralExpr {
+                    value: Literal::String(name_clone),
+                    span,
+                }))
+            }
+            TokenType::Symbol(Symbol::LeftParen) => {
+                // Parenthesized expression
+                let expr = self.parse_expression(tokens)?;
+                tokens.expect(
+                    TokenType::Symbol(Symbol::RightParen),
+                    &mut self.compilation_report,
+                );
+                Some(expr)
+            }
+            TokenType::Keyword(Keyword::If) => self.parse_if_expression(tokens),
+            _ => {
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "expression".to_string(),
+                        found: token.token.clone(),
+                        span: token.span,
+                        suggestion: vec!["Expected an expression.".to_string()],
+                    }));
+                None
+            }
+        }
     }
 
-    fn parse_module_const(&mut self, visibility: Visibility, tokens: &mut Tokens) {
-        todo!()
+    /// Parses function call arguments.
+    fn parse_call_arguments(&mut self, tokens: &mut Tokens) -> Option<Vec<Expr>> {
+        tokens.expect(
+            TokenType::Symbol(Symbol::LeftParen),
+            &mut self.compilation_report,
+        );
+
+        let mut args = Vec::new();
+
+        while tokens.at().token != TokenType::Symbol(Symbol::RightParen) && tokens.not_eof() {
+            let arg = self.parse_expression(tokens)?;
+            args.push(arg);
+
+            if tokens.at().token == TokenType::Symbol(Symbol::Comma) {
+                tokens.eat();
+            } else {
+                break;
+            }
+        }
+
+        tokens.expect(
+            TokenType::Symbol(Symbol::RightParen),
+            &mut self.compilation_report,
+        );
+
+        Some(args)
     }
 
-    fn parse_module_global(&mut self, visibility: Visibility, tokens: &mut Tokens) {
-        todo!()
+    /// Parses an if expression.
+    fn parse_if_expression(&mut self, tokens: &mut Tokens) -> Option<Expr> {
+        let if_span = tokens.at().span;
+        tokens.eat(); // Consume 'if'
+
+        // Parse condition
+        let condition = self.parse_expression(tokens)?;
+
+        // Parse then block
+        let then_block = self.parse_block(tokens)?;
+
+        // Optional else block
+        let else_block = if tokens.at().token == TokenType::Keyword(Keyword::Else) {
+            tokens.eat(); // Consume 'else'
+            if tokens.at().token == TokenType::Keyword(Keyword::If) {
+                // Else if
+                Some(Box::new(self.parse_if_expression(tokens)?))
+            } else {
+                // Else block
+                Some(Box::new(Expr::Block(self.parse_block(tokens)?)))
+            }
+        } else {
+            None
+        };
+
+        Some(Expr::If(IfExpr {
+            cond: Box::new(condition),
+            then_block: Box::new(Expr::Block(then_block)),
+            else_block,
+            span: if_span,
+        }))
     }
 
-    fn parse_module_mod(&mut self, visibility: Visibility, tokens: &mut Tokens) {
+    fn parse_module_struct(
+        &mut self,
+        _visibility: Visibility,
+        tokens: &mut Tokens,
+    ) -> Option<Struct> {
+        // Consume 'struct'
+        tokens.eat();
+
+        // Parse struct name
+        let name = match &tokens.eat().token {
+            TokenType::Identifier(ident) => ident.clone(),
+            token => {
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "struct name".to_string(),
+                        found: token.clone(),
+                        span: tokens.at().span,
+                        suggestion: vec!["Expected a struct name.".to_string()],
+                    }));
+                return None;
+            }
+        };
+
+        // Parse struct fields
+        tokens.expect(
+            TokenType::Symbol(Symbol::LeftBrace),
+            &mut self.compilation_report,
+        );
+
+        let mut fields = Vec::new();
+
+        while tokens.at().token != TokenType::Symbol(Symbol::RightBrace) && tokens.not_eof() {
+            // Parse field visibility
+            let field_visibility = self.parse_visibility(tokens);
+
+            // Parse field name
+            let field_name = match &tokens.eat().token {
+                TokenType::Identifier(ident) => ident.clone(),
+                token => {
+                    self.compilation_report
+                        .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                            expected: "field name".to_string(),
+                            found: token.clone(),
+                            span: tokens.at().span,
+                            suggestion: vec!["Expected a field name.".to_string()],
+                        }));
+                    return None;
+                }
+            };
+
+            tokens.expect(
+                TokenType::Symbol(Symbol::Colon),
+                &mut self.compilation_report,
+            );
+
+            // Parse field type
+            let field_type = self.parse_type_declaration(tokens)?;
+
+            // Check for comma
+            if tokens.at().token == TokenType::Symbol(Symbol::Comma) {
+                tokens.eat();
+            }
+
+            fields.push(StructField {
+                name: field_name,
+                ty: field_type.kind,
+                visibility: field_visibility,
+            });
+        }
+
+        tokens.expect(
+            TokenType::Symbol(Symbol::RightBrace),
+            &mut self.compilation_report,
+        );
+
+        Some(Struct {
+            name,
+            fields,
+            generics: vec![], // Generics parsing not implemented here
+        })
+    }
+
+    fn parse_module_enum(&mut self, _visibility: Visibility, tokens: &mut Tokens) -> Option<Enum> {
+        tokens.eat(); // Consume 'enum'
+
+        // Parse enum name
+        let name = match &tokens.eat().token {
+            TokenType::Identifier(ident) => ident.clone(),
+            token => {
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "enum name".to_string(),
+                        found: token.clone(),
+                        span: tokens.at().span,
+                        suggestion: vec!["Expected an enum name.".to_string()],
+                    }));
+                return None;
+            }
+        };
+
+        // Parse enum variants
+        tokens.expect(
+            TokenType::Symbol(Symbol::LeftBrace),
+            &mut self.compilation_report,
+        );
+
+        let mut variants = Vec::new();
+
+        while tokens.at().token != TokenType::Symbol(Symbol::RightBrace) && tokens.not_eof() {
+            // Parse variant name
+            let variant_name = match &tokens.eat().token {
+                TokenType::Identifier(ident) => ident.clone(),
+                token => {
+                    self.compilation_report
+                        .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                            expected: "variant name".to_string(),
+                            found: token.clone(),
+                            span: tokens.at().span,
+                            suggestion: vec!["Expected a variant name.".to_string()],
+                        }));
+                    return None;
+                }
+            };
+
+            // For simplicity, we won't parse variant fields here
+            // Check for comma
+            if tokens.at().token == TokenType::Symbol(Symbol::Comma) {
+                tokens.eat();
+            }
+
+            variants.push(EnumVariant {
+                name: variant_name,
+                fields: EnumField::None,
+            });
+        }
+
+        tokens.expect(
+            TokenType::Symbol(Symbol::RightBrace),
+            &mut self.compilation_report,
+        );
+
+        Some(Enum {
+            name,
+            variants,
+            generics: vec![], // Generics parsing not implemented here
+        })
+    }
+
+    fn parse_module_type_alias(
+        &mut self,
+        _visibility: Visibility,
+        tokens: &mut Tokens,
+    ) -> Option<TypeAlias> {
+        tokens.eat(); // Consume 'type'
+
+        // Parse type alias name
+        let name = match &tokens.eat().token {
+            TokenType::Identifier(ident) => ident.clone(),
+            token => {
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "type alias name".to_string(),
+                        found: token.clone(),
+                        span: tokens.at().span,
+                        suggestion: vec!["Expected a type alias name.".to_string()],
+                    }));
+                return None;
+            }
+        };
+
+        tokens.expect(
+            TokenType::Operator(Operator::Assign),
+            &mut self.compilation_report,
+        );
+
+        // Parse the aliased type
+        let ty = self.parse_type_declaration(tokens)?;
+
+        tokens.expect(
+            TokenType::Symbol(Symbol::Semicolon),
+            &mut self.compilation_report,
+        );
+
+        Some(TypeAlias {
+            name,
+            ty: ty.kind,
+            generics: vec![],
+        })
+    }
+
+    fn parse_module_trait(
+        &mut self,
+        _visibility: Visibility,
+        tokens: &mut Tokens,
+    ) -> Option<Trait> {
+        // For brevity, we'll not implement trait parsing here
+        tokens.eat(); // Consume 'trait'
+        tokens.eat(); // Consume trait name
+                      // Skip the trait body
+        None
+    }
+
+    fn parse_module_impl(&mut self, _visibility: Visibility, tokens: &mut Tokens) -> Option<Impl> {
+        // For brevity, we'll not implement impl parsing here
+        tokens.eat(); // Consume 'impl'
+                      // Skip the impl body
+        None
+    }
+
+    fn parse_module_const(
+        &mut self,
+        _visibility: Visibility,
+        tokens: &mut Tokens,
+    ) -> Option<Const> {
+        tokens.eat(); // Consume 'const'
+
+        // Parse const name
+        let name = match &tokens.eat().token {
+            TokenType::Identifier(ident) => ident.clone(),
+            token => {
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "const name".to_string(),
+                        found: token.clone(),
+                        span: tokens.at().span,
+                        suggestion: vec!["Expected a constant name.".to_string()],
+                    }));
+                return None;
+            }
+        };
+
+        tokens.expect(
+            TokenType::Symbol(Symbol::Colon),
+            &mut self.compilation_report,
+        );
+
+        // Parse const type
+        let ty = self.parse_type_declaration(tokens)?;
+
+        tokens.expect(
+            TokenType::Operator(Operator::Assign),
+            &mut self.compilation_report,
+        );
+
+        // Parse const value
+        let value = self.parse_expression(tokens)?;
+
+        tokens.expect(
+            TokenType::Symbol(Symbol::Semicolon),
+            &mut self.compilation_report,
+        );
+
+        Some(Const {
+            name,
+            visibility: Visibility::Private, // Assuming private for now
+            ty: ty.kind,
+            value,
+        })
+    }
+
+    fn parse_module_global(
+        &mut self,
+        _visibility: Visibility,
+        tokens: &mut Tokens,
+    ) -> Option<Global> {
+        // For brevity, we'll not implement global variable parsing here
+        tokens.eat(); // Consume 'global'
+        None
+    }
+
+    fn parse_module_mod(&mut self, _visibility: Visibility, _tokens: &mut Tokens) {
         todo!()
     }
 }

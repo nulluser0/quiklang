@@ -111,6 +111,10 @@ impl Tokens {
         &self.tokens[self.index]
     }
 
+    pub fn peek(&self) -> Option<&Token> {
+        self.tokens.get(self.index + 1)
+    }
+
     pub fn eat(&mut self) -> &Token {
         let token = &self.tokens[self.index];
         self.index += 1;
@@ -527,7 +531,7 @@ fn tokenize_normally(
                 }
             }
         }
-        '+' | '-' | '*' | '=' | '!' | '>' | '<' | '&' | '|' | '@' | '^' | '~' | '.' => {
+        '+' | '-' | '*' | '=' | '!' | '>' | '<' | '&' | '|' | '@' | '^' | '~' | '.' | ':' => {
             match tokenize_operator_or_symbol(
                 chars, file_id, start_pos, start_line, start_col, c, report,
             ) {
@@ -538,7 +542,7 @@ fn tokenize_normally(
                 }
             }
         }
-        '(' | ')' | '{' | '}' | '[' | ']' | ',' | ';' | ':' => {
+        '(' | ')' | '{' | '}' | '[' | ']' | ',' | ';' => {
             let symbol = match c {
                 '(' => Symbol::LeftParen,
                 ')' => Symbol::RightParen,
@@ -548,7 +552,6 @@ fn tokenize_normally(
                 ']' => Symbol::RightBracket,
                 ',' => Symbol::Comma,
                 ';' => Symbol::Semicolon,
-                ':' => Symbol::Colon,
                 _ => unreachable!(),
             };
             chars.next_char(); // Consume symbol
@@ -810,6 +813,20 @@ fn tokenize_operator_or_symbol(
             } else {
                 Ok(Some(Token {
                     token: TokenType::Symbol(Symbol::Dot),
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
+            }
+        }
+        ':' => {
+            if let Some(&':') = chars.peek_char() {
+                chars.next_char(); // Consume second ':'
+                Ok(Some(Token {
+                    token: TokenType::Symbol(Symbol::DoubleColon),
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
+            } else {
+                Ok(Some(Token {
+                    token: TokenType::Symbol(Symbol::Colon),
                     span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
                 }))
             }

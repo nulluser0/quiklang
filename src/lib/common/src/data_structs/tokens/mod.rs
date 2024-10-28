@@ -247,6 +247,7 @@ pub enum Symbol {
     Dot,          // .
     Arrow,        // ->
     At,           // @
+    DoubleColon,  // ::
 }
 
 impl std::fmt::Display for Symbol {
@@ -264,6 +265,7 @@ impl std::fmt::Display for Symbol {
             Symbol::Dot => write!(f, "Symbol Dot '.'"),
             Symbol::Arrow => write!(f, "Symbol Arrow '->'"),
             Symbol::At => write!(f, "Symbol At '@'"),
+            Symbol::DoubleColon => write!(f, "Symbol Double Colon '::'"),
         }
     }
 }
