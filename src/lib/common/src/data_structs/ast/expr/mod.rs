@@ -51,14 +51,14 @@ use tuple_index_expr::TupleIndexExpr;
 use underscore_expr::UnderscoreExpr;
 use while_expr::WhileExpr;
 
-use super::paths::ASTPath;
+use super::paths::ASTExprPath;
 
 /// Represents an expression in Quiklang.
 /// All expressions are statements.
 #[derive(Debug, Clone)]
 pub enum Expr {
-    /// A path expression.
-    Path(ASTPath),
+    /// An Expr Path expression.
+    Path(ASTExprPath),
     /// An operation expression.
     Operator(OperatorExpr),
     /// A literal expression.

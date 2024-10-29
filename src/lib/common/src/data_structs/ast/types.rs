@@ -7,7 +7,7 @@
 //! ## List of Type AST Structures
 //! - [`ASTType`](#ast-type)
 
-use super::{package_module::TraitBound, paths::ASTPath};
+use super::{package_module::TraitBound, paths::ASTTypePath};
 
 /// Way of representing types in the Quiklang AST.
 #[derive(Debug, Clone)]
@@ -19,16 +19,16 @@ pub struct ASTType {
 /// Represents the different types of types in Quiklang.
 #[derive(Debug, Clone)]
 pub enum ASTTypeKind {
-    /// A path to a type.
-    Path(ASTPath),
+    /// Type path.
+    Path(ASTTypePath),
     /// A primitive type.
     Primitive(PrimitiveType),
     /// A ref type.
     Ref(Box<ASTType>, bool), // Type, mutable
     /// Trait object type.
-    TraitObject(Vec<ASTPath>),
+    TraitObject(Vec<ASTTypePath>),
     /// Type alias type.
-    Alias(ASTPath),
+    Alias(ASTTypePath),
     /// Placeholder type.
     ImplTrait,
     /// Self type. The type which represents the type of `self` in a trait or impl.

@@ -29,7 +29,10 @@ use quiklang_common::{
                 Bin, Const, Enum, EnumField, EnumVariant, Function, Global, Impl, Item, Module,
                 ModuleItem, Package, Parameter, Struct, StructField, Trait, TypeAlias, Visibility,
             },
-            paths::{ASTPath, PathSegment},
+            paths::{
+                ASTExprPath, ASTSimplePath, ASTTypePath, ExprPathSegment, SimplePathSegment,
+                TypePathSegment,
+            },
             stmt::{Stmt, VarDeclStmt},
             types::{ASTType, ASTTypeKind, PrimitiveType},
         },
@@ -441,6 +444,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a type declaration.
+    /// Also contains its own Type Path parsing logic, since Type Paths are only used in type declarations.
     fn parse_type_declaration(&mut self, tokens: &mut Tokens) -> Option<ASTType> {
         let ty = match &tokens.eat().token {
             // Identifier
@@ -546,22 +550,71 @@ impl<'a> Parser<'a> {
             }
         };
 
-        let mut path_segments = vec![PathSegment {
-            name: ty,
-            args: vec![],
-            span: tokens.at().span,
-        }];
+        let mut path_segments = Vec::new();
+
+        // Parse arguments if present 'T<U>'
+        if tokens.at().token == TokenType::Operator(Operator::LessThan) {
+            tokens.eat(); // Consume '<'
+            let mut args = Vec::new();
+            while tokens.at().token != TokenType::Operator(Operator::GreaterThan) {
+                let arg = self.parse_type_declaration(tokens)?;
+                args.push(arg);
+                if tokens.at().token == TokenType::Symbol(Symbol::Comma) {
+                    tokens.eat(); // Consume ','
+                }
+            }
+            tokens.expect(
+                TokenType::Operator(Operator::GreaterThan),
+                self.compilation_report,
+            );
+            path_segments.push(TypePathSegment {
+                name: ty,
+                args,
+                span: tokens.at().span,
+            });
+        } else {
+            path_segments.push(TypePathSegment {
+                name: ty,
+                args: vec![],
+                span: tokens.at().span,
+            });
+        }
 
         // Handle paths with '::'
         while tokens.at().token == TokenType::Symbol(Symbol::DoubleColon) {
             tokens.eat(); // Consume '::'
             match &tokens.eat().token {
                 TokenType::Identifier(ident) => {
-                    path_segments.push(PathSegment {
-                        name: ident.clone(),
-                        args: vec![],
-                        span: tokens.at().span,
-                    });
+                    let ident_clone = ident.clone();
+                    // Mutable borrow from tokens.eat() ends here
+
+                    // Parse arguments if present 'T<U>'
+                    if tokens.at().token == TokenType::Operator(Operator::LessThan) {
+                        tokens.eat(); // Consume '<'
+                        let mut args = Vec::new();
+                        while tokens.at().token != TokenType::Operator(Operator::GreaterThan) {
+                            let arg = self.parse_type_declaration(tokens)?;
+                            args.push(arg);
+                            if tokens.at().token == TokenType::Symbol(Symbol::Comma) {
+                                tokens.eat(); // Consume ','
+                            }
+                        }
+                        tokens.expect(
+                            TokenType::Operator(Operator::GreaterThan),
+                            self.compilation_report,
+                        );
+                        path_segments.push(TypePathSegment {
+                            name: ident_clone,
+                            args,
+                            span: tokens.at().span,
+                        });
+                    } else {
+                        path_segments.push(TypePathSegment {
+                            name: ident_clone,
+                            args: vec![],
+                            span: tokens.at().span,
+                        });
+                    }
                 }
                 token => {
                     self.compilation_report
@@ -577,10 +630,73 @@ impl<'a> Parser<'a> {
         }
 
         Some(ASTType {
-            kind: ASTTypeKind::Path(ASTPath {
+            kind: ASTTypeKind::Path(ASTTypePath {
                 segments: path_segments,
                 span: tokens.at().span,
             }),
+        })
+    }
+
+    /// Parse a path.
+    /// This will be useful in use items. Example: `use std::io::Read;`
+    fn parse_simple_path(&mut self, tokens: &mut Tokens) -> Option<ASTSimplePath> {
+        let mut path_segments = Vec::new();
+
+        // Parse the first path segment
+        let token = tokens.eat();
+        let ident = match &token.token {
+            TokenType::Identifier(ident) => ident.clone(),
+            token_type => {
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "identifier".to_string(),
+                        found: token_type.clone(),
+                        span: token.span,
+                        suggestion: vec!["Expected an identifier in path.".to_string()],
+                    }));
+                return None;
+            }
+        };
+        // Mutable borrow from tokens.eat() ends here
+
+        // No arguments allowed in simple paths
+        path_segments.push(SimplePathSegment {
+            name: ident,
+            span: token.span,
+        });
+
+        // Handle paths with '::'
+        while tokens.at().token == TokenType::Symbol(Symbol::DoubleColon) {
+            tokens.eat(); // Consume '::'
+
+            let token = tokens.eat();
+            match &token.token {
+                TokenType::Identifier(ident) => {
+                    let ident_clone = ident.clone();
+                    // Mutable borrow from tokens.eat() ends here
+
+                    // No arguments allowed in simple paths
+                    path_segments.push(SimplePathSegment {
+                        name: ident_clone,
+                        span: tokens.at().span,
+                    });
+                }
+                token_type => {
+                    self.compilation_report
+                        .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                            expected: "identifier".to_string(),
+                            found: token_type.clone(),
+                            span: token.span,
+                            suggestion: vec!["Expected an identifier after '::'.".to_string()],
+                        }));
+                    return None;
+                }
+            }
+        }
+
+        Some(ASTSimplePath {
+            segments: path_segments,
+            span: tokens.at().span,
         })
     }
 
@@ -1180,51 +1296,38 @@ impl<'a> Parser<'a> {
 
     /// Parses a primary expression. This is the base case for the expression parser.
     fn parse_primary_expression(&mut self, tokens: &mut Tokens) -> Option<Expr> {
-        // Use a smaller scope for the mutable borrow
-        let token = tokens.eat();
+        // Peek at the current token without consuming it
+        let token = tokens.at();
         let span = token.span;
+
         match &token.token {
-            TokenType::IntegerLiteral(value) => Some(Expr::Literal(LiteralExpr {
-                value: Literal::Integer(*value),
-                span,
-            })),
-            TokenType::FloatLiteral(value) => Some(Expr::Literal(LiteralExpr {
-                value: Literal::Float(*value),
-                span,
-            })),
-            TokenType::StringLiteral(value) => Some(Expr::Literal(LiteralExpr {
-                value: Literal::String(value.to_string()),
-                span,
-            })),
-            TokenType::Identifier(name) => {
-                // Clone the name to end the borrow of `token`
-                let name_clone = name.clone();
-                // The mutable borrow from `tokens.eat()` ends here because `token` is no longer used
-
-                // Now we can safely peek without borrow conflicts
-                if let Some(next_token) = tokens.peek() {
-                    if next_token.token == TokenType::Symbol(Symbol::LeftParen) {
-                        tokens.eat(); // Consume the '('
-
-                        // Function call
-                        let args = self.parse_call_arguments(tokens)?;
-                        return Some(Expr::FuncCall(FuncCallExpr {
-                            func: Box::new(Expr::Literal(LiteralExpr {
-                                value: Literal::String(name_clone),
-                                span,
-                            })),
-                            args,
-                            span,
-                        }));
-                    }
+            TokenType::IntegerLiteral(_)
+            | TokenType::FloatLiteral(_)
+            | TokenType::StringLiteral(_) => {
+                // For literals, consume the token and create the literal expression
+                let token = tokens.eat(); // Mutable borrow starts and ends here
+                match &token.token {
+                    TokenType::IntegerLiteral(value) => Some(Expr::Literal(LiteralExpr {
+                        value: Literal::Integer(*value),
+                        span,
+                    })),
+                    TokenType::FloatLiteral(value) => Some(Expr::Literal(LiteralExpr {
+                        value: Literal::Float(*value),
+                        span,
+                    })),
+                    TokenType::StringLiteral(value) => Some(Expr::Literal(LiteralExpr {
+                        value: Literal::String(value.clone()),
+                        span,
+                    })),
+                    _ => unreachable!(),
                 }
-
-                // Variable reference (path)
-                // parse path
-                todo!("parse path");
+            }
+            TokenType::Identifier(_) => {
+                // For identifiers, we may need to parse an expression path or variable
+                self.parse_expr_path(tokens)
             }
             TokenType::Symbol(Symbol::LeftParen) => {
-                // Parenthesized expression
+                tokens.eat(); // Consume '('
                 let expr = self.parse_expression(tokens)?;
                 tokens.expect(
                     TokenType::Symbol(Symbol::RightParen),
@@ -1233,20 +1336,20 @@ impl<'a> Parser<'a> {
                 Some(expr)
             }
             TokenType::Symbol(Symbol::LeftBracket) => {
-                // Array expression '[1, 2, 3]'
+                tokens.eat(); // Consume '['
                 let elements = self.parse_array_values(tokens)?;
-
                 Some(Expr::Array(ArrayExpr {
                     values: elements,
                     span,
                 }))
             }
             TokenType::Keyword(Keyword::List) => {
-                // List Array expression 'list[1, 2, 3]'
-                tokens.eat(); // Consume '['
-
+                tokens.eat(); // Consume 'list'
+                tokens.expect(
+                    TokenType::Symbol(Symbol::LeftBracket),
+                    self.compilation_report,
+                );
                 let elements = self.parse_array_values(tokens)?;
-
                 Some(Expr::ListArray(ListArrayExpr {
                     values: elements,
                     span,
@@ -1264,6 +1367,104 @@ impl<'a> Parser<'a> {
                 None
             }
         }
+    }
+
+    /// Parses an expression path or variable reference.
+    /// Expr Paths are used to represent variable references, function calls, etc.
+    /// Only used in expressions.
+    fn parse_expr_path(&mut self, tokens: &mut Tokens) -> Option<Expr> {
+        // Consume the identifier
+        let token = tokens.eat();
+        let ident = match &token.token {
+            TokenType::Identifier(name) => name,
+            other => {
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "identifier".to_string(),
+                        found: other.clone(),
+                        span: token.span,
+                        suggestion: vec!["Expected an identifier.".to_string()],
+                    }));
+                return None;
+            }
+        };
+        let span = token.span;
+        // Mutable borrow from tokens.eat() ends here
+
+        let mut path_segments = vec![ExprPathSegment {
+            name: ident.clone(),
+            args: vec![],
+            span,
+        }];
+
+        // Handle paths with '::'
+        while tokens.at().token == TokenType::Symbol(Symbol::DoubleColon) {
+            tokens.eat(); // Consume '::'
+
+            let token = tokens.eat().clone();
+            let ident = match &token.token {
+                TokenType::Identifier(name) => name,
+                other => {
+                    self.compilation_report
+                        .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                            expected: "identifier".to_string(),
+                            found: other.clone(),
+                            span: token.span,
+                            suggestion: vec!["Expected an identifier after '::'.".to_string()],
+                        }));
+                    return None;
+                }
+            };
+            let ident_span = token.span;
+            // Mutable borrow from tokens.eat() ends here
+
+            // Parse generic arguments if any
+            let args = {
+                let token = tokens.at().token.clone();
+                if token == TokenType::Operator(Operator::LessThan) {
+                    tokens.eat(); // Consume '<'
+                    let args = self.parse_generic_arguments(tokens)?;
+                    tokens.expect(
+                        TokenType::Operator(Operator::GreaterThan),
+                        self.compilation_report,
+                    );
+                    args
+                } else {
+                    vec![]
+                }
+            };
+
+            path_segments.push(ExprPathSegment {
+                name: ident.to_string(),
+                args,
+                span: ident_span,
+            });
+        }
+
+        Some(Expr::Path(ASTExprPath {
+            segments: path_segments,
+            span,
+        }))
+    }
+
+    /// Parses generic arguments, e.g., `<T, U>`.
+    fn parse_generic_arguments(&mut self, tokens: &mut Tokens) -> Option<Vec<ASTType>> {
+        tokens.eat(); // Consume '<'
+        let mut args = Vec::new();
+        while tokens.at().token != TokenType::Operator(Operator::GreaterThan) {
+            let arg = self.parse_type_declaration(tokens)?;
+            args.push(arg);
+            if tokens.at().token == TokenType::Symbol(Symbol::Comma) {
+                tokens.eat(); // Consume ','
+            } else {
+                break;
+            }
+        }
+        tokens.expect(
+            TokenType::Operator(Operator::GreaterThan),
+            self.compilation_report,
+        );
+        Some(args)
     }
 
     /// Parses function call arguments.
