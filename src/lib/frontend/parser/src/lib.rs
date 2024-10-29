@@ -172,22 +172,44 @@ impl<'a> Parser<'a> {
         Some(binary)
     }
 
-    /// Parses a module.
+    /// Parses a module from source code, like root module or 'mod foo;'
     fn parse_module(&mut self, source: String, file_id: usize, module: &mut Module) {
         // Lex the source code
         let mut tokens = tokenize(&source, file_id, self.compilation_report);
 
         // Parse the tokens
         while tokens.not_eof() {
-            let item = self.parse_module_item(&mut tokens);
+            let item = self.parse_module_item(&mut tokens, module);
             if let Some(item) = item {
                 module.items.push(item);
             }
         }
     }
 
+    /// Parses a module body, like in 'mod foo { ... }'.
+    fn parse_module_body(
+        &mut self,
+        tokens: &mut Tokens,
+        module: &mut Module,
+    ) -> Option<Vec<ModuleItem>> {
+        let mut items = Vec::new();
+
+        while tokens.not_eof() {
+            let item = self.parse_module_item(tokens, module);
+            if let Some(item) = item {
+                items.push(item);
+            }
+        }
+
+        Some(items)
+    }
+
     /// Parses a module item.
-    fn parse_module_item(&mut self, tokens: &mut Tokens) -> Option<ModuleItem> {
+    fn parse_module_item(
+        &mut self,
+        tokens: &mut Tokens,
+        module: &mut Module,
+    ) -> Option<ModuleItem> {
         // Parse visibility
         let visibility = self.parse_visibility(tokens);
 
@@ -250,10 +272,10 @@ impl<'a> Parser<'a> {
                 })
             }
             TokenType::Keyword(Keyword::Mod) => {
-                // Handle submodule parsing here if necessary
-                // For now, we'll skip this
-                tokens.eat(); // Consume 'mod'
-                tokens.eat(); // Consume the module name
+                let submodule = self.parse_module_mod(visibility, tokens)?;
+
+                module.submodules.push(submodule);
+
                 None
             }
             _ => {
@@ -1817,7 +1839,47 @@ impl<'a> Parser<'a> {
         None
     }
 
-    fn _parse_module_mod(&mut self, _visibility: Visibility, _tokens: &mut Tokens) {
-        todo!()
+    fn parse_module_mod(&mut self, _visibility: Visibility, tokens: &mut Tokens) -> Option<Module> {
+        tokens.eat(); // Consume 'mod'
+
+        // Parse module name
+        let name = match &tokens.eat().token {
+            TokenType::Identifier(ident) => ident.clone(),
+            token => {
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "module name".to_string(),
+                        found: token.clone(),
+                        span: tokens.at().span,
+                        suggestion: vec!["Expected a module name.".to_string()],
+                    }));
+                return None;
+            }
+        };
+
+        // 'mod' can either have a block or a semicolon
+        // If it has a block, parse the module block.
+        // If it has a semicolon, it's an external module. Look for the module file in the file system, and parse it.
+        if tokens.at().token == TokenType::Symbol(Symbol::LeftBrace) {
+            // Create new module and parse module block
+            let mut module = Module {
+                name,
+                items: vec![],
+                submodules: vec![],
+            };
+            self.parse_module_body(tokens, &mut module)?;
+
+            Some(module)
+        } else {
+            // Expect a semicolon
+            tokens.expect(
+                TokenType::Symbol(Symbol::Semicolon),
+                self.compilation_report,
+            );
+
+            // External module
+            // Look for the module file in the file system, and parse it.
+            todo!("External module parsing not implemented yet.")
+        }
     }
 }
