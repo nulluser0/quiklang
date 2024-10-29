@@ -29,7 +29,7 @@ pub mod tuple_index_expr;
 pub mod underscore_expr;
 pub mod while_expr;
 
-use array_expr::ArrayExpr;
+use array_expr::{ArrayExpr, ListArrayExpr};
 use array_index_expr::ArrayIndexExpr;
 use block_expr::BlockExpr;
 use bracket_expr::BracketExpr;
@@ -89,6 +89,8 @@ pub enum Expr {
     TupleIndex(TupleIndexExpr),
     /// An array expression.
     Array(ArrayExpr),
+    /// A list array expression.
+    ListArray(ListArrayExpr),
     /// An array index expression.
     ArrayIndex(ArrayIndexExpr),
     /// A method call expression.

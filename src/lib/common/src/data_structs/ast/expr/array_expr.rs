@@ -20,8 +20,6 @@ use super::Expr;
 pub struct ArrayExpr {
     /// The values in the array.
     pub values: Vec<Expr>,
-    /// The size of the array.
-    pub size: Option<usize>,
     /// Span
     pub span: Span,
 }

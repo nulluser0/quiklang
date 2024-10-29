@@ -71,9 +71,9 @@ pub enum PrimitiveType {
     /// A tuple type. '(T1, T2, T3)'
     Tuple(Vec<ASTType>),
     /// A fixed-size array type. '[T; N]'
-    Array(Box<ASTType>),
-    /// A dynamic-size array type. 'dyn[T]'
-    DynArray(Box<ASTType>),
+    Array(Box<ASTType>, usize),
+    /// A dynamic-size array type. 'list[T]'
+    ListArray(Box<ASTType>),
     /// A function type. '(param1, param2) -> return'
     Fn(Vec<ASTType>, Box<ASTType>),
 }

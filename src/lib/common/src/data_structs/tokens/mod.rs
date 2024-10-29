@@ -90,6 +90,15 @@ pub enum Keyword {
     Trait,   // trait
     Mod,     // mod
     List,    // list
+    Bool,    // bool
+    True,    // true
+    False,   // false
+    Null,    // null
+    Void,    // void
+    Integer, // integer
+    Float,   // float
+    String,  // string
+    Char,    // char
 }
 
 impl FromStr for Keyword {
@@ -132,6 +141,15 @@ impl FromStr for Keyword {
             "trait" => Ok(Keyword::Trait),
             "mod" => Ok(Keyword::Mod),
             "list" => Ok(Keyword::List),
+            "bool" => Ok(Keyword::Bool),
+            "true" => Ok(Keyword::True),
+            "false" => Ok(Keyword::False),
+            "null" => Ok(Keyword::Null),
+            "void" => Ok(Keyword::Void),
+            "integer" => Ok(Keyword::Integer),
+            "float" => Ok(Keyword::Float),
+            "string" => Ok(Keyword::String),
+            "char" => Ok(Keyword::Char),
             _ => Err(format!("{} is not a keyword.", s)),
         }
     }
@@ -175,6 +193,15 @@ impl std::fmt::Display for Keyword {
             Keyword::Trait => write!(f, "Keyword 'trait'"),
             Keyword::Mod => write!(f, "Keyword 'mod'"),
             Keyword::List => write!(f, "Keyword 'list'"),
+            Keyword::Bool => write!(f, "Keyword 'bool'"),
+            Keyword::True => write!(f, "Keyword 'true'"),
+            Keyword::False => write!(f, "Keyword 'false'"),
+            Keyword::Null => write!(f, "Keyword 'null'"),
+            Keyword::Void => write!(f, "Keyword 'void'"),
+            Keyword::Integer => write!(f, "Keyword 'integer'"),
+            Keyword::Float => write!(f, "Keyword 'float'"),
+            Keyword::String => write!(f, "Keyword 'string'"),
+            Keyword::Char => write!(f, "Keyword 'char'"),
         }
     }
 }

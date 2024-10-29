@@ -7,6 +7,7 @@ use quiklang_common::{
     data_structs::{
         ast::{
             expr::{
+                array_expr::{ArrayExpr, ListArrayExpr},
                 array_index_expr::ArrayIndexExpr,
                 block_expr::BlockExpr,
                 control_expr::{BreakExpr, ReturnExpr},
@@ -442,7 +443,97 @@ impl<'a> Parser<'a> {
     /// Parses a type declaration.
     fn parse_type_declaration(&mut self, tokens: &mut Tokens) -> Option<ASTType> {
         let ty = match &tokens.eat().token {
+            // Identifier
             TokenType::Identifier(ident) => ident.clone(),
+            TokenType::Keyword(Keyword::Bool) => {
+                return Some(ASTType {
+                    kind: ASTTypeKind::Primitive(PrimitiveType::Bool),
+                })
+            }
+            // Primitive types
+            TokenType::Keyword(Keyword::Char) => {
+                return Some(ASTType {
+                    kind: ASTTypeKind::Primitive(PrimitiveType::Char),
+                })
+            }
+            TokenType::Keyword(Keyword::Integer) => {
+                return Some(ASTType {
+                    kind: ASTTypeKind::Primitive(PrimitiveType::Integer),
+                })
+            }
+            TokenType::Keyword(Keyword::Float) => {
+                return Some(ASTType {
+                    kind: ASTTypeKind::Primitive(PrimitiveType::Float),
+                })
+            }
+            TokenType::Keyword(Keyword::String) => {
+                return Some(ASTType {
+                    kind: ASTTypeKind::Primitive(PrimitiveType::String),
+                })
+            }
+            TokenType::Keyword(Keyword::Void) => {
+                return Some(ASTType {
+                    kind: ASTTypeKind::Primitive(PrimitiveType::Void),
+                })
+            }
+            TokenType::Keyword(Keyword::Null) => {
+                return Some(ASTType {
+                    kind: ASTTypeKind::Primitive(PrimitiveType::Null),
+                })
+            }
+            // List Array Type
+            TokenType::Keyword(Keyword::List) => {
+                // Handle list type differently due to different syntax
+                tokens.expect(
+                    TokenType::Symbol(Symbol::LeftBracket),
+                    self.compilation_report,
+                );
+                let ty = self.parse_type_declaration(tokens)?;
+                tokens.expect(
+                    TokenType::Symbol(Symbol::RightBracket),
+                    self.compilation_report,
+                );
+                return Some(ASTType {
+                    kind: ASTTypeKind::Primitive(PrimitiveType::ListArray(Box::new(ty))),
+                });
+            }
+            // Array Type
+            TokenType::Symbol(Symbol::LeftBracket) => {
+                let ty = self.parse_type_declaration(tokens)?;
+                tokens.expect(
+                    TokenType::Symbol(Symbol::Semicolon),
+                    self.compilation_report,
+                );
+                let size = match &tokens.eat().token {
+                    TokenType::IntegerLiteral(size) => *size,
+                    token => {
+                        self.compilation_report
+                            .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                                expected: "integer".to_string(),
+                                found: token.clone(),
+                                span: tokens.at().span,
+                                suggestion: vec![
+                                    "Expected an integer after ';' to denote array size."
+                                        .to_string(),
+                                ],
+                            }));
+                        return None;
+                    }
+                };
+                tokens.expect(
+                    TokenType::Symbol(Symbol::RightBracket),
+                    self.compilation_report,
+                );
+                return Some(ASTType {
+                    kind: ASTTypeKind::Primitive(PrimitiveType::Array(Box::new(ty), size as usize)),
+                });
+            }
+            TokenType::Operator(Operator::LogicalNot) => {
+                return Some(ASTType {
+                    kind: ASTTypeKind::Primitive(PrimitiveType::Never),
+                })
+            }
+            // Unexpected token
             token => {
                 self.compilation_report
                     .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
@@ -1141,6 +1232,26 @@ impl<'a> Parser<'a> {
                 );
                 Some(expr)
             }
+            TokenType::Symbol(Symbol::LeftBracket) => {
+                // Array expression '[1, 2, 3]'
+                let elements = self.parse_array_values(tokens)?;
+
+                Some(Expr::Array(ArrayExpr {
+                    values: elements,
+                    span,
+                }))
+            }
+            TokenType::Keyword(Keyword::List) => {
+                // List Array expression 'list[1, 2, 3]'
+                tokens.eat(); // Consume '['
+
+                let elements = self.parse_array_values(tokens)?;
+
+                Some(Expr::ListArray(ListArrayExpr {
+                    values: elements,
+                    span,
+                }))
+            }
             TokenType::Keyword(Keyword::If) => self.parse_if_expression(tokens),
             _ => {
                 self.compilation_report
@@ -1181,6 +1292,31 @@ impl<'a> Parser<'a> {
         );
 
         Some(args)
+    }
+
+    /// Parses array values.
+    ///
+    /// **NOTE:** Ensure you have already consumed the opening '[' before calling this function.
+    fn parse_array_values(&mut self, tokens: &mut Tokens) -> Option<Vec<Expr>> {
+        let mut elements = Vec::new();
+
+        while tokens.at().token != TokenType::Symbol(Symbol::RightBracket) && tokens.not_eof() {
+            let element = self.parse_expression(tokens)?;
+            elements.push(element);
+
+            if tokens.at().token == TokenType::Symbol(Symbol::Comma) {
+                tokens.eat();
+            } else {
+                break;
+            }
+        }
+
+        tokens.expect(
+            TokenType::Symbol(Symbol::RightBracket),
+            self.compilation_report,
+        );
+
+        Some(elements)
     }
 
     /// Parses an if expression.
