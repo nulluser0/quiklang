@@ -698,11 +698,16 @@ impl<'a> Parser<'a> {
             match &token.token {
                 TokenType::Identifier(ident) => {
                     let ident_clone = ident.clone();
-                    // Mutable borrow from tokens.eat() ends here
-
                     // No arguments allowed in simple paths
                     path_segments.push(SimplePathSegment {
                         name: ident_clone,
+                        span: tokens.at().span,
+                    });
+                }
+                TokenType::Operator(Operator::Multiply) => {
+                    // No arguments allowed in simple paths
+                    path_segments.push(SimplePathSegment {
+                        name: "*".to_string(),
                         span: tokens.at().span,
                     });
                 }
@@ -712,7 +717,9 @@ impl<'a> Parser<'a> {
                             expected: "identifier".to_string(),
                             found: token_type.clone(),
                             span: token.span,
-                            suggestion: vec!["Expected an identifier after '::'.".to_string()],
+                            suggestion: vec![
+                                "Expected an identifier or '*' after '::'.".to_string()
+                            ],
                         }));
                     return None;
                 }
@@ -1972,10 +1979,16 @@ impl<'a> Parser<'a> {
     fn parse_module_use(&mut self, _visibility: Visibility, tokens: &mut Tokens) -> Option<Use> {
         tokens.eat(); // Consume 'use'
 
-        // Parse module path
+        // Parse the path
         let path = self.parse_simple_path(tokens)?;
 
-        // Check for alias
+        // Check for glob import, path would be '*'
+        let glob = match path.segments.last() {
+            Some(segment) => segment.name.ends_with('*'),
+            None => false,
+        };
+
+        // Optional 'as' alias
         let alias = if tokens.at().token == TokenType::Keyword(Keyword::As) {
             tokens.eat(); // Consume 'as'
             match &tokens.eat().token {
@@ -1983,10 +1996,10 @@ impl<'a> Parser<'a> {
                 token => {
                     self.compilation_report
                         .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
-                            expected: "alias name".to_string(),
+                            expected: "identifier".to_string(),
                             found: token.clone(),
                             span: tokens.at().span,
-                            suggestion: vec!["Expected an alias name.".to_string()],
+                            suggestion: vec!["Expected an identifier after 'as'.".to_string()],
                         }));
                     return None;
                 }
@@ -2000,10 +2013,6 @@ impl<'a> Parser<'a> {
             self.compilation_report,
         );
 
-        Some(Use {
-            path,
-            alias,
-            glob: false,
-        })
+        Some(Use { path, alias, glob })
     }
 }

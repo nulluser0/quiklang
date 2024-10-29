@@ -121,6 +121,11 @@ impl Tokens {
         token
     }
 
+    // amazing name for this function B))
+    pub fn un_eat(&mut self) {
+        self.index -= 1;
+    }
+
     pub fn expect(&mut self, expected: TokenType, report: &mut CompilationReport) {
         if self.at().token != expected {
             report.add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
