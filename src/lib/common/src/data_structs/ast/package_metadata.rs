@@ -1,11 +1,13 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct PackageMetadata {
+    #[serde(rename = "Package")]
     pub package: PackageInfo,
-    pub dependencies: Vec<Dependency>,
+    #[serde(rename = "Dependencies")]
+    pub dependencies: HashMap<String, DependencyInfo>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -16,10 +18,19 @@ pub struct PackageInfo {
     pub description: String,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct Dependency {
-    pub name: String,
-    pub version: String,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum DependencyInfo {
+    Simple(String), // Only version is specified
+    Detailed {
+        version: String,
+        #[serde(default)]
+        features: Vec<String>,
+        // Add other fields as needed
+        // For example:
+        // optional: bool,
+        // path: String,
+    },
 }
 
 impl PackageMetadata {

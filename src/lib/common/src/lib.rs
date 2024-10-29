@@ -27,6 +27,15 @@ pub struct FileStore {
 }
 
 impl FileStore {
+    /// Creates a new, empty file store.
+    pub fn new() -> Self {
+        Self {
+            files: HashMap::new(),
+            next_id: 0,
+            project_metadata: None,
+        }
+    }
+
     /// Adds a new file to the store and returns its unique ID.
     pub fn add_file(&mut self, name: String, source: String) -> usize {
         let id = self.next_id;
@@ -110,6 +119,14 @@ pub struct CompilationReport {
 }
 
 impl CompilationReport {
+    pub fn new(file_store: FileStore) -> Self {
+        Self {
+            errors: Vec::new(),
+            warnings: Vec::new(),
+            file_store,
+        }
+    }
+
     pub fn add_error(&mut self, error: CompilerError) {
         self.errors.push(error);
     }

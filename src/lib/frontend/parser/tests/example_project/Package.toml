@@ -1,0 +1,9 @@
+[Package]
+name = "example_project"
+version = "0.1.0"
+authors = ["me"]
+description = "An example project"
+
+[Dependencies]
+a-dependency = "0.1.0"
+another-dependency = { version = "0.1.0" }

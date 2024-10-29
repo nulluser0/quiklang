@@ -91,6 +91,7 @@ impl<'a> CharStream<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct Tokens {
     tokens: Vec<Token>,
     index: usize,
@@ -103,7 +104,7 @@ impl Tokens {
 
     pub fn not_eof(&self) -> bool {
         self.tokens
-            .first()
+            .get(self.index)
             .map_or(false, |t| t.token != TokenType::EOF)
     }
 
@@ -124,6 +125,10 @@ impl Tokens {
     // amazing name for this function B))
     pub fn un_eat(&mut self) {
         self.index -= 1;
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
     }
 
     pub fn expect(&mut self, expected: TokenType, report: &mut CompilationReport) {
