@@ -29,6 +29,8 @@ pub enum OperatorExpr {
     Binary(BinaryOperatorExpr),
     /// Unary operator expression.
     Unary(UnaryOperatorExpr),
+    /// Propagator operator expression.
+    Propagator(PropagatorOperatorExpr),
     /// Comparison operator expression.
     Comparison(ComparisonOperatorExpr),
     /// Boolean operator expression.
@@ -119,6 +121,8 @@ pub struct UnaryOperatorExpr {
 /// Example: `-`, `!`, `~`, `*`, `ref`, `mut ref`.
 #[derive(Debug, Clone)]
 pub enum UnaryOperator {
+    /// Positive operator. `+`
+    Pos,
     /// Negation operator. `-`
     Neg,
     /// Logical NOT operator. `!`
@@ -131,6 +135,37 @@ pub enum UnaryOperator {
     Ref,
     /// Mutable reference operator. `mut ref`
     MutRef,
+}
+
+/// Propagator operator expression.
+/// Represents a propagator operation.
+/// Example: `x?`, `x??`, 'x!!
+/// List of propagator operators:
+/// - `?` Unwrap or propagate error/null (to scope), rust equivalent: `Option<T>? -> T or propagate null`
+/// - `??' Unwrap or default value, rust equivalent: 'Option<T>.unwrap_or(F) -> T or F'
+/// - `!!` Unwrap or panic, rust equivalent: `Option<T>.unwrap() -> T`
+///
+#[derive(Debug, Clone)]
+pub struct PropagatorOperatorExpr {
+    /// The expression.
+    pub expr: Box<Expr>,
+    /// The propagator operator.
+    pub op: PropagatorOperator,
+    /// Span
+    pub span: Span,
+}
+
+/// Propagator operator.
+/// Represents a propagator operator.
+/// Example: `?`, `??`, `!!`.
+#[derive(Debug, Clone)]
+pub enum PropagatorOperator {
+    /// Unwrap or propagate error/null (to scope), rust equivalent: `Option<T>? -> T or propagate null` '?'
+    Propagate,
+    /// Unwrap or default value, rust equivalent: `Option<T>.unwrap_or(F) -> T or F` '??'
+    Default(Box<Expr>),
+    /// Unwrap or panic, rust equivalent: `Option<T>.unwrap() -> T` '!!'
+    Unwrap,
 }
 
 /// Comparison operator expression.

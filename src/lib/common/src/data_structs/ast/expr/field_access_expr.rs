@@ -23,7 +23,7 @@ pub struct FieldAccessExpr {
     /// The struct/enum expression.
     pub expr: Box<Expr>,
     /// The name of the field.
-    pub field: &'static str,
+    pub field: String,
     /// Span
     pub span: Span,
 }

@@ -179,30 +179,33 @@ impl std::fmt::Display for Keyword {
 // Operators
 #[derive(Debug, PartialEq, Clone)]
 pub enum Operator {
-    Assign,         // =
-    Add,            // +
-    Subtract,       // -
-    Multiply,       // *
-    Divide,         // /
-    GreaterThan,    // >
-    LessThan,       // <
-    GreaterOrEqual, // >=
-    LessOrEqual,    // <=
-    Equal,          // ==
-    NotEqual,       // !=
-    LogicalNot,     // !
-    BitwiseAnd,     // &
-    And,            // &&
-    Or,             // ||
-    Pipe,           // >
-    Modulus,        // %
-    BitwiseNot,     // ~
-    RangeExclusive, // ..
-    RangeInclusive, // ..=
-    BitwiseOr,      // |
-    BitwiseXor,     // ^
-    ShiftLeft,      // <<
-    ShiftRight,     // >>
+    Assign,            // =
+    Add,               // +
+    Subtract,          // -
+    Multiply,          // *
+    Divide,            // /
+    GreaterThan,       // >
+    LessThan,          // <
+    GreaterOrEqual,    // >=
+    LessOrEqual,       // <=
+    Equal,             // ==
+    NotEqual,          // !=
+    LogicalNot,        // !
+    BitwiseAnd,        // &
+    And,               // &&
+    Or,                // ||
+    Pipe,              // >
+    Modulus,           // %
+    BitwiseNot,        // ~
+    RangeExclusive,    // ..
+    RangeInclusive,    // ..=
+    BitwiseOr,         // |
+    BitwiseXor,        // ^
+    ShiftLeft,         // <<
+    ShiftRight,        // >>
+    QuestionMark,      // ?
+    DoubleQuestion,    // ??
+    DoubleExclamation, // !!
 }
 
 impl std::fmt::Display for Operator {
@@ -232,6 +235,9 @@ impl std::fmt::Display for Operator {
             Operator::BitwiseXor => write!(f, "Operator Bitwise Xor '^'"),
             Operator::ShiftLeft => write!(f, "Operator Shift Left '<<'"),
             Operator::ShiftRight => write!(f, "Operator Shift Right '>>'"),
+            Operator::QuestionMark => write!(f, "Operator Question Mark '?'"),
+            Operator::DoubleQuestion => write!(f, "Operator Double Question '??'"),
+            Operator::DoubleExclamation => write!(f, "Operator Double Exclamation '!!'"),
         }
     }
 }
