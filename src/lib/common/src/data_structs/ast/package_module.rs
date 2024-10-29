@@ -34,6 +34,7 @@ use std::rc::Rc;
 
 use super::{
     expr::{block_expr::BlockExpr, Expr},
+    paths::ASTSimplePath,
     types::{ASTGeneric, ASTTypeKind},
 };
 
@@ -41,7 +42,7 @@ use super::{
 /// Packages are the main unit of compilation in Quiklang.
 /// A package can contain multiple modules, which are the building blocks of the package.
 /// Packages can also reference other packages, locally or from external sources (extern package).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Package {
     /// The name of the package.
     pub name: String,
@@ -60,7 +61,7 @@ pub struct Package {
 }
 
 /// A bin is a binary module that is compiled as an executable.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Bin {
     /// The name of the binary module.
     pub name: String,
@@ -70,7 +71,7 @@ pub struct Bin {
 
 /// A module is a collection of functions, types, and other items that are grouped together.
 /// Modules are the building blocks of a package.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Module {
     /// The name of the module.
     pub name: String,
@@ -83,7 +84,7 @@ pub struct Module {
 /// A module item is a function, type, or other item that is contained within a module.
 /// Module items are the individual components of a module.
 /// They can be exported or private, depending on their visibility.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ModuleItem {
     /// The visibility of the module item.
     pub visibility: Visibility,
@@ -107,7 +108,7 @@ pub enum Visibility {
 }
 
 /// An item is a function, type, or other entity that is contained within a module.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Item {
     /// A function item.
     Function(Function),
@@ -125,13 +126,15 @@ pub enum Item {
     Const(Const),
     /// A global variable item.
     Global(Global),
+    /// A use item.
+    Use(Use),
 }
 
 /// A function is a block of code that can be called with arguments and return a value.
 /// Functions can have parameters, a return type, and a body that contains the code to be executed.
 /// Functions can also be generic, meaning they can take type parameters.
 /// Functions can be defined at the module level or within other functions.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Function {
     /// The name of the function.
     pub name: String,
@@ -147,7 +150,7 @@ pub struct Function {
 /// Parameters have a name and a type.
 /// Parameters can be required or optional, depending on whether they have default values.
 /// Parameters can also be generic, meaning they can take type parameters.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Parameter {
     /// The name of the parameter.
     pub name: String,
@@ -160,7 +163,7 @@ pub struct Parameter {
 /// A struct is a data structure that contains named fields.
 /// If you are reading this, you probably already know what a struct is.
 /// Quiklang structs are rust-like.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Struct {
     /// The name of the struct.
     pub name: String,
@@ -171,7 +174,7 @@ pub struct Struct {
 }
 
 /// A struct field is a key-type pair that represents a field in a struct.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StructField {
     /// The name of the field.
     pub name: String,
@@ -184,7 +187,7 @@ pub struct StructField {
 /// An enum is a type that can have a fixed set of values.
 /// This is a major selling point of Quiklang, as many VM languages do not have native-level enums
 /// Quiklang enums are rust-like.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Enum {
     /// The name of the enum.
     pub name: String,
@@ -195,7 +198,7 @@ pub struct Enum {
 }
 
 /// Emum variant, rust-like.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EnumVariant {
     /// The name of the variant.
     pub name: String,
@@ -204,7 +207,7 @@ pub struct EnumVariant {
 }
 
 /// Enum field, rust-like.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum EnumField {
     /// No fields.
     None,
@@ -215,7 +218,7 @@ pub enum EnumField {
 }
 
 /// Types can be aliased using type aliases.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TypeAlias {
     /// The name of the type alias.
     pub name: String,
@@ -227,7 +230,7 @@ pub struct TypeAlias {
 
 /// A trait is a collection of methods that can be implemented by other types.
 /// Traits are similar to interfaces in other languages.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Trait {
     /// The name of the trait.
     pub name: &'static str,
@@ -251,7 +254,7 @@ pub struct TraitBound {
 
 /// Traits can have different types of items
 /// Methods, type aliases, and consts.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AssociatedItem {
     /// A trait method.
     Method(AssociatedMethod),
@@ -263,7 +266,7 @@ pub enum AssociatedItem {
 
 /// A trait method is a function that is defined within a trait.
 /// Trait methods can be implemented by other types.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AssociatedMethod {
     /// The name of the method.
     pub name: &'static str,
@@ -277,7 +280,7 @@ pub struct AssociatedMethod {
 
 /// A trait type alias is a type alias that is defined within a trait.
 /// Trait type aliases can be implemented by other types.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TraitTypeAlias {
     /// The name of the type alias.
     pub name: &'static str,
@@ -287,7 +290,7 @@ pub struct TraitTypeAlias {
 
 /// A trait constant is a constant that is defined within a trait.
 /// Trait constants can be implemented by other types.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TraitConst {
     /// The name of the constant.
     pub name: &'static str,
@@ -299,7 +302,7 @@ pub struct TraitConst {
 
 /// An Impl is a block of code that implements methods or traits for a type.
 /// Impls are used to define the behavior of a type.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Impl {
     /// Self type of the impl.
     pub self_type: ASTTypeKind,
@@ -313,7 +316,7 @@ pub struct Impl {
 
 /// A const is a constant value that is defined at compile time.
 /// Constants are immutable and cannot be changed during runtime.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Const {
     /// The name of the constant.
     pub name: String,
@@ -328,7 +331,7 @@ pub struct Const {
 /// A global variable is a variable that is defined at the module level.
 /// Global variables have varying levels of visibility.
 /// Global variables can be mutable or immutable.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Global {
     /// The name of the global variable.
     pub name: &'static str,
@@ -340,4 +343,20 @@ pub struct Global {
     pub mutable: bool,
     /// The value of the global variable.
     pub value: Expr,
+}
+
+/// A use item is used to import items from other modules into the current module.
+/// Use items are used to avoid having to fully qualify the names of items.
+/// Use items can import individual items, all items from a module, or items with a different name.
+/// Use items can also be aliased.
+/// Use items are similar to the `use` keyword in Rust.
+/// Example: `use std::collections::HashMap as Map;`
+#[derive(Debug, Clone)]
+pub struct Use {
+    /// The path being imported.
+    pub path: ASTSimplePath,
+    /// The alias of the path (if any).
+    pub alias: Option<String>,
+    /// Indicate if the path is glob. 'use foo::bar::*'
+    pub glob: bool,
 }

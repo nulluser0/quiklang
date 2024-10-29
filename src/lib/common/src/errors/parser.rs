@@ -16,6 +16,13 @@ pub enum ParserError {
     #[error("Unexpected end of file at line {}, column {}.", span.line, span.col)]
     UnexpectedEOF { span: Span, suggestion: Vec<String> },
 
+    #[error("Module not found: {module_name}.")]
+    ModuleNotFound {
+        module_name: String,
+        span: Span,
+        suggestion: Vec<String>,
+    },
+
     #[error(
         "Unexpected token '{found:?}' at line {}, column {}. Expected {expected}.",
         span.line,
@@ -37,6 +44,7 @@ impl ParserError {
             ParserError::UnexpectedToken { span, .. } => *span,
             ParserError::FileNotFound { .. } => unimplemented!(),
             ParserError::NoEntryPoint { .. } => unimplemented!(),
+            ParserError::ModuleNotFound { span, .. } => *span,
         }
     }
 
@@ -52,6 +60,10 @@ impl ParserError {
             } => suggestions.clone(),
             ParserError::FileNotFound { .. } => vec![],
             ParserError::NoEntryPoint { suggestion } => suggestion.clone(),
+            ParserError::ModuleNotFound {
+                suggestion: suggestions,
+                ..
+            } => suggestions.clone(),
         }
     }
 }

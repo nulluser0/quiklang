@@ -99,6 +99,7 @@ pub enum Keyword {
     Float,   // float
     String,  // string
     Char,    // char
+    Use,     // use
 }
 
 impl FromStr for Keyword {
@@ -150,6 +151,7 @@ impl FromStr for Keyword {
             "float" => Ok(Keyword::Float),
             "string" => Ok(Keyword::String),
             "char" => Ok(Keyword::Char),
+            "use" => Ok(Keyword::Use),
             _ => Err(format!("{} is not a keyword.", s)),
         }
     }
@@ -202,6 +204,7 @@ impl std::fmt::Display for Keyword {
             Keyword::Float => write!(f, "Keyword 'float'"),
             Keyword::String => write!(f, "Keyword 'string'"),
             Keyword::Char => write!(f, "Keyword 'char'"),
+            Keyword::Use => write!(f, "Keyword 'use'"),
         }
     }
 }
