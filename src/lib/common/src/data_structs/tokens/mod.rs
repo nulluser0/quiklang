@@ -89,6 +89,7 @@ pub enum Keyword {
     Package, // package
     Trait,   // trait
     Mod,     // mod
+    List,    // list
 }
 
 impl FromStr for Keyword {
@@ -130,6 +131,7 @@ impl FromStr for Keyword {
             "package" => Ok(Keyword::Package),
             "trait" => Ok(Keyword::Trait),
             "mod" => Ok(Keyword::Mod),
+            "list" => Ok(Keyword::List),
             _ => Err(format!("{} is not a keyword.", s)),
         }
     }
@@ -172,6 +174,7 @@ impl std::fmt::Display for Keyword {
             Keyword::Package => write!(f, "Keyword 'package'"),
             Keyword::Trait => write!(f, "Keyword 'trait'"),
             Keyword::Mod => write!(f, "Keyword 'mod'"),
+            Keyword::List => write!(f, "Keyword 'list'"),
         }
     }
 }
