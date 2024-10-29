@@ -28,13 +28,13 @@ pub enum Stmt {
 #[derive(Debug, Clone)]
 pub struct VarDeclStmt {
     /// The name of the variable.
-    pub name: &'static str,
+    pub name: String,
     /// Is mutable?
     pub mutable: bool,
     /// The type of the variable. Optional, as it can be inferred.
-    pub ty: Option<ASTTypeKind>,
-    /// The value assigned to the variable.
-    pub value: Expr,
+    pub ty: ASTTypeKind,
+    /// The value assigned to the variable. Can be uninitialized.
+    pub value: Option<Expr>,
     /// Span
     pub span: Span,
 }

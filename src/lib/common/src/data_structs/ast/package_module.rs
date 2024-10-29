@@ -138,19 +138,9 @@ pub struct Function {
     /// The parameters of the function.
     pub parameters: Vec<Parameter>,
     /// The return type of the function.
-    pub return_type: ReturnType,
+    pub return_type: ASTTypeKind,
     /// The body of the function.
     pub body: BlockExpr,
-}
-
-/// Function return type.
-/// Represents the return type of a function.
-#[derive(Debug)]
-pub enum ReturnType {
-    /// The function returns a value.
-    Value(ASTTypeKind),
-    /// The function does not return a value.
-    DefaultVoid,
 }
 
 /// A parameter is a variable that is passed to a function when it is called.

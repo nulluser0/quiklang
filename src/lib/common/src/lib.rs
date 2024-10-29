@@ -168,7 +168,7 @@ impl CompilationReport {
                 unreachable_code,
                 unused_variables,
                 clippy::match_single_binding,
-                reason = "Remove this line when adding warning categories"
+                // reason = "Remove this line when adding warning categories"
             )]
             for warning in &self.warnings {
                 let diagnostic = match warning {

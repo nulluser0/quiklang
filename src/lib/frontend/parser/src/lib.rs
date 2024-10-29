@@ -17,11 +17,11 @@ use quiklang_common::{
             },
             package_module::{
                 Bin, Const, Enum, EnumField, EnumVariant, Function, Global, Impl, Item, Module,
-                ModuleItem, Package, Parameter, ReturnType, Struct, StructField, Trait, TypeAlias,
+                ModuleItem, Package, Parameter, Struct, StructField, Trait, TypeAlias,
                 Visibility,
             },
             paths::{ASTPath, PathSegment},
-            stmt::Stmt,
+            stmt::{Stmt, VarDeclStmt},
             types::{ASTType, ASTTypeKind, PrimitiveType},
         },
         tokens::{Keyword, Operator, Symbol, TokenType},
@@ -358,10 +358,7 @@ impl<'a> Parser<'a> {
         Some(Function {
             name: ident,
             parameters: params,
-            return_type: match return_ty.kind {
-                ASTTypeKind::Primitive(PrimitiveType::Void) => ReturnType::DefaultVoid,
-                _ => ReturnType::Value(return_ty.kind),
-            },
+            return_type: return_ty.kind,
             body,
         })
     }
@@ -521,13 +518,72 @@ impl<'a> Parser<'a> {
 
     /// Parses a statement.
     fn parse_statement(&mut self, tokens: &mut Tokens) -> Option<Stmt> {
-        // For simplicity, let's assume statements are expressions for now
-        let expr = self.parse_expression(tokens)?;
-        tokens.expect(
-            TokenType::Symbol(Symbol::Semicolon),
-            &mut self.compilation_report,
-        );
-        Some(Stmt::Expr(expr))
+        match &tokens.at().token {
+            TokenType::Keyword(Keyword::Let) => {
+                let declare = self.parse_var_decl_statement(tokens);
+                if let Some(declare) = declare {
+                    Some(Stmt::VarDecl(declare))
+                } else {
+                    None
+                }
+            },
+            _ => {
+                let expr = self.parse_expression(tokens);
+                if let Some(expr) = expr {
+                    Some(Stmt::Expr(expr))
+                } else {
+                    None
+                }
+            },
+        }
+    }
+
+    /// Parses a variable declaration statement.
+    fn parse_var_decl_statement(&mut self, tokens: &mut Tokens) -> Option<VarDeclStmt> {
+        tokens.eat(); // Consume 'let'
+
+        // Parse mutability
+        let mutable = if tokens.at().token == TokenType::Keyword(Keyword::Mut) {
+            tokens.eat(); // Consume 'mut'
+            true
+        } else {
+            false
+        };
+
+        // Parse variable name
+        let name = match &tokens.eat().token {
+            TokenType::Identifier(ident) => ident.clone(),
+            token => {
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "variable name".to_string(),
+                        found: token.clone(),
+                        span: tokens.at().span,
+                        suggestion: vec!["Expected a variable name.".to_string()],
+                    }));
+                return None;
+            }
+        };
+
+        // Parse variable type
+        let ty = if tokens.at().token == TokenType::Symbol(Symbol::Colon) {
+            tokens.eat(); // Consume ':'
+            self.parse_type_declaration(tokens)?
+        } else {
+            ASTType {
+                kind: ASTTypeKind::Infer,
+            }
+        };
+
+        // Parse variable value if present
+        let value = if tokens.at().token == TokenType::Operator(Operator::Assign) {
+            tokens.eat(); // Consume '='
+            self.parse_expression(tokens)
+        } else {
+            None
+        };
+
+        Some(VarDeclStmt { name, mutable, ty: ty.kind, value, span: tokens.at().span })
     }
 
     /// Parses an expression.
