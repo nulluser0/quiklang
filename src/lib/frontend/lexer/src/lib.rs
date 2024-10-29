@@ -720,6 +720,12 @@ fn tokenize_operator_or_symbol(
                     token: TokenType::Operator(Operator::LessOrEqual),
                     span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
                 }))
+            } else if let Some(&'<') = chars.peek_char() {
+                chars.next_char(); // Consume '<'
+                Ok(Some(Token {
+                    token: TokenType::Operator(Operator::ShiftLeft),
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
             } else {
                 Ok(Some(Token {
                     token: TokenType::Operator(Operator::LessThan),
@@ -732,6 +738,12 @@ fn tokenize_operator_or_symbol(
                 chars.next_char(); // Consume '='
                 Ok(Some(Token {
                     token: TokenType::Operator(Operator::GreaterOrEqual),
+                    span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
+                }))
+            } else if let Some(&'>') = chars.peek_char() {
+                chars.next_char(); // Consume '<'
+                Ok(Some(Token {
+                    token: TokenType::Operator(Operator::ShiftRight),
                     span: Span::new(file_id, start_pos, chars.current_pos, start_line, start_col),
                 }))
             } else {

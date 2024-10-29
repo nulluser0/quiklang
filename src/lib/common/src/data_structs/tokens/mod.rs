@@ -184,8 +184,8 @@ pub enum Operator {
     Subtract,       // -
     Multiply,       // *
     Divide,         // /
-    GreaterThan,    // >>
-    LessThan,       // <<
+    GreaterThan,    // >
+    LessThan,       // <
     GreaterOrEqual, // >=
     LessOrEqual,    // <=
     Equal,          // ==
@@ -201,6 +201,8 @@ pub enum Operator {
     RangeInclusive, // ..=
     BitwiseOr,      // |
     BitwiseXor,     // ^
+    ShiftLeft,      // <<
+    ShiftRight,     // >>
 }
 
 impl std::fmt::Display for Operator {
@@ -228,6 +230,8 @@ impl std::fmt::Display for Operator {
             Operator::RangeInclusive => write!(f, "Operator Range Inclusive '..='"),
             Operator::BitwiseOr => write!(f, "Operator Bitwise Or '|'"),
             Operator::BitwiseXor => write!(f, "Operator Bitwise Xor '^'"),
+            Operator::ShiftLeft => write!(f, "Operator Shift Left '<<'"),
+            Operator::ShiftRight => write!(f, "Operator Shift Right '>>'"),
         }
     }
 }
