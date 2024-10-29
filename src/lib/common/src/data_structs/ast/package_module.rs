@@ -128,6 +128,8 @@ pub enum Item {
     Global(Global),
     /// A use item.
     Use(Use),
+    /// Special Ignore item only for parser.
+    Ignore,
 }
 
 /// A function is a block of code that can be called with arguments and return a value.

@@ -1,3 +1,9 @@
+mod bruh {
+    fn hi() {
+        println("amazing")
+    }
+}
+
 fn main() {
     println("Hello world!")
 }

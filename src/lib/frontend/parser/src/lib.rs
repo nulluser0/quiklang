@@ -207,7 +207,9 @@ impl<'a> Parser<'a> {
         while tokens.not_eof() {
             let item = self.parse_module_item(&mut tokens, module, file_id);
             if let Some(item) = item {
-                module.items.push(item);
+                if !matches!(item.item, Item::Ignore) {
+                    module.items.push(item);
+                }
             } else {
                 break; // Syntax errors are very hard to recover from, so we stop parsing here
             }
@@ -287,7 +289,10 @@ impl<'a> Parser<'a> {
 
                 module.submodules.push(submodule);
 
-                None
+                Some(ModuleItem {
+                    visibility,
+                    item: Item::Ignore,
+                })
             }
             TokenType::Keyword(Keyword::Use) => {
                 let use_item = self.parse_module_use(visibility, tokens)?;
