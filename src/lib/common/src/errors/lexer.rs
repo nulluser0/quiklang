@@ -36,6 +36,12 @@ pub enum LexerError {
         span: Span,
         suggestions: Vec<String>,
     },
+
+    #[error("Invalid escape sequence at line {}, column {}.", span.line, span.col)]
+    InvalidEscapeSequence {
+        span: Span,
+        suggestions: Vec<String>,
+    },
 }
 
 impl LexerError {
@@ -46,6 +52,7 @@ impl LexerError {
             LexerError::UnterminatedInterpolation { span, .. } => Some(*span),
             LexerError::UnterminatedMultiLineComment { span, .. } => Some(*span),
             LexerError::InvalidNumberFormat { span, .. } => Some(*span),
+            LexerError::InvalidEscapeSequence { span, .. } => Some(*span),
         }
     }
 
@@ -65,6 +72,10 @@ impl LexerError {
                 ..
             } => suggestion.clone(),
             LexerError::InvalidNumberFormat {
+                suggestions: suggestion,
+                ..
+            } => suggestion.clone(),
+            LexerError::InvalidEscapeSequence {
                 suggestions: suggestion,
                 ..
             } => suggestion.clone(),

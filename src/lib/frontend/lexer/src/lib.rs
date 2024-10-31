@@ -290,16 +290,230 @@ pub fn tokenize(source_code: &str, file_id: usize, report: &mut CompilationRepor
                             chars.next_char(); // Consume '\\'
                             if let Some(&escaped_char) = chars.peek_char() {
                                 let escaped = match escaped_char {
-                                    'n' => '\n',
-                                    't' => '\t',
-                                    'r' => '\r',
-                                    '"' => '"',
-                                    '\\' => '\\',
+                                    // 'n' => '\n',
+                                    // 't' => '\t',
+                                    // 'r' => '\r',
+                                    // '"' => '"',
+                                    // '\\' => '\\',
+                                    // '$' => '$',
+                                    '\\' => {
+                                        chars.next_char(); // Consume '\\'
+                                        '\\'
+                                    }
+                                    '\"' => {
+                                        chars.next_char(); // Consume '\"'
+                                        '\"'
+                                    }
+                                    '\'' => {
+                                        chars.next_char(); // Consume '\''
+                                        '\''
+                                    }
+                                    'n' => {
+                                        chars.next_char(); // Consume 'n'
+                                        '\n'
+                                    }
+                                    't' => {
+                                        chars.next_char(); // Consume 't'
+                                        '\t'
+                                    }
+                                    'r' => {
+                                        chars.next_char(); // Consume 'r'
+                                        '\r'
+                                    }
+                                    '0' => {
+                                        chars.next_char(); // Consume '0'
+                                        '\0'
+                                    }
+                                    'x' => {
+                                        // Hexadecimal escape sequence
+                                        chars.next_char(); // Consume 'x'
+                                        let mut hex = String::new();
+                                        while let Some(&c) = chars.peek_char() {
+                                            if c.is_ascii_hexdigit() {
+                                                hex.push(c);
+                                                chars.next_char();
+                                            } else {
+                                                break;
+                                            }
+                                        }
+                                        match u32::from_str_radix(&hex, 16) {
+                                            Ok(value) => match std::char::from_u32(value) {
+                                                Some(c) => c,
+                                                None => {
+                                                    report.add_error(
+                                                            LexerError::InvalidEscapeSequence {
+                                                                span: Span::new(
+                                                                    file_id,
+                                                                    string_info.start_pos,
+                                                                    chars.current_pos,
+                                                                    string_info.start_line,
+                                                                    string_info.start_col,
+                                                                ),
+                                                                suggestions: vec![
+                                                                    "The escape sequence is not a valid Unicode code point."
+                                                                        .to_string(),
+                                                                ],
+                                                            }
+                                                            .into(),
+                                                        );
+                                                    continue;
+                                                }
+                                            },
+                                            Err(_) => {
+                                                report.add_error(
+                                                    LexerError::InvalidEscapeSequence {
+                                                        span: Span::new(
+                                                            file_id,
+                                                            string_info.start_pos,
+                                                            chars.current_pos,
+                                                            string_info.start_line,
+                                                            string_info.start_col,
+                                                        ),
+                                                        suggestions: vec![
+                                                            "The escape sequence is not a valid hexadecimal number."
+                                                                .to_string(),
+                                                        ],
+                                                    }
+                                                    .into(),
+                                                );
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                    'u' => {
+                                        // Unicode escape sequence
+                                        chars.next_char(); // Consume 'u'
+                                        let mut hex = String::new();
+                                        while let Some(&c) = chars.peek_char() {
+                                            if c.is_ascii_hexdigit() {
+                                                hex.push(c);
+                                                chars.next_char();
+                                            } else {
+                                                break;
+                                            }
+                                        }
+                                        match u32::from_str_radix(&hex, 16) {
+                                            Ok(value) => match std::char::from_u32(value) {
+                                                Some(c) => c,
+                                                None => {
+                                                    report.add_error(
+                                                            LexerError::InvalidEscapeSequence {
+                                                                span: Span::new(
+                                                                    file_id,
+                                                                    string_info.start_pos,
+                                                                    chars.current_pos,
+                                                                    string_info.start_line,
+                                                                    string_info.start_col,
+                                                                ),
+                                                                suggestions: vec![
+                                                                    "The escape sequence is not a valid Unicode code point."
+                                                                        .to_string(),
+                                                                ],
+                                                            }
+                                                            .into(),
+                                                        );
+                                                    continue;
+                                                }
+                                            },
+                                            Err(_) => {
+                                                report.add_error(
+                                                    LexerError::InvalidEscapeSequence {
+                                                        span: Span::new(
+                                                            file_id,
+                                                            string_info.start_pos,
+                                                            chars.current_pos,
+                                                            string_info.start_line,
+                                                            string_info.start_col,
+                                                        ),
+                                                        suggestions: vec![
+                                                            "The escape sequence is not a valid hexadecimal number."
+                                                                .to_string(),
+                                                        ],
+                                                    }
+                                                    .into(),
+                                                );
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                    'U' => {
+                                        // Unicode Extended escape sequence
+                                        chars.next_char(); // Consume 'U'
+                                        let mut hex = String::new();
+                                        while let Some(&c) = chars.peek_char() {
+                                            if c.is_ascii_hexdigit() {
+                                                hex.push(c);
+                                                chars.next_char();
+                                            } else {
+                                                break;
+                                            }
+                                        }
+                                        match u32::from_str_radix(&hex, 16) {
+                                            Ok(value) => match std::char::from_u32(value) {
+                                                Some(c) => c,
+                                                None => {
+                                                    report.add_error(
+                                                            LexerError::InvalidEscapeSequence {
+                                                                span: Span::new(
+                                                                    file_id,
+                                                                    string_info.start_pos,
+                                                                    chars.current_pos,
+                                                                    string_info.start_line,
+                                                                    string_info.start_col,
+                                                                ),
+                                                                suggestions: vec![
+                                                                    "The escape sequence is not a valid Unicode code point."
+                                                                        .to_string(),
+                                                                ],
+                                                            }
+                                                            .into(),
+                                                        );
+                                                    continue;
+                                                }
+                                            },
+                                            Err(_) => {
+                                                report.add_error(
+                                                    LexerError::InvalidEscapeSequence {
+                                                        span: Span::new(
+                                                            file_id,
+                                                            string_info.start_pos,
+                                                            chars.current_pos,
+                                                            string_info.start_line,
+                                                            string_info.start_col,
+                                                        ),
+                                                        suggestions: vec![
+                                                            "The escape sequence is not a valid hexadecimal number."
+                                                                .to_string(),
+                                                        ],
+                                                    }
+                                                    .into(),
+                                                );
+                                                continue;
+                                            }
+                                        }
+                                    }
                                     '$' => '$',
-                                    other => other, // Treat unknown escapes literally
+                                    e => {
+                                        report.add_error(
+                                            LexerError::InvalidEscapeSequence {
+                                                span: Span::new(
+                                                    file_id,
+                                                    string_info.start_pos,
+                                                    chars.current_pos,
+                                                    string_info.start_line,
+                                                    string_info.start_col,
+                                                ),
+                                                suggestions: vec![format!(
+                                                    "'{}' is not a valid escape sequence.",
+                                                    e
+                                                )],
+                                            }
+                                            .into(),
+                                        );
+                                        continue;
+                                    }
                                 };
                                 string_info.buffer.push(escaped);
-                                chars.next_char(); // Consume escaped character
                             } else {
                                 // Unterminated string literal
                                 report.add_error(

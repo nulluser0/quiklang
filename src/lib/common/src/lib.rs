@@ -158,10 +158,10 @@ impl CompilationReport {
             for error in &self.errors {
                 let diagnostic = match error {
                     CompilerError::LexerError(e) => {
-                        let mut diag = Diagnostic::error().with_message(&e.to_string());
+                        let mut diag = Diagnostic::error().with_message(e.to_string());
 
                         if let Some(span) = e.span() {
-                            if let Some(file_name) = file_id_map.get(&span.file_id) {
+                            if file_id_map.contains_key(&span.file_id) {
                                 diag = diag.with_labels(vec![Label::primary(
                                     span.file_id,
                                     span.start..span.end,
@@ -184,10 +184,10 @@ impl CompilationReport {
                         diag
                     }
                     CompilerError::ParserError(e) => {
-                        let mut diag = Diagnostic::error().with_message(&e.to_string());
+                        let mut diag = Diagnostic::error().with_message(e.to_string());
 
                         if let Some(span) = e.span() {
-                            if let Some(file_name) = file_id_map.get(&span.file_id) {
+                            if file_id_map.contains_key(&span.file_id) {
                                 diag = diag.with_labels(vec![Label::primary(
                                     span.file_id,
                                     span.start..span.end,

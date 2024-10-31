@@ -9,5 +9,5 @@ mod hi;
 
 fn main() {
     let x = 12;
-    println("Hello world! ${12}");
+    println("Hello world! \U0001F600 {12}");
 }
