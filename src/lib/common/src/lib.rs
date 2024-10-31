@@ -142,7 +142,7 @@ impl CompilationReport {
     /// Reports all accumulated errors and warnings with file names.
     pub fn report(&self) {
         let config = codespan_reporting::term::Config::default();
-        let mut writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
+        let writer = StandardStream::stderr(term::termcolor::ColorChoice::Auto);
 
         let mut files = SimpleFiles::new(); // Placeholder
         let mut file_id_map = std::collections::HashMap::new();
