@@ -236,7 +236,7 @@ impl<'a> Parser<'a> {
 
         // Parse the rest of the module item
         match &tokens.at().token {
-            TokenType::Keyword(Keyword::Fn) => {
+            TokenType::Keyword(Keyword::Fun) => {
                 let function = self.parse_module_function(visibility, tokens)?;
                 Some(ModuleItem {
                     visibility,
@@ -292,7 +292,7 @@ impl<'a> Parser<'a> {
                     item: Item::Global(global),
                 })
             }
-            TokenType::Keyword(Keyword::Mod) => {
+            TokenType::Keyword(Keyword::Module) => {
                 let submodule = self.parse_module_mod(visibility, tokens, current_file_id)?;
 
                 module.submodules.push(submodule);

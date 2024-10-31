@@ -61,7 +61,7 @@ impl std::fmt::Display for TokenType {
 // Keywords
 #[derive(Debug, PartialEq, Clone)]
 pub enum Keyword {
-    Fn,      // fn
+    Fun,     // fun
     Let,     // let
     Mut,     // mut
     Const,   // const
@@ -94,7 +94,7 @@ pub enum Keyword {
     Super,   // super
     Package, // package
     Trait,   // trait
-    Mod,     // mod
+    Module,  // module
     List,    // list
     Bool,    // bool
     True,    // true
@@ -113,7 +113,7 @@ impl FromStr for Keyword {
 
     fn from_str(s: &str) -> Result<Self, <Keyword as FromStr>::Err> {
         match s {
-            "fn" => Ok(Keyword::Fn),
+            "fun" => Ok(Keyword::Fun),
             "let" => Ok(Keyword::Let),
             "mut" => Ok(Keyword::Mut),
             "const" => Ok(Keyword::Const),
@@ -146,7 +146,7 @@ impl FromStr for Keyword {
             "super" => Ok(Keyword::Super),
             "package" => Ok(Keyword::Package),
             "trait" => Ok(Keyword::Trait),
-            "mod" => Ok(Keyword::Mod),
+            "module" => Ok(Keyword::Module),
             "list" => Ok(Keyword::List),
             "bool" => Ok(Keyword::Bool),
             "true" => Ok(Keyword::True),
@@ -166,7 +166,7 @@ impl FromStr for Keyword {
 impl std::fmt::Display for Keyword {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Keyword::Fn => write!(f, "Keyword 'fn'"),
+            Keyword::Fun => write!(f, "Keyword 'fun'"),
             Keyword::Let => write!(f, "Keyword 'let'"),
             Keyword::Mut => write!(f, "Keyword 'mut'"),
             Keyword::Const => write!(f, "Keyword 'const'"),
@@ -199,7 +199,7 @@ impl std::fmt::Display for Keyword {
             Keyword::Super => write!(f, "Keyword 'super'"),
             Keyword::Package => write!(f, "Keyword 'package'"),
             Keyword::Trait => write!(f, "Keyword 'trait'"),
-            Keyword::Mod => write!(f, "Keyword 'mod'"),
+            Keyword::Module => write!(f, "Keyword 'module'"),
             Keyword::List => write!(f, "Keyword 'list'"),
             Keyword::Bool => write!(f, "Keyword 'bool'"),
             Keyword::True => write!(f, "Keyword 'true'"),

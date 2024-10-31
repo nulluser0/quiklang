@@ -1162,7 +1162,7 @@ mod tests {
     #[test]
     fn test_simple_function() {
         let source = r#"
-            fn main() {
+            fun main() {
                 let x = 42;
                 let y = "hello";
             }
@@ -1184,7 +1184,7 @@ mod tests {
 
         // Define expected tokens
         let expected_tokens = vec![
-            TokenType::Keyword(Keyword::Fn),
+            TokenType::Keyword(Keyword::Fun),
             TokenType::Identifier("main".to_string()),
             TokenType::Symbol(Symbol::LeftParen),
             TokenType::Symbol(Symbol::RightParen),
