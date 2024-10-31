@@ -15,7 +15,7 @@ use quiklang_common::{
                 array_expr::{ArrayExpr, ListArrayExpr},
                 array_index_expr::ArrayIndexExpr,
                 block_expr::BlockExpr,
-                control_expr::{BreakExpr, ReturnExpr},
+                control_expr::{BreakExpr, ContinueExpr, ReturnExpr},
                 field_access_expr::FieldAccessExpr,
                 func_call_expr::FuncCallExpr,
                 if_expr::IfExpr,
@@ -203,6 +203,13 @@ impl<'a> Parser<'a> {
         // Lex the source code
         let mut tokens = tokenize(&source, file_id, self.compilation_report);
 
+        println!("tokens: {:#?}", tokens);
+
+        // If there are any lexer errors, return early
+        if self.compilation_report.has_errors() {
+            return;
+        }
+
         // Parse the tokens
         while tokens.not_eof() {
             let item = self.parse_module_item(&mut tokens, module, file_id);
@@ -211,6 +218,7 @@ impl<'a> Parser<'a> {
                     module.items.push(item);
                 }
             } else {
+                println!("failed");
                 break; // Syntax errors are very hard to recover from, so we stop parsing here
             }
         }
@@ -224,7 +232,7 @@ impl<'a> Parser<'a> {
         current_file_id: usize,
     ) -> Option<ModuleItem> {
         // Parse visibility
-        let visibility = self.parse_visibility(tokens);
+        let visibility = self.parse_visibility(tokens)?;
 
         // Parse the rest of the module item
         match &tokens.at().token {
@@ -318,7 +326,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses visibility modifiers.
-    fn parse_visibility(&mut self, tokens: &mut Tokens) -> Visibility {
+    fn parse_visibility(&mut self, tokens: &mut Tokens) -> Option<Visibility> {
         match tokens.at().token {
             // Pub
             TokenType::Keyword(Keyword::Pub) => {
@@ -330,12 +338,12 @@ impl<'a> Parser<'a> {
                         // pub(package)
                         TokenType::Keyword(Keyword::Package) => {
                             tokens.eat();
-                            Visibility::Package
+                            Some(Visibility::Package)
                         }
                         // pub(super)
                         TokenType::Keyword(Keyword::Super) => {
                             tokens.eat();
-                            Visibility::Super
+                            Some(Visibility::Super)
                         }
                         // Error
                         _ => {
@@ -351,7 +359,7 @@ impl<'a> Parser<'a> {
                                         ],
                                     },
                                 ));
-                            Visibility::Private
+                            None
                         }
                     };
                     tokens.expect(
@@ -361,11 +369,11 @@ impl<'a> Parser<'a> {
                     visibility
                 } else {
                     // pub
-                    Visibility::Public
+                    Some(Visibility::Public)
                 }
             }
             // private
-            _ => Visibility::Private,
+            _ => Some(Visibility::Private),
         }
     }
 
@@ -491,6 +499,23 @@ impl<'a> Parser<'a> {
     /// Parses a type declaration.
     /// Also contains its own Type Path parsing logic, since Type Paths are only used in type declarations.
     fn parse_type_declaration(&mut self, tokens: &mut Tokens) -> Option<ASTType> {
+        // Parse nullable type '?(T)'
+        if tokens.at().token == TokenType::Operator(Operator::QuestionMark) {
+            tokens.eat(); // Consume '?'
+            tokens.expect(
+                TokenType::Symbol(Symbol::LeftParen),
+                self.compilation_report,
+            )?;
+            let ty = self.parse_type_declaration(tokens)?;
+            tokens.expect(
+                TokenType::Symbol(Symbol::RightParen),
+                self.compilation_report,
+            )?;
+            return Some(ASTType {
+                kind: ASTTypeKind::Primitive(PrimitiveType::Nullable(Box::new(ty))),
+            });
+        }
+
         let ty = match &tokens.eat().token {
             // Identifier
             TokenType::Identifier(ident) => ident.clone(),
@@ -536,12 +561,12 @@ impl<'a> Parser<'a> {
                 tokens.expect(
                     TokenType::Symbol(Symbol::LeftBracket),
                     self.compilation_report,
-                );
+                )?;
                 let ty = self.parse_type_declaration(tokens)?;
                 tokens.expect(
                     TokenType::Symbol(Symbol::RightBracket),
                     self.compilation_report,
-                );
+                )?;
                 return Some(ASTType {
                     kind: ASTTypeKind::Primitive(PrimitiveType::ListArray(Box::new(ty))),
                 });
@@ -552,7 +577,7 @@ impl<'a> Parser<'a> {
                 tokens.expect(
                     TokenType::Symbol(Symbol::Semicolon),
                     self.compilation_report,
-                );
+                )?;
                 let size = match &tokens.eat().token {
                     TokenType::IntegerLiteral(size) => *size,
                     token => {
@@ -572,7 +597,7 @@ impl<'a> Parser<'a> {
                 tokens.expect(
                     TokenType::Symbol(Symbol::RightBracket),
                     self.compilation_report,
-                );
+                )?;
                 return Some(ASTType {
                     kind: ASTTypeKind::Primitive(PrimitiveType::Array(Box::new(ty), size as usize)),
                 });
@@ -611,7 +636,7 @@ impl<'a> Parser<'a> {
             tokens.expect(
                 TokenType::Operator(Operator::GreaterThan),
                 self.compilation_report,
-            );
+            )?;
             path_segments.push(TypePathSegment {
                 name: ty,
                 args,
@@ -647,7 +672,7 @@ impl<'a> Parser<'a> {
                         tokens.expect(
                             TokenType::Operator(Operator::GreaterThan),
                             self.compilation_report,
-                        );
+                        )?;
                         path_segments.push(TypePathSegment {
                             name: ident_clone,
                             args,
@@ -757,7 +782,7 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Symbol(Symbol::LeftBrace),
             self.compilation_report,
-        );
+        )?;
 
         let mut stmts = Vec::new();
 
@@ -769,7 +794,7 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Symbol(Symbol::RightBrace),
             self.compilation_report,
-        );
+        )?;
 
         Some(BlockExpr {
             stmts,
@@ -781,12 +806,47 @@ impl<'a> Parser<'a> {
     fn parse_statement(&mut self, tokens: &mut Tokens) -> Option<Stmt> {
         match &tokens.at().token {
             TokenType::Keyword(Keyword::Let) => {
-                let declare = self.parse_var_decl_statement(tokens);
-                declare.map(Stmt::VarDecl)
+                let declare = self.parse_var_decl_statement(tokens)?;
+                // Expect a semicolon after variable declaration
+                if tokens.at().token == TokenType::Symbol(Symbol::Semicolon) {
+                    tokens.eat(); // Consume ';'
+                } else {
+                    self.compilation_report
+                        .add_error(CompilerError::ParserError(ParserError::MissingSemicolon {
+                            span: tokens.at().span,
+                            suggestion: vec![
+                                "Add a semicolon to terminate the statement.".to_string()
+                            ],
+                        }));
+                }
+                Some(Stmt::VarDecl(declare))
+            }
+            TokenType::Symbol(Symbol::Semicolon) => {
+                let semicolon = tokens.eat(); // Consume ';'
+                self.compilation_report
+                    .add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
+                        expected: "statement".to_string(),
+                        found: TokenType::Symbol(Symbol::Semicolon),
+                        span: semicolon.span,
+                        suggestion: vec!["Expected a statement.".to_string()],
+                    }));
+                Some(Stmt::Error)
             }
             _ => {
+                // Parse an expression statement
                 let expr = self.parse_expression(tokens);
-                expr.map(Stmt::Expr)
+                if let Some(expression) = expr {
+                    // Expression statements can optionally end with a semicolon
+                    if tokens.at().token == TokenType::Symbol(Symbol::Semicolon) {
+                        tokens.eat(); // Consume ';'
+                        Some(Stmt::Expr(expression))
+                    } else {
+                        // If no semicolon, treat it as an expression without termination
+                        Some(Stmt::Expr(expression))
+                    }
+                } else {
+                    None
+                }
             }
         }
     }
@@ -1251,7 +1311,7 @@ impl<'a> Parser<'a> {
             tokens.expect(
                 TokenType::Symbol(Symbol::RightBracket),
                 self.compilation_report,
-            );
+            )?;
 
             Some(Expr::ArrayIndex(ArrayIndexExpr {
                 array: Box::new(lhs),
@@ -1385,7 +1445,7 @@ impl<'a> Parser<'a> {
                 tokens.expect(
                     TokenType::Symbol(Symbol::RightParen),
                     self.compilation_report,
-                );
+                )?;
                 Some(expr)
             }
             TokenType::Symbol(Symbol::LeftBracket) => {
@@ -1401,7 +1461,7 @@ impl<'a> Parser<'a> {
                 tokens.expect(
                     TokenType::Symbol(Symbol::LeftBracket),
                     self.compilation_report,
-                );
+                )?;
                 let elements = self.parse_array_values(tokens)?;
                 Some(Expr::ListArray(ListArrayExpr {
                     values: elements,
@@ -1480,7 +1540,7 @@ impl<'a> Parser<'a> {
                     tokens.expect(
                         TokenType::Operator(Operator::GreaterThan),
                         self.compilation_report,
-                    );
+                    )?;
                     args
                 } else {
                     vec![]
@@ -1515,7 +1575,7 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Operator(Operator::GreaterThan),
             self.compilation_report,
-        );
+        )?;
         Some(args)
     }
 
@@ -1524,7 +1584,7 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Symbol(Symbol::LeftParen),
             self.compilation_report,
-        );
+        )?;
 
         let mut args = Vec::new();
 
@@ -1542,7 +1602,7 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Symbol(Symbol::RightParen),
             self.compilation_report,
-        );
+        )?;
 
         Some(args)
     }
@@ -1567,7 +1627,7 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Symbol(Symbol::RightBracket),
             self.compilation_report,
-        );
+        )?;
 
         Some(elements)
     }
@@ -1632,13 +1692,13 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Symbol(Symbol::LeftBrace),
             self.compilation_report,
-        );
+        )?;
 
         let mut fields = Vec::new();
 
         while tokens.at().token != TokenType::Symbol(Symbol::RightBrace) && tokens.not_eof() {
             // Parse field visibility
-            let field_visibility = self.parse_visibility(tokens);
+            let field_visibility = self.parse_visibility(tokens)?;
 
             // Parse field name
             let field_name = match &tokens.eat().token {
@@ -1655,7 +1715,7 @@ impl<'a> Parser<'a> {
                 }
             };
 
-            tokens.expect(TokenType::Symbol(Symbol::Colon), self.compilation_report);
+            tokens.expect(TokenType::Symbol(Symbol::Colon), self.compilation_report)?;
 
             // Parse field type
             let field_type = self.parse_type_declaration(tokens)?;
@@ -1675,7 +1735,7 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Symbol(Symbol::RightBrace),
             self.compilation_report,
-        );
+        )?;
 
         Some(Struct {
             name,
@@ -1706,7 +1766,7 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Symbol(Symbol::LeftBrace),
             self.compilation_report,
-        );
+        )?;
 
         let mut variants = Vec::new();
 
@@ -1741,7 +1801,7 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Symbol(Symbol::RightBrace),
             self.compilation_report,
-        );
+        )?;
 
         Some(Enum {
             name,
@@ -1775,7 +1835,7 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Operator(Operator::Assign),
             self.compilation_report,
-        );
+        )?;
 
         // Parse the aliased type
         let ty = self.parse_type_declaration(tokens)?;
@@ -1783,7 +1843,7 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Symbol(Symbol::Semicolon),
             self.compilation_report,
-        );
+        )?;
 
         Some(TypeAlias {
             name,
@@ -1833,7 +1893,7 @@ impl<'a> Parser<'a> {
             }
         };
 
-        tokens.expect(TokenType::Symbol(Symbol::Colon), self.compilation_report);
+        tokens.expect(TokenType::Symbol(Symbol::Colon), self.compilation_report)?;
 
         // Parse const type
         let ty = self.parse_type_declaration(tokens)?;
@@ -1841,7 +1901,7 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Operator(Operator::Assign),
             self.compilation_report,
-        );
+        )?;
 
         // Parse const value
         let value = self.parse_expression(tokens)?;
@@ -1849,7 +1909,7 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Symbol(Symbol::Semicolon),
             self.compilation_report,
-        );
+        )?;
 
         Some(Const {
             name,
@@ -1908,16 +1968,14 @@ impl<'a> Parser<'a> {
             };
 
             while tokens.at().token != TokenType::Symbol(Symbol::RightBrace) && tokens.not_eof() {
-                let item = self.parse_module_item(tokens, &mut submodule, current_file_id);
-                if let Some(item) = item {
-                    submodule.items.push(item);
-                }
+                let item = self.parse_module_item(tokens, &mut submodule, current_file_id)?;
+                submodule.items.push(item);
             }
 
             tokens.expect(
                 TokenType::Symbol(Symbol::RightBrace),
                 self.compilation_report,
-            );
+            )?;
 
             Some(submodule)
         } else {
@@ -1925,7 +1983,7 @@ impl<'a> Parser<'a> {
             tokens.expect(
                 TokenType::Symbol(Symbol::Semicolon),
                 self.compilation_report,
-            );
+            )?;
 
             // External module
             // Get current file path
@@ -2049,7 +2107,7 @@ impl<'a> Parser<'a> {
         tokens.expect(
             TokenType::Symbol(Symbol::Semicolon),
             self.compilation_report,
-        );
+        )?;
 
         Some(Use { path, alias, glob })
     }

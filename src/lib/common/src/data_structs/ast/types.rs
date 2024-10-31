@@ -64,6 +64,8 @@ pub enum PrimitiveType {
     String,
     /// A null type. 'null'
     Null,
+    /// A null type. '?T'
+    Nullable(Box<ASTType>),
     /// A void type. 'void'
     Void,
     /// A never type. '!'

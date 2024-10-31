@@ -157,25 +157,64 @@ impl CompilationReport {
         if !self.errors.is_empty() {
             for error in &self.errors {
                 let diagnostic = match error {
-                    CompilerError::LexerError(e) => Diagnostic::error()
-                        .with_message(format!("{}", e))
-                        .with_labels(vec![Label::primary(
-                            *file_id_map.get(&e.span().file_id).unwrap(),
-                            e.span().start..e.span().end,
-                        )
-                        .with_message("here")])
-                        .with_notes(e.suggestions()),
-                    CompilerError::ParserError(e) => Diagnostic::error()
-                        .with_message(format!("{}", e))
-                        .with_labels(vec![Label::primary(
-                            *file_id_map.get(&e.span().file_id).unwrap(),
-                            e.span().start..e.span().end,
-                        )
-                        .with_message("here")])
-                        .with_notes(e.suggestions()),
+                    CompilerError::LexerError(e) => {
+                        let mut diag = Diagnostic::error().with_message(&e.to_string());
+
+                        if let Some(span) = e.span() {
+                            if let Some(file_name) = file_id_map.get(&span.file_id) {
+                                diag = diag.with_labels(vec![Label::primary(
+                                    span.file_id,
+                                    span.start..span.end,
+                                )
+                                .with_message("here")]);
+                            } else {
+                                // If file_id is not found in the map, provide a generic label
+                                diag = diag.with_notes(vec!["File ID not recognized.".to_string()]);
+                            }
+                        } else {
+                            // No span available, provide a general note
+                            diag = diag
+                                .with_notes(vec!["No location information available.".to_string()]);
+                        }
+
+                        if !e.suggestions().is_empty() {
+                            diag = diag.with_notes(e.suggestions());
+                        }
+
+                        diag
+                    }
+                    CompilerError::ParserError(e) => {
+                        let mut diag = Diagnostic::error().with_message(&e.to_string());
+
+                        if let Some(span) = e.span() {
+                            if let Some(file_name) = file_id_map.get(&span.file_id) {
+                                diag = diag.with_labels(vec![Label::primary(
+                                    span.file_id,
+                                    span.start..span.end,
+                                )
+                                .with_message("here")]);
+                            } else {
+                                // If file_id is not found in the map, provide a generic label
+                                diag = diag.with_notes(vec!["File ID not recognized.".to_string()]);
+                            }
+                        } else {
+                            // No span available, provide a general note
+                            diag = diag
+                                .with_notes(vec!["No location information available.".to_string()]);
+                        }
+
+                        if !e.suggestions().is_empty() {
+                            diag = diag.with_notes(e.suggestions());
+                        }
+
+                        diag
+                    } // Handle other CompilerError variants if necessary
                 };
 
-                codespan_reporting::term::emit(&mut writer, &config, &files, &diagnostic).unwrap();
+                // Emit the diagnostic
+                if let Err(e) = term::emit(&mut writer.lock(), &config, &files, &diagnostic) {
+                    eprintln!("Failed to emit diagnostic: {}", e);
+                }
             }
         }
 

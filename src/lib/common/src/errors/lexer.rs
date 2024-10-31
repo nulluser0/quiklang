@@ -39,13 +39,13 @@ pub enum LexerError {
 }
 
 impl LexerError {
-    pub fn span(&self) -> Span {
+    pub fn span(&self) -> Option<Span> {
         match self {
-            LexerError::UnrecognizedCharacter { span, .. } => *span,
-            LexerError::UnterminatedStringLiteral { span, .. } => *span,
-            LexerError::UnterminatedInterpolation { span, .. } => *span,
-            LexerError::UnterminatedMultiLineComment { span, .. } => *span,
-            LexerError::InvalidNumberFormat { span, .. } => *span,
+            LexerError::UnrecognizedCharacter { span, .. } => Some(*span),
+            LexerError::UnterminatedStringLiteral { span, .. } => Some(*span),
+            LexerError::UnterminatedInterpolation { span, .. } => Some(*span),
+            LexerError::UnterminatedMultiLineComment { span, .. } => Some(*span),
+            LexerError::InvalidNumberFormat { span, .. } => Some(*span),
         }
     }
 

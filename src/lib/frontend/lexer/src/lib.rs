@@ -40,6 +40,7 @@ struct StringInfo {
     pub start_line: usize,
     pub start_col: usize,
     pub buffer: String,
+    pub complex_string: bool,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -131,7 +132,7 @@ impl Tokens {
         self.index
     }
 
-    pub fn expect(&mut self, expected: TokenType, report: &mut CompilationReport) {
+    pub fn expect(&mut self, expected: TokenType, report: &mut CompilationReport) -> Option<()> {
         if self.at().token != expected {
             report.add_error(CompilerError::ParserError(ParserError::UnexpectedToken {
                 expected: expected.to_string(),
@@ -139,8 +140,11 @@ impl Tokens {
                 span: self.at().span,
                 suggestion: vec![],
             }));
+            self.eat();
+            return None;
         }
         self.eat();
+        Some(())
     }
 }
 
@@ -179,6 +183,7 @@ pub fn tokenize(source_code: &str, file_id: usize, report: &mut CompilationRepor
         start_line: 0,
         start_col: 0,
         buffer: String::new(),
+        complex_string: false,
     };
 
     while let Some(&c) = chars.peek_char() {
@@ -211,39 +216,74 @@ pub fn tokenize(source_code: &str, file_id: usize, report: &mut CompilationRepor
                                     string_info.start_col,
                                 ),
                             });
+                            if string_info.complex_string {
+                                // Insert Complex String End to indicate the end of an interpolated string
+                                tokens.push(Token {
+                                    token: TokenType::ComplexStringEnd,
+                                    span: Span::new(
+                                        file_id,
+                                        chars.current_pos,
+                                        chars.current_pos,
+                                        chars.line,
+                                        chars.col,
+                                    ),
+                                });
+                            }
                             string_info.buffer.clear(); // Clear the buffer
+                            string_info.complex_string = false; // Reset complex string flag
                             state = LexingState::Normal;
                             continue;
                         }
-                        '{' => {
-                            // Start of interpolation
-                            chars.next_char(); // Consume '{'
-                            if !string_info.buffer.is_empty() {
-                                // Emit the string segment before '{'
+                        '$' => {
+                            chars.next_char(); // Consume '$'
+
+                            // Check for presence of '{' after '$'
+                            if let Some(&'{') = chars.peek_char() {
+                                // Start of interpolation
+                                chars.next_char(); // Consume '{'
+                                string_info.complex_string = true; // Set complex string flag
+                                if !string_info.buffer.is_empty() {
+                                    // Insert Complex String Start to indicate an interpolated string
+                                    tokens.push(Token {
+                                        token: TokenType::ComplexStringStart,
+                                        span: Span::new(
+                                            file_id,
+                                            string_info.start_pos,
+                                            string_info.start_pos,
+                                            string_info.start_line,
+                                            string_info.start_col,
+                                        ),
+                                    });
+                                    // Emit the string segment before '{'
+                                    tokens.push(Token {
+                                        token: TokenType::StringLiteral(string_info.buffer.clone()),
+                                        span: Span::new(
+                                            file_id,
+                                            string_info.start_pos,
+                                            chars.current_pos - 1,
+                                            string_info.start_line,
+                                            string_info.start_col,
+                                        ),
+                                    });
+                                    string_info.buffer.clear();
+                                }
                                 tokens.push(Token {
-                                    token: TokenType::StringLiteral(string_info.buffer.clone()),
+                                    token: TokenType::StringInterpolationStart,
                                     span: Span::new(
                                         file_id,
-                                        string_info.start_pos,
                                         chars.current_pos - 1,
-                                        string_info.start_line,
-                                        string_info.start_col,
+                                        chars.current_pos,
+                                        chars.line,
+                                        chars.col,
                                     ),
                                 });
-                                string_info.buffer.clear();
+                                state = LexingState::InInterpolation;
+                                continue;
+                            } else {
+                                // Treat '$' as a regular character
+                                string_info.buffer.push('$');
+                                continue;
                             }
-                            tokens.push(Token {
-                                token: TokenType::StringInterpolationStart,
-                                span: Span::new(
-                                    file_id,
-                                    chars.current_pos - 1,
-                                    chars.current_pos,
-                                    chars.line,
-                                    chars.col,
-                                ),
-                            });
-                            state = LexingState::InInterpolation;
-                            continue;
                         }
                         '\\' => {
                             // Handle escape sequences
@@ -255,6 +295,7 @@ pub fn tokenize(source_code: &str, file_id: usize, report: &mut CompilationRepor
                                     'r' => '\r',
                                     '"' => '"',
                                     '\\' => '\\',
+                                    '$' => '$',
                                     other => other, // Treat unknown escapes literally
                                 };
                                 string_info.buffer.push(escaped);
@@ -541,7 +582,7 @@ fn tokenize_normally(
                 }
             }
         }
-        '+' | '-' | '*' | '=' | '!' | '>' | '<' | '&' | '|' | '@' | '^' | '~' | '.' | ':' => {
+        '+' | '-' | '*' | '=' | '!' | '>' | '<' | '&' | '|' | '@' | '^' | '~' | '.' | ':' | '?' => {
             match tokenize_operator_or_symbol(
                 chars, file_id, start_pos, start_line, start_col, c, report,
             ) {
@@ -1168,7 +1209,7 @@ mod tests {
     fn test_string_interpolation() {
         let source = r#"
             let name = "Alice";
-            let greeting = "Hello, {name}!";
+            let greeting = "Hello, ${name}!";
         "#;
         let file_name = "test_string_interpolation.quik";
         let mut file_store = FileStore::default();
@@ -1185,6 +1226,8 @@ mod tests {
         )
         .tokens;
 
+        println!("{:#?}", tokens);
+
         // Define expected tokens (assuming string interpolation is not fully implemented)
         let expected_tokens = vec![
             TokenType::Keyword(Keyword::Let),
@@ -1195,11 +1238,13 @@ mod tests {
             TokenType::Keyword(Keyword::Let),
             TokenType::Identifier("greeting".to_string()),
             TokenType::Operator(Operator::Assign),
+            TokenType::ComplexStringStart,
             TokenType::StringLiteral("Hello, ".to_string()),
             TokenType::StringInterpolationStart,
             TokenType::Identifier("name".to_string()),
             TokenType::StringInterpolationEnd,
-            TokenType::StringLiteral("!".to_string()), // If '!' is a symbol, else handle accordingly
+            TokenType::StringLiteral("!".to_string()),
+            TokenType::ComplexStringEnd,
             TokenType::Symbol(Symbol::Semicolon),
             TokenType::EOF,
         ];

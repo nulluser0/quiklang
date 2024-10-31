@@ -22,6 +22,8 @@ pub enum Stmt {
     Expr(Expr),
     /// Variable declaration statement.
     VarDecl(VarDeclStmt),
+    /// Errorous statement.
+    Error,
 }
 
 /// Represents a variable declaration statement.

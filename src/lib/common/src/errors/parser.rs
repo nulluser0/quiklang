@@ -34,17 +34,21 @@ pub enum ParserError {
         span: Span,
         suggestion: Vec<String>,
     },
+
+    #[error("Missing semicolon at line {}, column {}.", span.line, span.col)]
+    MissingSemicolon { span: Span, suggestion: Vec<String> },
     // Add more parser-specific errors
 }
 
 impl ParserError {
-    pub fn span(&self) -> Span {
+    pub fn span(&self) -> Option<Span> {
         match self {
-            ParserError::UnexpectedEOF { span, .. } => *span,
-            ParserError::UnexpectedToken { span, .. } => *span,
-            ParserError::FileNotFound { .. } => unimplemented!(),
-            ParserError::NoEntryPoint { .. } => unimplemented!(),
-            ParserError::ModuleNotFound { span, .. } => *span,
+            ParserError::UnexpectedEOF { span, .. } => Some(*span),
+            ParserError::UnexpectedToken { span, .. } => Some(*span),
+            ParserError::FileNotFound { .. } => None,
+            ParserError::NoEntryPoint { .. } => None,
+            ParserError::ModuleNotFound { span, .. } => Some(*span),
+            ParserError::MissingSemicolon { span, .. } => Some(*span),
         }
     }
 
@@ -61,6 +65,10 @@ impl ParserError {
             ParserError::FileNotFound { .. } => vec![],
             ParserError::NoEntryPoint { suggestion } => suggestion.clone(),
             ParserError::ModuleNotFound {
+                suggestion: suggestions,
+                ..
+            } => suggestions.clone(),
+            ParserError::MissingSemicolon {
                 suggestion: suggestions,
                 ..
             } => suggestions.clone(),

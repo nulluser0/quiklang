@@ -22,8 +22,12 @@ pub enum TokenType {
 
     // String literals and interpolation
     StringLiteral(String),
-    StringInterpolationStart,
-    StringInterpolationEnd,
+
+    // String interpolation
+    ComplexStringStart, // Indicates the start of a complex string (string interpolation) '"...'
+    StringInterpolationStart, // Indicates the start of a string interpolation '{'
+    StringInterpolationEnd, // Indicates the end of a string interpolation '}'
+    ComplexStringEnd,   // Indicates the end of a complex string (string interpolation) '..."'
 
     // Operators
     Operator(Operator),
@@ -43,8 +47,10 @@ impl std::fmt::Display for TokenType {
             TokenType::IntegerLiteral(value) => write!(f, "{}", value),
             TokenType::FloatLiteral(value) => write!(f, "{}", value),
             TokenType::StringLiteral(value) => write!(f, "{}", value),
+            TokenType::ComplexStringStart => write!(f, "Complex String Start"),
             TokenType::StringInterpolationStart => write!(f, "String Interpolation Start"),
             TokenType::StringInterpolationEnd => write!(f, "String Interpolation End"),
+            TokenType::ComplexStringEnd => write!(f, "Complex String End"),
             TokenType::Operator(operator) => write!(f, "{}", operator),
             TokenType::Symbol(symbol) => write!(f, "{}", symbol),
             TokenType::EOF => write!(f, "EOF"),
