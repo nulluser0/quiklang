@@ -302,8 +302,6 @@ pub fn tokenize(source_code: &str) -> Result<Vec<Token>, LexerError> {
         col: chars.col,
     });
 
-    println!("{:#?}", tokens);
-
     Ok(tokens)
 }
 
