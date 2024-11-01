@@ -108,6 +108,7 @@ pub struct VM {
     constant_ptrs: HashSet<RegisterVal>, // Pointers to heap allocated objects
     function_indexes: Vec<usize>,        // Function indexes
     instructions: Vec<Instruction>,      // Instructions
+    translated_instructions: Vec<(VmHandler, Instruction)>, // Translated instructions
     qffi: QFFI,                          // QFFI instance
     threads: Mutex<HashMap<usize, tokio::task::JoinHandle<()>>>, // Active threads
     thread_id_counter: Mutex<usize>,     // For assigning unique thread IDs
@@ -143,6 +144,7 @@ impl VM {
             qffi: QFFI::new(),
             threads: Mutex::new(HashMap::new()),
             thread_id_counter: Mutex::new(0),
+            translated_instructions: vec![],
         }
     }
 
@@ -296,9 +298,28 @@ impl VM {
         }
     }
 
+    // Translate instructions to a more efficient format
+    // This is done by translating the instructions to a tuple of (VmHandler, Instruction)
+    #[inline(always)]
+    async fn translate_instructions(&mut self) -> Result<(), VMRuntimeError> {
+        let mut translated_instructions = Vec::with_capacity(self.instructions.len());
+        for (i, inst) in self.instructions.iter().enumerate() {
+            let opcode = get_opcode(*inst);
+            if opcode as usize >= DISPATCH_TABLE.len() {
+                return Err(VMRuntimeError::InvalidOpcode(opcode, i));
+            }
+            translated_instructions.push((DISPATCH_TABLE[opcode as usize], *inst));
+        }
+        self.translated_instructions = translated_instructions;
+        Ok(())
+    }
+
     // Execute the VM
     // This function simply initializes a new VMThread and executes it.
-    pub async fn execute(self) -> Result<RegisterVal, VMRuntimeError> {
+    pub async fn execute(mut self) -> Result<RegisterVal, VMRuntimeError> {
+        // Translate instructions
+        self.translate_instructions().await?;
+
         let mut vm_thread = VMThread::new(Arc::new(self));
         vm_thread.execute().await
     }
@@ -474,6 +495,14 @@ impl VMThread {
     }
 
     pub async fn execute(&mut self) -> Result<RegisterVal, VMRuntimeError> {
+        // Do we have native instructions to execute?
+        match self.vm.translated_instructions.len() {
+            0 => self.execute_interpreted().await,
+            _ => self.execute_native().await,
+        }
+    }
+
+    async fn execute_interpreted(&mut self) -> Result<RegisterVal, VMRuntimeError> {
         // The result is typically register[0], which is the return value of the function. This is important for async functions.
         let inst_len = self.vm.get_instruction_len();
         while self.program_counter < inst_len {
@@ -484,6 +513,26 @@ impl VMThread {
                 return Err(VMRuntimeError::InvalidOpcode(opcode, self.program_counter));
             }
             match DISPATCH_TABLE[opcode as usize](self, inst) {
+                // The instruction was successful, so we continue to the next instruction
+                Ok(_) => {}
+                // Process exited, so we need to interrupt the execution and return the exit code
+                Err(VMRuntimeError::Exit(code)) => {
+                    self.vm.process_exit().await;
+                    return Err(VMRuntimeError::Exit(code));
+                }
+                // The thread failed, so we should unwind the callstack and clean up the memory
+                Err(e) => return Err(self.on_thread_failure(e)),
+            };
+        }
+        Ok(*self.registers.first().unwrap_or(&RegisterVal { null: () }))
+    }
+
+    async fn execute_native(&mut self) -> Result<RegisterVal, VMRuntimeError> {
+        let inst_len = self.vm.translated_instructions.len();
+        while self.program_counter < inst_len {
+            let (handler, inst) = self.vm.translated_instructions[self.program_counter];
+            self.program_counter += 1;
+            match handler(self, inst) {
                 // The instruction was successful, so we continue to the next instruction
                 Ok(_) => {}
                 // Process exited, so we need to interrupt the execution and return the exit code
