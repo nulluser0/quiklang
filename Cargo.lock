@@ -267,6 +267,9 @@ dependencies = [
 [[package]]
 name = "quiklang-frontend-semantic-checker"
 version = "0.1.0"
+dependencies = [
+ "quiklang-common",
+]
 
 [[package]]
 name = "quiklang-hir-hir-builder"
